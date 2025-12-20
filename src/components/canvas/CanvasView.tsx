@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -7,6 +7,10 @@ import {
   ConnectionMode,
   Panel,
   MarkerType,
+  useNodesState,
+  useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -14,6 +18,7 @@ import { useStore } from '../../store/useStore';
 import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import CanvasNode from './CanvasNode';
+import { RotateCcw } from 'lucide-react';
 
 // Custom node types
 const nodeTypes = {
@@ -29,128 +34,182 @@ interface CanvasViewProps {
   onNodeSelect?: (id: string) => void;
 }
 
-const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
-  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
-  const filteredItems = getFilteredItems();
+// Helper function to calculate hierarchical layout
+const calculateLayout = (
+  filteredItems: WorkItem[],
+  selectedItemId: string | null
+): { nodes: Node[]; edges: Edge[] } => {
+  const nodeList: Node[] = [];
+  const edgeList: Edge[] = [];
 
-  // Convert work items to React Flow nodes with hierarchical layout
-  const { nodes, edges } = useMemo(() => {
-    const nodeList: Node[] = [];
-    const edgeList: Edge[] = [];
+  // Find root items (no parent or parent not in filtered set)
+  const filteredIds = new Set(filteredItems.map(i => i.id));
+  const rootItems = filteredItems.filter(
+    item => !item.parentId || !filteredIds.has(item.parentId)
+  );
 
-    // Find root items (no parent or parent not in filtered set)
-    const filteredIds = new Set(filteredItems.map(i => i.id));
-    const rootItems = filteredItems.filter(
-      item => !item.parentId || !filteredIds.has(item.parentId)
-    );
+  // Calculate positions using a tree layout algorithm
+  const positionMap = new Map<string, { x: number; y: number }>();
+  let currentX = 0;
 
-    // Calculate positions using a tree layout algorithm
-    const positionMap = new Map<string, { x: number; y: number }>();
-    let currentX = 0;
+  const calculatePositions = (
+    item: WorkItem,
+    level: number,
+    _parentX?: number
+  ): number => {
+    const children = filteredItems.filter(i => i.parentId === item.id);
 
-    const calculatePositions = (
-      item: WorkItem,
-      level: number,
-      parentX?: number
-    ): number => {
-      const children = filteredItems.filter(i => i.parentId === item.id);
-
-      if (children.length === 0) {
-        // Leaf node
-        const x = parentX !== undefined ? parentX : currentX;
-        positionMap.set(item.id, { x, y: level * VERTICAL_SPACING });
-        currentX = Math.max(currentX, x + HORIZONTAL_SPACING);
-        return x;
-      }
-
-      // Calculate children positions first
-      let childXSum = 0;
-      let childCount = 0;
-
-      for (const child of children) {
-        const childX = calculatePositions(child, level + 1, undefined);
-        childXSum += childX;
-        childCount++;
-      }
-
-      // Parent is centered above children
-      const avgChildX = childXSum / childCount;
-      positionMap.set(item.id, { x: avgChildX, y: level * VERTICAL_SPACING });
-
-      return avgChildX;
-    };
-
-    // Position each root tree
-    for (const root of rootItems) {
-      calculatePositions(root, 0);
-      currentX += HORIZONTAL_SPACING / 2; // Gap between trees
+    if (children.length === 0) {
+      // Leaf node
+      const x = currentX;
+      positionMap.set(item.id, { x, y: level * VERTICAL_SPACING });
+      currentX = x + HORIZONTAL_SPACING;
+      return x;
     }
 
-    // Create nodes
-    for (const item of filteredItems) {
-      const position = positionMap.get(item.id) || { x: 0, y: 0 };
+    // Calculate children positions first
+    let childXSum = 0;
+    let childCount = 0;
 
-      nodeList.push({
-        id: item.id,
-        type: 'workItem',
-        position,
-        data: {
-          item,
-          isSelected: item.id === selectedItemId,
-        },
+    for (const child of children) {
+      const childX = calculatePositions(child, level + 1, undefined);
+      childXSum += childX;
+      childCount++;
+    }
+
+    // Parent is centered above children
+    const avgChildX = childXSum / childCount;
+    positionMap.set(item.id, { x: avgChildX, y: level * VERTICAL_SPACING });
+
+    return avgChildX;
+  };
+
+  // Position each root tree
+  for (const root of rootItems) {
+    calculatePositions(root, 0);
+    currentX += HORIZONTAL_SPACING / 2; // Gap between trees
+  }
+
+  // Create nodes
+  for (const item of filteredItems) {
+    const position = positionMap.get(item.id) || { x: 0, y: 0 };
+
+    nodeList.push({
+      id: item.id,
+      type: 'workItem',
+      position,
+      data: {
+        item,
+        isSelected: item.id === selectedItemId,
+      },
+      style: {
+        width: NODE_WIDTH,
+      },
+    });
+
+    // Create edges for parent-child relationships
+    if (item.parentId && filteredIds.has(item.parentId)) {
+      edgeList.push({
+        id: `${item.parentId}-${item.id}`,
+        source: item.parentId,
+        target: item.id,
+        type: 'smoothstep',
+        animated: item.status === 'in-progress',
         style: {
-          width: NODE_WIDTH,
+          stroke: typeHexColors[item.type],
+          strokeWidth: 2,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: typeHexColors[item.type],
         },
       });
+    }
 
-      // Create edges for parent-child relationships
-      if (item.parentId && filteredIds.has(item.parentId)) {
-        edgeList.push({
-          id: `${item.parentId}-${item.id}`,
-          source: item.parentId,
-          target: item.id,
-          type: 'smoothstep',
-          animated: item.status === 'in-progress',
-          style: {
-            stroke: typeHexColors[item.type],
-            strokeWidth: 2,
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: typeHexColors[item.type],
-          },
-        });
-      }
-
-      // Create edges for blocked-by relationships
-      if (item.blockedBy) {
-        for (const blockerId of item.blockedBy) {
-          if (filteredIds.has(blockerId)) {
-            edgeList.push({
-              id: `blocked-${blockerId}-${item.id}`,
-              source: blockerId,
-              target: item.id,
-              type: 'smoothstep',
-              animated: true,
-              style: {
-                stroke: '#ef4444',
-                strokeWidth: 2,
-                strokeDasharray: '5,5',
-              },
-              markerEnd: {
-                type: MarkerType.ArrowClosed,
-                color: '#ef4444',
-              },
-              label: 'blocks',
-              labelStyle: { fill: '#ef4444', fontSize: 10 },
-            });
-          }
+    // Create edges for blocked-by relationships
+    if (item.blockedBy) {
+      for (const blockerId of item.blockedBy) {
+        if (filteredIds.has(blockerId)) {
+          edgeList.push({
+            id: `blocked-${blockerId}-${item.id}`,
+            source: blockerId,
+            target: item.id,
+            type: 'smoothstep',
+            animated: true,
+            style: {
+              stroke: '#ef4444',
+              strokeWidth: 2,
+              strokeDasharray: '5,5',
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#ef4444',
+            },
+            label: 'blocks',
+            labelStyle: { fill: '#ef4444', fontSize: 10 },
+          });
         }
       }
     }
+  }
 
-    return { nodes: nodeList, edges: edgeList };
-  }, [filteredItems, selectedItemId]);
+  return { nodes: nodeList, edges: edgeList };
+};
+
+// Inner component that uses React Flow hooks
+const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
+  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
+  const filteredItems = getFilteredItems();
+  const { fitView } = useReactFlow();
+
+  // Track the data key to detect when underlying data changes
+  const dataKey = useMemo(
+    () => filteredItems.map(i => i.id).sort().join(','),
+    [filteredItems]
+  );
+  const prevDataKeyRef = useRef(dataKey);
+
+  // Calculate initial layout
+  const initialLayout = useMemo(
+    () => calculateLayout(filteredItems, selectedItemId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [] // Only calculate on mount
+  );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialLayout.nodes);
+  const [edges, setEdges] = useEdgesState(initialLayout.edges);
+
+  // Update when underlying data changes (new items added/removed)
+  useEffect(() => {
+    if (prevDataKeyRef.current !== dataKey) {
+      const newLayout = calculateLayout(filteredItems, selectedItemId);
+      setNodes(newLayout.nodes);
+      setEdges(newLayout.edges);
+      prevDataKeyRef.current = dataKey;
+    }
+  }, [dataKey, filteredItems, selectedItemId, setNodes, setEdges]);
+
+  // Update node selection state without resetting positions
+  useEffect(() => {
+    setNodes(currentNodes =>
+      currentNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          isSelected: node.id === selectedItemId,
+        },
+      }))
+    );
+  }, [selectedItemId, setNodes]);
+
+  // Reset layout to original positions
+  const handleResetLayout = useCallback(() => {
+    const newLayout = calculateLayout(filteredItems, selectedItemId);
+    setNodes(newLayout.nodes);
+    setEdges(newLayout.edges);
+    // Fit view after a short delay to allow nodes to update
+    setTimeout(() => fitView({ padding: 0.2 }), 50);
+  }, [filteredItems, selectedItemId, setNodes, setEdges, fitView]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -171,6 +230,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
@@ -232,12 +292,33 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
           </div>
         </Panel>
 
+        {/* Reset button */}
+        <Panel position="top-right" className="flex gap-2">
+          <button
+            onClick={handleResetLayout}
+            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            title="Reset layout to original positions"
+          >
+            <RotateCcw size={16} />
+            Reset Layout
+          </button>
+        </Panel>
+
         {/* Instructions */}
         <Panel position="bottom-left" className="bg-white/90 px-3 py-2 rounded-lg text-xs text-gray-500">
-          Drag to pan • Scroll to zoom • Click nodes to select
+          Drag nodes to reorganize • Scroll to zoom • Click nodes to select
         </Panel>
       </ReactFlow>
     </div>
+  );
+};
+
+// Wrapper component that provides ReactFlowProvider
+const CanvasView: React.FC<CanvasViewProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <CanvasViewInner {...props} />
+    </ReactFlowProvider>
   );
 };
 
