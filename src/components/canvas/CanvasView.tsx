@@ -26,9 +26,10 @@ const nodeTypes = {
 };
 
 // Layout configuration
-const HORIZONTAL_SPACING = 300;
-const VERTICAL_SPACING = 150;
+const HORIZONTAL_SPACING = 400;
+const VERTICAL_SPACING = 220;
 const NODE_WIDTH = 250;
+const TREE_GAP = 200; // Extra gap between separate trees
 
 interface CanvasViewProps {
   onNodeSelect?: (id: string) => void;
@@ -87,7 +88,7 @@ const calculateLayout = (
   // Position each root tree
   for (const root of rootItems) {
     calculatePositions(root, 0);
-    currentX += HORIZONTAL_SPACING / 2; // Gap between trees
+    currentX += TREE_GAP; // Gap between separate trees
   }
 
   // Create nodes
