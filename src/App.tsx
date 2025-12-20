@@ -161,7 +161,7 @@ function App() {
 
 // Placeholder components for other views
 const KanbanPlaceholder = () => {
-  const { getFilteredItems } = useStore();
+  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
   const items = getFilteredItems();
 
   const statuses = ['not-started', 'in-progress', 'blocked', 'in-review', 'completed'] as const;
@@ -196,7 +196,10 @@ const KanbanPlaceholder = () => {
                 {statusItems.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setSelectedItem(item.id)}
+                    className={`bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
+                      selectedItemId === item.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
+                    }`}
                   >
                     <div className="text-sm font-medium text-gray-800 mb-1">{item.title}</div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -219,7 +222,7 @@ const KanbanPlaceholder = () => {
 };
 
 const ListPlaceholder = () => {
-  const { getFilteredItems, setSelectedItem } = useStore();
+  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
   const items = getFilteredItems();
 
   const statusColors: Record<string, string> = {
@@ -247,7 +250,7 @@ const ListPlaceholder = () => {
           {items.map((item) => (
             <tr
               key={item.id}
-              className="hover:bg-gray-50 cursor-pointer"
+              className={`hover:bg-gray-50 cursor-pointer ${selectedItemId === item.id ? 'bg-blue-50' : ''}`}
               onClick={() => setSelectedItem(item.id)}
             >
               <td className="px-4 py-3">
@@ -281,7 +284,7 @@ const ListPlaceholder = () => {
 };
 
 const TimelinePlaceholder = () => {
-  const { getFilteredItems } = useStore();
+  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
   const items = getFilteredItems().filter((item) => item.dueDate);
 
   // Sort by due date
@@ -318,9 +321,15 @@ const TimelinePlaceholder = () => {
             {sortedItems.map((item) => {
               const isOverdue = item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'completed';
               return (
-                <div key={item.id} className="flex items-start gap-4 pl-1">
+                <div
+                  key={item.id}
+                  className="flex items-start gap-4 pl-1 cursor-pointer"
+                  onClick={() => setSelectedItem(item.id)}
+                >
                   <div className={`w-3 h-3 rounded-full mt-1.5 ${statusColors[item.status]} ring-4 ring-white z-10`} />
-                  <div className="flex-1 bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                  <div className={`flex-1 bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow ${
+                    selectedItemId === item.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
+                  }`}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-gray-800">{item.title}</span>
                       <span className={`text-xs ${isOverdue ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
