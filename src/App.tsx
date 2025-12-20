@@ -4,6 +4,7 @@ import Header from './components/common/Header';
 import FilterPanel from './components/filters/FilterPanel';
 import StatsOverview from './components/common/StatsOverview';
 import TreeView from './components/tree/TreeView';
+import CanvasView from './components/canvas/CanvasView';
 import DetailPanel from './components/common/DetailPanel';
 import NotionConfigModal from './components/common/NotionConfigModal';
 import { sampleData } from './utils/sampleData';
@@ -77,6 +78,8 @@ function App() {
   // Render the appropriate view based on viewMode
   const renderMainView = () => {
     switch (viewMode) {
+      case 'canvas':
+        return <CanvasView onNodeSelect={() => setShowDetailPanel(true)} />;
       case 'kanban':
         return <KanbanPlaceholder />;
       case 'list':

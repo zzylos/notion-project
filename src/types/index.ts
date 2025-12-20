@@ -69,7 +69,7 @@ export interface FilterState {
 }
 
 // View mode options
-export type ViewMode = 'tree' | 'kanban' | 'timeline' | 'list';
+export type ViewMode = 'tree' | 'canvas' | 'kanban' | 'timeline' | 'list';
 
 // Notion database configuration
 export interface NotionConfig {

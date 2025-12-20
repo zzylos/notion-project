@@ -6,6 +6,7 @@ import {
   Calendar,
   RefreshCw,
   Settings,
+  Network,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { ViewMode } from '../../types';
@@ -18,13 +19,15 @@ interface HeaderProps {
 
 const viewModeIcons: Record<ViewMode, React.ComponentType<{ className?: string }>> = {
   tree: TreeDeciduous,
+  canvas: Network,
   kanban: LayoutGrid,
   list: List,
   timeline: Calendar,
 };
 
 const viewModeLabels: Record<ViewMode, string> = {
-  tree: 'Tree View',
+  tree: 'Tree',
+  canvas: 'Canvas',
   kanban: 'Kanban',
   list: 'List',
   timeline: 'Timeline',
