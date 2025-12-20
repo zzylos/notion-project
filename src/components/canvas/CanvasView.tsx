@@ -1,11 +1,9 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
-  useNodesState,
-  useEdgesState,
   ConnectionMode,
   Panel,
   MarkerType,
@@ -36,9 +34,9 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const filteredItems = getFilteredItems();
 
   // Convert work items to React Flow nodes with hierarchical layout
-  const { initialNodes, initialEdges } = useMemo(() => {
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
+  const { nodes, edges } = useMemo(() => {
+    const nodeList: Node[] = [];
+    const edgeList: Edge[] = [];
 
     // Find root items (no parent or parent not in filtered set)
     const filteredIds = new Set(filteredItems.map(i => i.id));
@@ -92,7 +90,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     for (const item of filteredItems) {
       const position = positionMap.get(item.id) || { x: 0, y: 0 };
 
-      nodes.push({
+      nodeList.push({
         id: item.id,
         type: 'workItem',
         position,
@@ -107,7 +105,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
 
       // Create edges for parent-child relationships
       if (item.parentId && filteredIds.has(item.parentId)) {
-        edges.push({
+        edgeList.push({
           id: `${item.parentId}-${item.id}`,
           source: item.parentId,
           target: item.id,
@@ -128,7 +126,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       if (item.blockedBy) {
         for (const blockerId of item.blockedBy) {
           if (filteredIds.has(blockerId)) {
-            edges.push({
+            edgeList.push({
               id: `blocked-${blockerId}-${item.id}`,
               source: blockerId,
               target: item.id,
@@ -151,17 +149,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       }
     }
 
-    return { initialNodes: nodes, initialEdges: edges };
+    return { nodes: nodeList, edges: edgeList };
   }, [filteredItems, selectedItemId]);
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  // Update nodes when data changes
-  useEffect(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -182,11 +171,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={true}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
