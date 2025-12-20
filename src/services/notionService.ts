@@ -1,4 +1,3 @@
-import { Client } from '@notionhq/client';
 import type { WorkItem, ItemType, ItemStatus, Priority, Owner, NotionConfig } from '../types';
 
 // Type for Notion API responses
@@ -26,17 +25,52 @@ type NotionPropertyValue = {
   url?: string | null;
 };
 
+type NotionQueryResponse = {
+  results: NotionPage[];
+  has_more: boolean;
+  next_cursor: string | null;
+};
+
+// CORS proxy for browser requests (you can self-host one or use a service)
+// For production, you should use your own backend proxy
+const CORS_PROXY = 'https://corsproxy.io/?';
+const NOTION_API_BASE = 'https://api.notion.com/v1';
+
 class NotionService {
-  private client: Client | null = null;
   private config: NotionConfig | null = null;
 
   initialize(config: NotionConfig) {
     this.config = config;
-    this.client = new Client({ auth: config.apiKey });
   }
 
   isInitialized(): boolean {
-    return this.client !== null && this.config !== null;
+    return this.config !== null;
+  }
+
+  private async notionFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    if (!this.config) {
+      throw new Error('NotionService not initialized');
+    }
+
+    const url = `${CORS_PROXY}${encodeURIComponent(NOTION_API_BASE + endpoint)}`;
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Notion API error:', response.status, errorText);
+      throw new Error(`Notion API error: ${response.status} - ${errorText}`);
+    }
+
+    return response.json();
   }
 
   private extractPlainText(property: NotionPropertyValue): string {
@@ -173,7 +207,7 @@ class NotionService {
   }
 
   async fetchAllItems(): Promise<WorkItem[]> {
-    if (!this.client || !this.config) {
+    if (!this.config) {
       throw new Error('NotionService not initialized. Call initialize() first.');
     }
 
@@ -182,16 +216,24 @@ class NotionService {
     let startCursor: string | undefined;
 
     while (hasMore) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await (this.client as any).databases.query({
-        database_id: this.config.databaseId,
-        start_cursor: startCursor,
+      const body: Record<string, unknown> = {
         page_size: 100,
-      });
+      };
+      if (startCursor) {
+        body.start_cursor = startCursor;
+      }
+
+      const response = await this.notionFetch<NotionQueryResponse>(
+        `/databases/${this.config.databaseId}/query`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }
+      );
 
       for (const page of response.results) {
         if ('properties' in page) {
-          items.push(this.pageToWorkItem(page as unknown as NotionPage));
+          items.push(this.pageToWorkItem(page));
         }
       }
 
@@ -213,31 +255,30 @@ class NotionService {
   }
 
   async fetchItem(pageId: string): Promise<WorkItem> {
-    if (!this.client || !this.config) {
+    if (!this.config) {
       throw new Error('NotionService not initialized');
     }
 
-    const page = await this.client.pages.retrieve({ page_id: pageId });
-    if ('properties' in page) {
-      return this.pageToWorkItem(page as unknown as NotionPage);
-    }
-    throw new Error('Invalid page response');
+    const page = await this.notionFetch<NotionPage>(`/pages/${pageId}`);
+    return this.pageToWorkItem(page);
   }
 
   async updateItemStatus(pageId: string, status: ItemStatus): Promise<void> {
-    if (!this.client || !this.config) {
+    if (!this.config) {
       throw new Error('NotionService not initialized');
     }
 
     const statusName = this.statusToNotionName(status);
 
-    await this.client.pages.update({
-      page_id: pageId,
-      properties: {
-        [this.config.mappings.status]: {
-          select: { name: statusName },
+    await this.notionFetch(`/pages/${pageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        properties: {
+          [this.config.mappings.status]: {
+            select: { name: statusName },
+          },
         },
-      },
+      }),
     });
   }
 
@@ -253,17 +294,19 @@ class NotionService {
   }
 
   async updateItemProgress(pageId: string, progress: number): Promise<void> {
-    if (!this.client || !this.config) {
+    if (!this.config) {
       throw new Error('NotionService not initialized');
     }
 
-    await this.client.pages.update({
-      page_id: pageId,
-      properties: {
-        [this.config.mappings.progress]: {
-          number: Math.min(100, Math.max(0, progress)),
+    await this.notionFetch(`/pages/${pageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        properties: {
+          [this.config.mappings.progress]: {
+            number: Math.min(100, Math.max(0, progress)),
+          },
         },
-      },
+      }),
     });
   }
 }

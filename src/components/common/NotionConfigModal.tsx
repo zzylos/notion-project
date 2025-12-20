@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Key, Database, Settings, HelpCircle, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { X, Key, Database, Settings, HelpCircle, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { NotionConfig } from '../../types';
 
@@ -27,9 +27,13 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
   const [databaseId, setDatabaseId] = useState(notionConfig?.databaseId || '');
   const [mappings, setMappings] = useState(notionConfig?.mappings || defaultMappings);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsConnecting(true);
+    setError(null);
 
     const config: NotionConfig = {
       apiKey,
@@ -37,17 +41,31 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
       mappings,
     };
 
+    // Save config - the App will handle loading
     setNotionConfig(config);
+    setIsConnecting(false);
+    onConnect();
+    onClose();
+  };
+
+  const handleDisconnect = () => {
+    setNotionConfig(null);
+    setApiKey('');
+    setDatabaseId('');
+    setMappings(defaultMappings);
     onConnect();
     onClose();
   };
 
   const handleUseDemoData = () => {
-    onClose();
+    setNotionConfig(null);
     onConnect();
+    onClose();
   };
 
   if (!isOpen) return null;
+
+  const isConnected = notionConfig && notionConfig.apiKey && notionConfig.databaseId;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -70,6 +88,35 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Current status */}
+        {isConnected && (
+          <div className="px-4 pt-4">
+            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 text-green-700">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Connected to Notion</span>
+              </div>
+              <button
+                onClick={handleDisconnect}
+                className="flex items-center gap-1 px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
+              >
+                <Unplug className="w-4 h-4" />
+                Disconnect
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error message */}
+        {error && (
+          <div className="px-4 pt-4">
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">{error}</div>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
@@ -121,7 +168,7 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
             />
             <p className="text-xs text-gray-500">
-              Copy the database ID from your Notion database URL
+              Copy the database ID from your Notion database URL. Make sure to share the database with your integration.
             </p>
           </div>
 
@@ -161,15 +208,32 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             )}
           </div>
 
+          {/* Info box */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-800">
+              <strong>Note:</strong> This app uses a CORS proxy to connect to the Notion API from the browser.
+              For production use, you should set up your own backend proxy for security.
+            </p>
+          </div>
+
           {/* Submit button */}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={!apiKey || !databaseId}
+              disabled={!apiKey || !databaseId || isConnecting}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Connect to Notion
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  {isConnected ? 'Update Connection' : 'Connect to Notion'}
+                </>
+              )}
             </button>
           </div>
         </form>
