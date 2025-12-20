@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -18,7 +18,7 @@ import { useStore } from '../../store/useStore';
 import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import CanvasNode from './CanvasNode';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Maximize, Minimize } from 'lucide-react';
 
 // Custom node types
 const nodeTypes = {
@@ -27,7 +27,7 @@ const nodeTypes = {
 
 // Layout configuration
 const HORIZONTAL_SPACING = 400;
-const VERTICAL_SPACING = 220;
+const VERTICAL_SPACING = 280;
 const NODE_WIDTH = 250;
 const TREE_GAP = 200; // Extra gap between separate trees
 
@@ -162,6 +162,32 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
   const filteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Handle fullscreen changes (including ESC key)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Toggle fullscreen mode
+  const handleToggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err);
+    }
+  }, []);
 
   // Track the data key to detect when underlying data changes
   const dataKey = useMemo(
@@ -227,7 +253,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   }, []);
 
   return (
-    <div className="h-full w-full">
+    <div ref={containerRef} className="h-full w-full bg-gray-50">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -293,7 +319,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
           </div>
         </Panel>
 
-        {/* Reset button */}
+        {/* Action buttons */}
         <Panel position="top-right" className="flex gap-2">
           <button
             onClick={handleResetLayout}
@@ -302,6 +328,14 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
           >
             <RotateCcw size={16} />
             Reset Layout
+          </button>
+          <button
+            onClick={handleToggleFullscreen}
+            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          >
+            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+            {isFullscreen ? 'Exit' : 'Fullscreen'}
           </button>
         </Panel>
 
