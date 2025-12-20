@@ -9,16 +9,29 @@ interface NotionConfigModalProps {
   onConnect: () => void;
 }
 
+// Default mappings - title is auto-detected, others use common names
 const defaultMappings = {
-  title: 'Name',
-  type: 'Type',
-  status: 'Status',
-  priority: 'Priority',
-  owner: 'Owner',
-  parent: 'Parent',
-  progress: 'Progress',
-  dueDate: 'Due Date',
-  tags: 'Tags',
+  title: 'Name',           // Auto-detected from any 'title' type property
+  type: 'Type',            // Optional: select property for item type
+  status: 'Status',        // Required: select/status property
+  priority: 'Priority',    // Optional: select property for priority
+  owner: 'Owner',          // Optional: people property
+  parent: 'Parent',        // Optional: relation property for hierarchy
+  progress: 'Progress',    // Optional: number property (0-100)
+  dueDate: 'Deadline',     // Optional: date property
+  tags: 'Tags',            // Optional: multi-select property
+};
+
+const mappingDescriptions: Record<string, string> = {
+  title: 'Auto-detected (your title column)',
+  type: 'Item type (Mission, Problem, etc.)',
+  status: 'Status column name',
+  priority: 'Priority level (P0-P3)',
+  owner: 'Person/Owner column',
+  parent: 'Parent relation column',
+  progress: 'Progress % (number)',
+  dueDate: 'Due date / Deadline',
+  tags: 'Tags (multi-select)',
 };
 
 const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, onConnect }) => {
@@ -172,7 +185,7 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             </p>
           </div>
 
-          {/* Advanced: Property Mappings */}
+          {/* Property Mappings */}
           <div className="space-y-2">
             <button
               type="button"
@@ -181,29 +194,41 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             >
               <Settings className="w-4 h-4" />
               Property Mappings
-              <span className="text-xs text-gray-500">(optional)</span>
+              <span className="text-xs text-gray-500">
+                ({showAdvanced ? 'hide' : 'show'})
+              </span>
             </button>
 
             {showAdvanced && (
               <div className="p-3 bg-gray-50 rounded-lg space-y-3">
                 <p className="text-xs text-gray-600">
-                  Map your Notion database properties to the visualization fields:
+                  Match these to your Notion database column names. Title is auto-detected.
+                  Leave others blank if you don't have them.
                 </p>
                 {Object.entries(mappings).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-2">
-                    <label className="w-24 text-xs font-medium text-gray-600 capitalize">
-                      {key}:
-                    </label>
+                    <div className="w-28 flex-shrink-0">
+                      <label className="text-xs font-medium text-gray-700 capitalize block">
+                        {key}
+                      </label>
+                      <span className="text-[10px] text-gray-400">
+                        {mappingDescriptions[key]}
+                      </span>
+                    </div>
                     <input
                       type="text"
                       value={value}
                       onChange={(e) =>
                         setMappings((prev) => ({ ...prev, [key]: e.target.value }))
                       }
+                      placeholder={key === 'title' ? '(auto-detected)' : '(optional)'}
                       className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     />
                   </div>
                 ))}
+                <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
+                  <strong>Tip:</strong> Check your Notion database column names and enter them exactly as shown (case-insensitive).
+                </p>
               </div>
             )}
           </div>
