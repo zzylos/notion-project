@@ -16,10 +16,9 @@ const TreeView: React.FC<TreeViewProps> = ({ onNodeSelect }) => {
     expandedIds,
     items,
     isLoading,
-    filters,
   } = useStore();
 
-  const treeNodes = useMemo(() => getTreeNodes(), [items, expandedIds, filters]);
+  const treeNodes = useMemo(() => getTreeNodes(), [getTreeNodes]);
 
   const handleNodeClick = (id: string) => {
     onNodeSelect?.(id);

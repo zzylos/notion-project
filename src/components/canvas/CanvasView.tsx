@@ -55,8 +55,7 @@ const calculateLayout = (
 
   const calculatePositions = (
     item: WorkItem,
-    level: number,
-    _parentX?: number
+    level: number
   ): number => {
     const children = filteredItems.filter(i => i.parentId === item.id);
 
@@ -73,7 +72,7 @@ const calculateLayout = (
     let childCount = 0;
 
     for (const child of children) {
-      const childX = calculatePositions(child, level + 1, undefined);
+      const childX = calculatePositions(child, level + 1);
       childXSum += childX;
       childCount++;
     }
