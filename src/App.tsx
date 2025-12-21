@@ -12,7 +12,7 @@ import DetailPanel from './components/common/DetailPanel';
 import NotionConfigModal from './components/common/NotionConfigModal';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
-import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp, AlertTriangle, X } from 'lucide-react';
 
 function App() {
   const {
@@ -31,13 +31,25 @@ function App() {
   const [showStats, setShowStats] = useState(false); // Collapsed by default
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number | null } | null>(null);
+  const [failedDatabases, setFailedDatabases] = useState<Array<{ type: string; error: string }> | null>(null);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load data function with progressive updates
   const loadData = useCallback(async (config: typeof notionConfig, forceRefresh = false) => {
+    // Cancel any previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setLoading(true);
     setError(null);
     setLoadingProgress(null);
+    setFailedDatabases(null);
 
     try {
       if (config && config.apiKey && config.databaseId) {
@@ -49,14 +61,28 @@ function App() {
         // Initialize Notion service and fetch data with progress
         notionService.initialize(config);
 
-        const items = await notionService.fetchAllItems((progress) => {
-          setLoadingProgress({ loaded: progress.loaded, total: progress.total });
+        const items = await notionService.fetchAllItems({
+          signal: abortController.signal,
+          onProgress: (progress) => {
+            // Don't update state if aborted
+            if (abortController.signal.aborted) return;
 
-          // Update items progressively for faster perceived performance
-          if (progress.items.length > 0 && !progress.done) {
-            setItems(progress.items);
-          }
+            setLoadingProgress({ loaded: progress.loaded, total: progress.total });
+
+            // Track failed databases
+            if (progress.failedDatabases && progress.failedDatabases.length > 0) {
+              setFailedDatabases(progress.failedDatabases);
+            }
+
+            // Update items progressively for faster perceived performance
+            if (progress.items.length > 0 && !progress.done) {
+              setItems(progress.items);
+            }
+          },
         });
+
+        // Don't update state if aborted
+        if (abortController.signal.aborted) return;
 
         setItems(items);
       } else {
@@ -68,12 +94,19 @@ function App() {
         }
         expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
       }
-    } catch {
+    } catch (error) {
+      // Ignore abort errors - they're expected when canceling
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       setError('Failed to load data from Notion. Using demo data instead.');
       setItems(sampleData);
     } finally {
-      setLoading(false);
-      setLoadingProgress(null);
+      // Only update loading state if this is still the current request
+      if (abortControllerRef.current === abortController) {
+        setLoading(false);
+        setLoadingProgress(null);
+      }
     }
   }, [setItems, setLoading, setError, expandAll]);
 
@@ -82,11 +115,14 @@ function App() {
     loadData(notionConfig);
   }, [notionConfig, loadData]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout and abort controller on unmount
   useEffect(() => {
     return () => {
       if (expandTimeoutRef.current) {
         clearTimeout(expandTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
   }, []);
@@ -151,6 +187,33 @@ function App() {
                 animation: loadingProgress.total ? 'none' : 'pulse 1.5s ease-in-out infinite',
               }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Failed Databases Warning */}
+      {failedDatabases && failedDatabases.length > 0 && !isLoading && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-amber-800">
+                Some databases failed to load
+              </span>
+              <ul className="mt-1 text-xs text-amber-700">
+                {failedDatabases.map((db, i) => (
+                  <li key={i}>
+                    <span className="font-medium capitalize">{db.type}</span>: {db.error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button
+              onClick={() => setFailedDatabases(null)}
+              className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

@@ -49,6 +49,17 @@ const mappingDescriptions: Record<keyof PropertyMappings, string> = {
   tags: 'Tags (multi-select)',
 };
 
+// Validate Notion database ID format (UUID with or without hyphens)
+const isValidDatabaseId = (id: string): boolean => {
+  if (!id.trim()) return true; // Empty is valid (optional field)
+  const trimmed = id.trim();
+  // UUID with hyphens: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  const uuidWithHyphens = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // UUID without hyphens: 32 hex characters
+  const uuidWithoutHyphens = /^[0-9a-f]{32}$/i;
+  return uuidWithHyphens.test(trimmed) || uuidWithoutHyphens.test(trimmed);
+};
+
 // Helper to convert legacy config to new format
 function migrateConfig(config: NotionConfig | null): { apiKey: string; databases: Record<ItemType, string>; mappings: PropertyMappings } {
   const databases: Record<ItemType, string> = {
@@ -107,11 +118,43 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<ItemType, string | null>>({
+    mission: null,
+    problem: null,
+    solution: null,
+    project: null,
+    design: null,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsConnecting(true);
     setError(null);
+
+    // Validate all database IDs
+    const newValidationErrors: Record<ItemType, string | null> = {
+      mission: null,
+      problem: null,
+      solution: null,
+      project: null,
+      design: null,
+    };
+    let hasValidationErrors = false;
+
+    for (const [type, dbId] of Object.entries(databases) as [ItemType, string][]) {
+      if (dbId.trim() && !isValidDatabaseId(dbId)) {
+        newValidationErrors[type] = 'Invalid ID format';
+        hasValidationErrors = true;
+      }
+    }
+
+    setValidationErrors(newValidationErrors);
+
+    if (hasValidationErrors) {
+      setError('Please fix the invalid database IDs. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+      setIsConnecting(false);
+      return;
+    }
 
     // Build database configs from non-empty entries
     const databaseConfigs: DatabaseConfig[] = [];
@@ -165,6 +208,14 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
 
   const updateDatabase = (type: ItemType, value: string) => {
     setDatabases(prev => ({ ...prev, [type]: value }));
+    // Clear validation error when user starts typing
+    if (validationErrors[type]) {
+      setValidationErrors(prev => ({ ...prev, [type]: null }));
+    }
+    // Validate on blur would be nicer, but for now validate as they type if there's content
+    if (value.trim() && !isValidDatabaseId(value)) {
+      setValidationErrors(prev => ({ ...prev, [type]: 'Invalid format' }));
+    }
   };
 
   if (!isOpen) return null;
@@ -271,23 +322,43 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             </p>
 
             <div className="space-y-2">
-              {databaseTypes.map(({ type, label, description, icon: Icon, color }) => (
-                <div key={type} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2 w-32 flex-shrink-0">
-                    <Icon className={`w-4 h-4 ${color}`} />
-                    <div>
-                      <span className="text-sm font-medium text-gray-700">{label}</span>
+              {databaseTypes.map(({ type, label, description, icon: Icon, color }) => {
+                const hasError = validationErrors[type] !== null;
+                const hasValidValue = databases[type].trim() && isValidDatabaseId(databases[type]);
+                return (
+                  <div key={type} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 w-32 flex-shrink-0">
+                      <Icon className={`w-4 h-4 ${color}`} />
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">{label}</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        value={databases[type]}
+                        onChange={(e) => updateDatabase(type, e.target.value)}
+                        placeholder={description}
+                        className={`w-full px-3 py-1.5 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition ${
+                          hasError
+                            ? 'border-red-400 bg-red-50'
+                            : hasValidValue
+                            ? 'border-green-400 bg-green-50'
+                            : 'border-gray-300'
+                        }`}
+                      />
+                      {hasError && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-red-500">
+                          {validationErrors[type]}
+                        </span>
+                      )}
+                      {hasValidValue && (
+                        <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                      )}
                     </div>
                   </div>
-                  <input
-                    type="text"
-                    value={databases[type]}
-                    onChange={(e) => updateDatabase(type, e.target.value)}
-                    placeholder={description}
-                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <p className="text-xs text-gray-500">

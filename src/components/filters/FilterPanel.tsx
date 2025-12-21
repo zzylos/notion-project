@@ -28,22 +28,22 @@ const FilterPanel: React.FC = () => {
   const priorities: Priority[] = ['P0', 'P1', 'P2', 'P3'];
 
   // Get unique statuses from items dynamically
+  // Using Array.from with map is more efficient than forEach with Set.add
   const itemStatuses = useMemo(() => {
-    const statusSet = new Set<string>();
-    items.forEach((item) => {
-      statusSet.add(item.status);
-    });
-    return Array.from(statusSet);
+    const itemsArray = Array.from(items.values());
+    return [...new Set(itemsArray.map(item => item.status))];
   }, [items]);
 
   // Get unique owners from items
+  // Using reduce is more efficient than forEach with Map.set
   const owners = useMemo(() => {
-    const ownerMap = new Map<string, { id: string; name: string }>();
-    items.forEach((item) => {
-      if (item.owner) {
-        ownerMap.set(item.owner.id, { id: item.owner.id, name: item.owner.name });
+    const itemsArray = Array.from(items.values());
+    const ownerMap = itemsArray.reduce((acc, item) => {
+      if (item.owner && !acc.has(item.owner.id)) {
+        acc.set(item.owner.id, { id: item.owner.id, name: item.owner.name });
       }
-    });
+      return acc;
+    }, new Map<string, { id: string; name: string }>());
     return Array.from(ownerMap.values());
   }, [items]);
 

@@ -175,17 +175,35 @@ export const useStore = create<StoreState>()(
         const filteredItems = state.getFilteredItems();
         const filteredIds = new Set(filteredItems.map(i => i.id));
 
-        // Build tree from items
-        const buildTree = (parentId: string | undefined, level: number): TreeNode[] => {
+        // Build tree from items with cycle detection
+        const buildTree = (parentId: string | undefined, level: number, ancestors: Set<string>): TreeNode[] => {
           const children = filteredItems.filter(item => item.parentId === parentId);
-          return children.map(item => ({
-            item,
-            children: buildTree(item.id, level + 1),
-            level,
-            isExpanded: state.expandedIds.has(item.id),
-            isSelected: state.selectedItemId === item.id,
-            isHighlighted: state.focusedItemId === item.id,
-          }));
+          return children.map(item => {
+            // Check for circular reference
+            if (ancestors.has(item.id)) {
+              console.warn(`[Store] Circular reference detected in tree at item: ${item.id}`);
+              return {
+                item,
+                children: [], // Stop recursion to prevent infinite loop
+                level,
+                isExpanded: state.expandedIds.has(item.id),
+                isSelected: state.selectedItemId === item.id,
+                isHighlighted: state.focusedItemId === item.id,
+              };
+            }
+
+            const newAncestors = new Set(ancestors);
+            newAncestors.add(item.id);
+
+            return {
+              item,
+              children: buildTree(item.id, level + 1, newAncestors),
+              level,
+              isExpanded: state.expandedIds.has(item.id),
+              isSelected: state.selectedItemId === item.id,
+              isHighlighted: state.focusedItemId === item.id,
+            };
+          });
         };
 
         // Start with root items (no parent or parent not in filtered set)
@@ -193,14 +211,17 @@ export const useStore = create<StoreState>()(
           item => !item.parentId || !filteredIds.has(item.parentId)
         );
 
-        return rootItems.map(item => ({
-          item,
-          children: buildTree(item.id, 1),
-          level: 0,
-          isExpanded: state.expandedIds.has(item.id),
-          isSelected: state.selectedItemId === item.id,
-          isHighlighted: state.focusedItemId === item.id,
-        }));
+        return rootItems.map(item => {
+          const ancestors = new Set<string>([item.id]);
+          return {
+            item,
+            children: buildTree(item.id, 1, ancestors),
+            level: 0,
+            isExpanded: state.expandedIds.has(item.id),
+            isSelected: state.selectedItemId === item.id,
+            isHighlighted: state.focusedItemId === item.id,
+          };
+        });
       },
 
       getFilteredItems: () => {
@@ -315,9 +336,17 @@ export const useStore = create<StoreState>()(
       getItemPath: (id: string): WorkItem[] => {
         const state = get();
         const path: WorkItem[] = [];
+        const visited = new Set<string>(); // Track visited IDs to detect cycles
         let currentId: string | undefined = id;
 
         while (currentId) {
+          // Check for circular reference
+          if (visited.has(currentId)) {
+            console.warn(`[Store] Circular parent reference detected at item: ${currentId}`);
+            break;
+          }
+          visited.add(currentId);
+
           const item = state.items.get(currentId);
           if (item) {
             path.unshift(item);
