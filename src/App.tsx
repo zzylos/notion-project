@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useStore } from './store/useStore';
 import Header from './components/common/Header';
 import FilterPanel from './components/filters/FilterPanel';
@@ -12,7 +12,8 @@ import DetailPanel from './components/common/DetailPanel';
 import NotionConfigModal from './components/common/NotionConfigModal';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
-import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp, AlertTriangle, X } from 'lucide-react';
+import { getMergedConfig, hasEnvConfig } from './utils/config';
+import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp, AlertTriangle, X, FileCode } from 'lucide-react';
 
 function App() {
   const {
@@ -34,6 +35,10 @@ function App() {
   const [failedDatabases, setFailedDatabases] = useState<Array<{ type: string; error: string }> | null>(null);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Merge environment config with stored config (env takes precedence)
+  const effectiveConfig = useMemo(() => getMergedConfig(notionConfig), [notionConfig]);
+  const usingEnvConfig = hasEnvConfig();
 
   // Load data function with progressive updates
   const loadData = useCallback(async (config: typeof notionConfig, forceRefresh = false) => {
@@ -110,10 +115,10 @@ function App() {
     }
   }, [setItems, setLoading, setError, expandAll]);
 
-  // Load data on mount and when notionConfig changes
+  // Load data on mount and when config changes
   useEffect(() => {
-    loadData(notionConfig);
-  }, [notionConfig, loadData]);
+    loadData(effectiveConfig);
+  }, [effectiveConfig, loadData]);
 
   // Cleanup timeout and abort controller on unmount
   useEffect(() => {
@@ -129,7 +134,7 @@ function App() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadData(notionConfig, true); // Force refresh, bypass cache
+    await loadData(effectiveConfig, true); // Force refresh, bypass cache
     setIsRefreshing(false);
   };
 
@@ -159,13 +164,25 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 font-notion">
-      {/* Header */}
-      <Header
-        onOpenSettings={() => setShowSettings(true)}
-        onRefresh={handleRefresh}
-        isRefreshing={isRefreshing || isLoading}
-      />
+    <div className="min-h-screen flex flex-col bg-gray-50 font-notion">
+      {/* Sticky header section */}
+      <div className="sticky top-0 z-20 bg-gray-50">
+        {/* Header */}
+        <Header
+          onOpenSettings={() => setShowSettings(true)}
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing || isLoading}
+        />
+
+        {/* Environment config indicator */}
+        {usingEnvConfig && (
+          <div className="bg-green-50 border-b border-green-200 px-4 py-1.5">
+            <div className="flex items-center gap-2 text-xs text-green-700">
+              <FileCode className="w-3.5 h-3.5" />
+              <span>Using configuration from <code className="px-1 py-0.5 bg-green-100 rounded">.env</code> file</span>
+            </div>
+          </div>
+        )}
 
       {/* Loading Progress Bar */}
       {isLoading && loadingProgress && (
@@ -218,29 +235,30 @@ function App() {
         </div>
       )}
 
-      {/* Stats Overview - Collapsible */}
-      <div className="border-b border-gray-200">
-        <button
-          onClick={() => setShowStats(!showStats)}
-          className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
-        >
-          <span className="text-sm font-medium text-gray-700">Statistics Overview</span>
-          {showStats ? (
-            <ChevronUp className="w-4 h-4 text-gray-500" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-gray-500" />
-          )}
-        </button>
-        {showStats && <StatsOverview />}
+        {/* Stats Overview - Collapsible */}
+        <div className="border-b border-gray-200 bg-white">
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <span className="text-sm font-medium text-gray-700">Statistics Overview</span>
+            {showStats ? (
+              <ChevronUp className="w-4 h-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            )}
+          </button>
+          {showStats && <StatsOverview />}
+        </div>
+
+        {/* Filter Panel */}
+        <FilterPanel />
       </div>
 
-      {/* Filter Panel */}
-      <FilterPanel />
-
-      {/* Main content area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Main view */}
-        <div className="flex-1 overflow-hidden">
+      {/* Main content area - scrollable with minimum height */}
+      <div className="flex-1 flex min-h-[500px]">
+        {/* Main view - with minimum height for canvas usability */}
+        <div className="flex-1 overflow-auto min-h-[500px]">
           {renderMainView()}
         </div>
 

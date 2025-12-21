@@ -13,6 +13,43 @@ npm run lint         # Run ESLint
 npm run test:notion <API_KEY> <DATABASE_ID>  # Test Notion API connection
 ```
 
+## Configuration
+
+The app supports configuration through environment variables (`.env` file) or through the UI settings modal. Environment variables take precedence.
+
+### Quick Setup with .env
+1. Copy `.env.example` to `.env`
+2. Fill in your Notion API key and database IDs
+3. Run `npm run dev`
+
+### Environment Variables
+```bash
+# Required
+VITE_NOTION_API_KEY=secret_xxx          # Your Notion API key
+
+# At least one database ID required
+VITE_NOTION_DB_MISSION=xxx              # Objectives database
+VITE_NOTION_DB_PROBLEM=xxx              # Problems database
+VITE_NOTION_DB_SOLUTION=xxx             # Solutions database
+VITE_NOTION_DB_PROJECT=xxx              # Projects database
+VITE_NOTION_DB_DESIGN=xxx               # Deliverables database
+
+# Optional property mappings (defaults shown)
+VITE_MAPPING_TITLE=Name
+VITE_MAPPING_STATUS=Status
+VITE_MAPPING_PRIORITY=Priority
+VITE_MAPPING_OWNER=Owner
+VITE_MAPPING_PARENT=Parent
+VITE_MAPPING_PROGRESS=Progress
+VITE_MAPPING_DUE_DATE=Deadline
+VITE_MAPPING_TAGS=Tags
+
+# Optional CORS proxy override
+VITE_CORS_PROXY=https://corsproxy.io/?
+```
+
+The config loader (`src/utils/config.ts`) merges env config with localStorage settings. When using env config, a green indicator appears below the header.
+
 ## Architecture
 
 ### State Management
