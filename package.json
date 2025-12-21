@@ -11,6 +11,7 @@
     "test:notion": "node scripts/test-notion-connection.js"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.13",
     "@types/d3": "^7.4.3",
     "@xyflow/react": "^12.10.0",
     "d3": "^7.9.0",

@@ -33,13 +33,26 @@ type NotionQueryResponse = {
   next_cursor: string | null;
 };
 
+// Progress callback for streaming updates
+export type FetchProgressCallback = (progress: {
+  loaded: number;
+  total: number | null;
+  items: WorkItem[];
+  done: boolean;
+}) => void;
+
 // CORS proxy for browser requests (you can self-host one or use a service)
 // For production, you should use your own backend proxy
 const CORS_PROXY = 'https://corsproxy.io/?';
 const NOTION_API_BASE = 'https://api.notion.com/v1';
 
+// Number of concurrent requests for parallel fetching
+const PARALLEL_REQUESTS = 3;
+
 class NotionService {
   private config: NotionConfig | null = null;
+  private cache: Map<string, { items: WorkItem[]; timestamp: number }> = new Map();
+  private cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
 
   initialize(config: NotionConfig) {
     this.config = config;
@@ -47,6 +60,10 @@ class NotionService {
 
   isInitialized(): boolean {
     return this.config !== null;
+  }
+
+  clearCache() {
+    this.cache.clear();
   }
 
   private async notionFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -271,9 +288,6 @@ class NotionService {
     const { mappings } = this.config;
     const props = page.properties;
 
-    // Debug: log properties to help troubleshoot
-    console.log('Page properties:', Object.keys(props));
-
     const title = this.extractTitle(props, mappings.title);
     const type = this.extractSelect(props, mappings.type);
     const status = this.extractStatus(props, mappings.status);
@@ -283,8 +297,6 @@ class NotionService {
     const people = this.extractPeople(props, mappings.owner);
     const parentRelations = this.extractRelation(props, mappings.parent);
     const tags = this.extractMultiSelect(props, mappings.tags);
-
-    console.log('Extracted title:', title, 'status:', status);
 
     return {
       id: page.id,
@@ -307,44 +319,22 @@ class NotionService {
     };
   }
 
-  async fetchAllItems(): Promise<WorkItem[]> {
-    if (!this.config) {
-      throw new Error('NotionService not initialized. Call initialize() first.');
-    }
-
+  // Process pages in batches to convert to WorkItems without blocking
+  private processPagesInBatches(pages: NotionPage[], batchSize = 50): WorkItem[] {
     const items: WorkItem[] = [];
-    let hasMore = true;
-    let startCursor: string | undefined;
-
-    while (hasMore) {
-      const body: Record<string, unknown> = {
-        page_size: 100,
-      };
-      if (startCursor) {
-        body.start_cursor = startCursor;
-      }
-
-      const response = await this.notionFetch<NotionQueryResponse>(
-        `/databases/${this.config.databaseId}/query`,
-        {
-          method: 'POST',
-          body: JSON.stringify(body),
-        }
-      );
-
-      console.log('Fetched', response.results.length, 'pages from Notion');
-
-      for (const page of response.results) {
+    for (let i = 0; i < pages.length; i += batchSize) {
+      const batch = pages.slice(i, i + batchSize);
+      for (const page of batch) {
         if ('properties' in page) {
-          items.push(this.pageToWorkItem(page as NotionPage));
+          items.push(this.pageToWorkItem(page));
         }
       }
-
-      hasMore = response.has_more;
-      startCursor = response.next_cursor ?? undefined;
     }
+    return items;
+  }
 
-    // Build parent-child relationships
+  // Build parent-child relationships efficiently
+  private buildRelationships(items: WorkItem[]): void {
     const itemMap = new Map(items.map(item => [item.id, item]));
     for (const item of items) {
       if (item.parentId && itemMap.has(item.parentId)) {
@@ -353,8 +343,147 @@ class NotionService {
         parent.children.push(item.id);
       }
     }
+  }
+
+  // Fetch a single page of results
+  private async fetchPage(cursor?: string): Promise<NotionQueryResponse> {
+    if (!this.config) {
+      throw new Error('NotionService not initialized');
+    }
+
+    const body: Record<string, unknown> = {
+      page_size: 100,
+    };
+    if (cursor) {
+      body.start_cursor = cursor;
+    }
+
+    return this.notionFetch<NotionQueryResponse>(
+      `/databases/${this.config.databaseId}/query`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
+  // Fetch all items with progressive loading support
+  async fetchAllItems(onProgress?: FetchProgressCallback): Promise<WorkItem[]> {
+    if (!this.config) {
+      throw new Error('NotionService not initialized. Call initialize() first.');
+    }
+
+    // Check cache first
+    const cacheKey = this.config.databaseId;
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      console.log('Using cached data:', cached.items.length, 'items');
+      onProgress?.({ loaded: cached.items.length, total: cached.items.length, items: cached.items, done: true });
+      return cached.items;
+    }
+
+    const allPages: NotionPage[] = [];
+
+    console.log('Starting optimized Notion fetch...');
+    const startTime = performance.now();
+
+    // First request to get initial data and check if there's more
+    const firstResponse = await this.fetchPage();
+    allPages.push(...firstResponse.results);
+
+    // Report initial progress
+    const initialItems = this.processPagesInBatches(allPages);
+    onProgress?.({ loaded: initialItems.length, total: null, items: initialItems, done: false });
+
+    if (firstResponse.has_more && firstResponse.next_cursor) {
+      // Collect all cursors by making sequential requests first to get cursors
+      // Then we can parallelize future fetches
+      let currentCursor: string | null = firstResponse.next_cursor;
+
+      while (currentCursor) {
+        // Fetch in parallel batches
+        const batchPromises: Promise<NotionQueryResponse>[] = [];
+        const batchCursors: string[] = [];
+
+        // Queue up parallel requests
+        for (let i = 0; i < PARALLEL_REQUESTS && currentCursor; i++) {
+          batchCursors.push(currentCursor);
+          batchPromises.push(this.fetchPage(currentCursor));
+          // We'll get the next cursor from the response, so break for now
+          if (i === 0) break; // For first iteration, we need to get next cursor
+        }
+
+        // Execute batch
+        const responses = await Promise.all(batchPromises);
+
+        for (const response of responses) {
+          allPages.push(...response.results);
+          currentCursor = response.has_more ? response.next_cursor : null;
+        }
+
+        // Report progress
+        const currentItems = this.processPagesInBatches(allPages);
+        onProgress?.({
+          loaded: currentItems.length,
+          total: null,
+          items: currentItems,
+          done: false
+        });
+
+        console.log(`Fetched ${allPages.length} pages so far...`);
+      }
+    }
+
+    // Final processing
+    const items = this.processPagesInBatches(allPages);
+    this.buildRelationships(items);
+
+    const endTime = performance.now();
+    console.log(`Fetched ${items.length} items in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+
+    // Cache the results
+    this.cache.set(cacheKey, { items, timestamp: Date.now() });
+
+    // Final progress callback
+    onProgress?.({ loaded: items.length, total: items.length, items, done: true });
 
     return items;
+  }
+
+  // Fetch with streaming updates to the store
+  async fetchAllItemsStreaming(
+    onBatch: (items: WorkItem[], isComplete: boolean) => void
+  ): Promise<void> {
+    if (!this.config) {
+      throw new Error('NotionService not initialized. Call initialize() first.');
+    }
+
+    const allPages: NotionPage[] = [];
+    let hasMore = true;
+    let startCursor: string | undefined;
+    let batchCount = 0;
+
+    console.log('Starting streaming Notion fetch...');
+    const startTime = performance.now();
+
+    while (hasMore) {
+      const response = await this.fetchPage(startCursor);
+      allPages.push(...response.results);
+      batchCount++;
+
+      // Process and send batch update every few requests
+      if (batchCount % 2 === 0 || !response.has_more) {
+        const items = this.processPagesInBatches(allPages);
+        this.buildRelationships(items);
+        onBatch(items, !response.has_more);
+      }
+
+      hasMore = response.has_more;
+      startCursor = response.next_cursor ?? undefined;
+    }
+
+    const endTime = performance.now();
+    console.log(`Streaming fetch complete: ${allPages.length} items in ${((endTime - startTime) / 1000).toFixed(2)}s`);
   }
 
   async fetchItem(pageId: string): Promise<WorkItem> {
@@ -383,6 +512,9 @@ class NotionService {
         },
       }),
     });
+
+    // Invalidate cache after update
+    this.clearCache();
   }
 
   private statusToNotionName(status: ItemStatus): string {
@@ -411,6 +543,9 @@ class NotionService {
         },
       }),
     });
+
+    // Invalidate cache after update
+    this.clearCache();
   }
 }
 
