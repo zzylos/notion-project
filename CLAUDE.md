@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is a Notion Opportunity Tree Visualizer for HouseSigma. It displays work items (missions, problems, solutions, designs, projects) in a hierarchical tree structure, integrated with Notion as the data source.
+This is a Notion Opportunity Tree Visualizer for HouseSigma. It displays work items (objectives, problems, solutions, projects, deliverables) in a hierarchical tree structure, integrated with Notion as the data source.
 
 ## Quick Commands
 
@@ -21,43 +21,76 @@ npm run test:notion <API_KEY> <DATABASE_ID>  # Test Notion API connection
 - Computed: `getFilteredItems()`, `getTreeNodes()`
 
 ### View Modes
-All view components are in `src/App.tsx` except Tree and Canvas:
 - **Tree View** (`src/components/tree/TreeView.tsx`) - Default hierarchical view
 - **Canvas View** (`src/components/canvas/CanvasView.tsx`) - Node-based visualization with @xyflow/react
-- **Kanban View** - Board by status columns (inline in App.tsx)
-- **List View** - Virtualized table with @tanstack/react-virtual (inline in App.tsx)
-- **Timeline View** - Chronological view by due date (inline in App.tsx)
+- **Kanban View** (`src/components/views/KanbanView.tsx`) - Board by dynamic status columns
+- **List View** (`src/components/views/ListView.tsx`) - Virtualized table with @tanstack/react-virtual
+- **Timeline View** (`src/components/views/TimelineView.tsx`) - Chronological view by due date
 
 ### Notion Integration
 - Service at `src/services/notionService.ts`
+- **Multi-database support**: Fetches from up to 5 databases (Objectives, Problems, Solutions, Projects, Deliverables)
 - Uses CORS proxy (`corsproxy.io`) for browser-based API calls
 - 5-minute caching to reduce API calls
 - Progressive loading with callback for large databases
+- Type is determined by which database an item comes from
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/App.tsx` | Main app, view switching, Kanban/List/Timeline views |
+| `src/App.tsx` | Main app, view switching, collapsible stats |
 | `src/store/useStore.ts` | Zustand state management |
-| `src/services/notionService.ts` | Notion API integration with caching |
+| `src/services/notionService.ts` | Multi-database Notion API integration |
+| `src/components/common/NotionConfigModal.tsx` | Settings with multi-database inputs |
 | `src/components/canvas/CanvasView.tsx` | React Flow canvas with hierarchical layout |
 | `src/components/canvas/CanvasNode.tsx` | Custom node component for canvas |
 | `src/components/tree/TreeView.tsx` | Tree view with expand/collapse |
 | `src/components/tree/TreeNode.tsx` | Individual tree node component |
+| `src/components/views/KanbanView.tsx` | Dynamic status columns from data |
+| `src/components/views/ListView.tsx` | Virtualized list view |
+| `src/components/views/TimelineView.tsx` | Timeline view |
 | `src/components/common/DetailPanel.tsx` | Selected item details sidebar |
-| `src/components/filters/FilterPanel.tsx` | Filter controls |
+| `src/components/common/StatsOverview.tsx` | Collapsible statistics panel |
+| `src/components/filters/FilterPanel.tsx` | Dynamic filter controls |
 | `src/types/index.ts` | TypeScript type definitions |
-| `src/utils/colors.ts` | Color utilities for status/type |
+| `src/utils/colors.ts` | Color utilities with dynamic status support |
 | `src/utils/sampleData.ts` | Demo data for offline use |
 
 ## Important Patterns
+
+### Multi-Database Configuration
+The app supports multiple Notion databases, each mapped to a specific item type:
+```typescript
+interface NotionConfig {
+  apiKey: string;
+  databases: DatabaseConfig[];  // Array of {databaseId, type}
+  defaultMappings: PropertyMappings;
+}
+```
+
+Database types:
+- `mission` → Objectives database
+- `problem` → Problems database
+- `solution` → Solutions database
+- `project` → Projects database
+- `design` → Deliverables database
+
+### Dynamic Status Labels
+Status is now a string type (not a union) to preserve original Notion values:
+```typescript
+type ItemStatus = string;  // Preserves "Analysis/Research", "Solutioning", etc.
+type StatusCategory = 'not-started' | 'in-progress' | 'blocked' | 'in-review' | 'completed';
+
+// Get color category from any status string
+const category = getStatusCategory(item.status);
+const colors = getStatusColors(item.status);
+```
 
 ### Canvas View - Avoiding Infinite Loops
 The canvas uses `useNodesState` and `useEdgesState` from React Flow. To avoid infinite update loops when data changes:
 ```typescript
 const prevDataRef = useRef<string>('');
-// Only update when data actually changes
 const dataKey = JSON.stringify(items.map(i => i.id));
 if (dataKey !== prevDataRef.current) {
   prevDataRef.current = dataKey;
@@ -69,7 +102,7 @@ if (dataKey !== prevDataRef.current) {
 The Notion service supports progress callbacks:
 ```typescript
 await notionService.fetchAllItems((progress) => {
-  // progress.loaded, progress.total, progress.items, progress.done
+  // progress.loaded, progress.total, progress.items, progress.done, progress.currentDatabase
 });
 ```
 
@@ -92,7 +125,7 @@ interface WorkItem {
   id: string;
   title: string;
   type: 'mission' | 'problem' | 'solution' | 'design' | 'project';
-  status: 'not-started' | 'in-progress' | 'blocked' | 'in-review' | 'completed';
+  status: string;  // Dynamic - preserves original Notion status
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   parentId?: string;
   owner?: { id: string; name: string; avatar?: string };
@@ -104,30 +137,53 @@ interface WorkItem {
 }
 ```
 
+### NotionConfig
+```typescript
+interface NotionConfig {
+  apiKey: string;
+  databases: DatabaseConfig[];  // Multiple databases
+  defaultMappings: PropertyMappings;
+  // Legacy support
+  databaseId?: string;
+  mappings?: PropertyMappings & { type: string };
+}
+
+interface DatabaseConfig {
+  databaseId: string;
+  type: ItemType;
+  mappings?: Partial<PropertyMappings>;  // Optional per-database overrides
+}
+```
+
 ## Known Considerations
 
-1. **CORS Proxy**: The app uses `corsproxy.io` to bypass CORS restrictions when calling Notion API from the browser. This may have rate limits.
+1. **Multi-Database Fetching**: Items from each database are fetched sequentially, then merged. Parent relations work across databases.
 
-2. **Notion API Pagination**: Large databases are fetched in pages of 100. The service handles pagination automatically.
+2. **CORS Proxy**: The app uses `corsproxy.io` to bypass CORS restrictions when calling Notion API from the browser. This may have rate limits.
 
-3. **React Flow Provider**: Canvas view must be wrapped in `ReactFlowProvider` for hooks like `useReactFlow` to work.
+3. **Notion API Pagination**: Large databases are fetched in pages of 100. The service handles pagination automatically.
 
-4. **useMemo Dependencies**: TreeView's `treeNodes` memo depends on `getTreeNodes` function reference from Zustand. Don't add `items` or `filters` directly.
+4. **React Flow Provider**: Canvas view must be wrapped in `ReactFlowProvider` for hooks like `useReactFlow` to work.
 
-5. **Fullscreen API**: Canvas fullscreen uses browser's native Fullscreen API with `document.fullscreenElement` checks.
+5. **useMemo Dependencies**: TreeView's `treeNodes` memo depends on `getTreeNodes` function reference from Zustand. Don't add `items` or `filters` directly.
+
+6. **Fullscreen API**: Canvas fullscreen uses browser's native Fullscreen API with `document.fullscreenElement` checks.
+
+7. **Status Color Mapping**: Use `getStatusCategory()` and `getStatusColors()` from `src/utils/colors.ts` for consistent color handling.
 
 ## Notion Database Schema
 
-Expected properties (configurable in app settings):
+Each database should have these properties (configurable in app settings):
 - Name (title) - Work item title
-- Type (select) - mission, problem, solution, design, project
-- Status (select) - not-started, in-progress, blocked, in-review, completed
-- Priority (select) - P0, P1, P2, P3
+- Status (select/status) - Your custom status labels (preserved as-is)
+- Priority (select) - P0, P1, P2, P3 (or High, Medium, Low variants)
 - Owner (people) - Assigned person
-- Parent (relation) - Parent work item
+- Parent (relation) - Parent work item (can link across databases)
 - Progress (number) - 0-100
 - Due Date (date) - Target completion
 - Tags (multi-select) - Categorization
+
+**Note**: Type property is NOT needed - type is determined by which database the item comes from.
 
 ## Testing Notion Connection
 
@@ -153,3 +209,10 @@ Common lint fixes:
 - Remove unused variables (prefix with `_` if intentionally unused)
 - Fix useMemo/useCallback dependencies
 - Remove unused imports
+
+## Debug Mode
+
+In development mode, the app logs helpful debug info to the console:
+- Property names detected from each database
+- Warnings when Type or Parent properties are not found
+- Which database is currently being fetched
