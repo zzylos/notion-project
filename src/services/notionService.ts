@@ -1,4 +1,4 @@
-import type { WorkItem, ItemType, ItemStatus, Priority, Owner, NotionConfig } from '../types';
+import type { WorkItem, ItemType, ItemStatus, Priority, Owner, NotionConfig, PropertyMappings, DatabaseConfig } from '../types';
 
 // Type for Notion API responses
 type NotionPage = {
@@ -39,6 +39,7 @@ export type FetchProgressCallback = (progress: {
   total: number | null;
   items: WorkItem[];
   done: boolean;
+  currentDatabase?: string;
 }) => void;
 
 /**
@@ -56,17 +57,18 @@ export type FetchProgressCallback = (progress: {
 const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || 'https://corsproxy.io/?';
 const NOTION_API_BASE = 'https://api.notion.com/v1';
 
-// Note: Notion's cursor-based pagination requires sequential requests
-// (each cursor depends on the previous response), so true parallelization
-// is not possible. We fetch one page at a time.
-
 class NotionService {
   private config: NotionConfig | null = null;
   private cache: Map<string, { items: WorkItem[]; timestamp: number }> = new Map();
   private cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
 
+  // Debug flag - set to true in dev to log property mappings
+  private debugMode = import.meta.env.DEV;
+  private loggedDatabases = new Set<string>();
+
   initialize(config: NotionConfig) {
     this.config = config;
+    this.loggedDatabases.clear();
   }
 
   isInitialized(): boolean {
@@ -102,80 +104,25 @@ class NotionService {
     return response.json();
   }
 
-  // Debug flag - set to true in dev to log property mappings
-  private debugMode = import.meta.env.DEV;
-  private hasLoggedProperties = false;
+  // Log property names once per database for debugging
+  private logPropertyNames(databaseType: ItemType, props: Record<string, NotionPropertyValue>): void {
+    if (!this.debugMode) return;
 
-  // Log property names once for debugging
-  private logPropertyNames(props: Record<string, NotionPropertyValue>): void {
-    if (!this.debugMode || this.hasLoggedProperties) return;
-    this.hasLoggedProperties = true;
+    const dbKey = databaseType;
+    if (this.loggedDatabases.has(dbKey)) return;
+    this.loggedDatabases.add(dbKey);
 
     const propertyInfo = Object.entries(props).map(([name, value]) => ({
       name,
       type: value.type,
       hasValue: this.hasPropertyValue(value),
-      sampleValue: this.getSampleValue(value),
     }));
 
     console.info(
-      '%c[Notion Debug] Database properties detected:',
+      `%c[Notion Debug] ${databaseType.toUpperCase()} database properties:`,
       'color: #0ea5e9; font-weight: bold'
     );
     console.table(propertyInfo);
-
-    // Check for common issues
-    const hasRelation = propertyInfo.some(p => p.type === 'relation');
-    const hasTypeProperty = propertyInfo.some(p =>
-      p.name.toLowerCase().includes('type') || p.name.toLowerCase().includes('category')
-    );
-
-    if (!hasRelation) {
-      console.warn(
-        '%c[Notion Warning] No relation property found. Parent/child hierarchy will not work. ' +
-        'Add a self-referencing relation property to enable hierarchy.',
-        'color: #f59e0b; font-weight: bold'
-      );
-    }
-
-    if (!hasTypeProperty) {
-      console.warn(
-        '%c[Notion Warning] No "Type" or "Category" property found. All items will show as "Project". ' +
-        'Add a select property named "Type" with values like Mission, Problem, Solution, Design, Project.',
-        'color: #f59e0b; font-weight: bold'
-      );
-    }
-
-    console.info(
-      '%cConfigure property names in Settings > Property Mappings if data is not showing correctly.',
-      'color: #64748b'
-    );
-  }
-
-  // Get a sample value from a property for debugging
-  private getSampleValue(prop: NotionPropertyValue): string {
-    switch (prop.type) {
-      case 'select':
-        return prop.select?.name || '(empty)';
-      case 'status':
-        return prop.status?.name || '(empty)';
-      case 'relation':
-        return prop.relation?.length ? `${prop.relation.length} linked` : '(empty)';
-      case 'people':
-        return prop.people?.length ? `${prop.people.length} people` : '(empty)';
-      case 'number':
-        return prop.number !== null ? String(prop.number) : '(empty)';
-      case 'date':
-        return prop.date?.start || '(empty)';
-      case 'title':
-        return prop.title?.map(t => t.plain_text).join('').substring(0, 30) || '(empty)';
-      case 'rich_text':
-        return prop.rich_text?.map(t => t.plain_text).join('').substring(0, 30) || '(empty)';
-      case 'multi_select':
-        return prop.multi_select?.map(s => s.name).join(', ').substring(0, 30) || '(empty)';
-      default:
-        return '...';
-    }
   }
 
   private hasPropertyValue(prop: NotionPropertyValue): boolean {
@@ -197,7 +144,27 @@ class NotionService {
     }
   }
 
-  // Find property by name (case-insensitive) or by type, with auto-detection fallbacks
+  // Get the effective mappings for a database (default + overrides)
+  private getMappings(dbConfig?: DatabaseConfig): PropertyMappings {
+    const defaults = this.config?.defaultMappings || {
+      title: 'Name',
+      status: 'Status',
+      priority: 'Priority',
+      owner: 'Owner',
+      parent: 'Parent',
+      progress: 'Progress',
+      dueDate: 'Deadline',
+      tags: 'Tags',
+    };
+
+    if (!dbConfig?.mappings) {
+      return defaults;
+    }
+
+    return { ...defaults, ...dbConfig.mappings };
+  }
+
+  // Find property by name (case-insensitive)
   private findProperty(
     props: Record<string, NotionPropertyValue>,
     mappingName: string,
@@ -216,7 +183,7 @@ class NotionService {
       }
     }
 
-    // Try common aliases based on the mapping name
+    // Try common aliases
     const aliases = this.getPropertyAliases(mappingName);
     for (const alias of aliases) {
       const lowerAlias = alias.toLowerCase();
@@ -227,7 +194,7 @@ class NotionService {
       }
     }
 
-    // Try to find by type (useful for title which is unique)
+    // Try to find by type
     if (fallbackType) {
       for (const value of Object.values(props)) {
         if (value.type === fallbackType) {
@@ -236,18 +203,8 @@ class NotionService {
       }
     }
 
-    // Special case: for relation properties, try to find ANY relation property
-    // (Most databases with hierarchy have exactly one self-referencing relation)
+    // Special case: for relation properties, find ANY relation
     if (fallbackType === 'relation' || mappingName.toLowerCase() === 'parent') {
-      for (const [key, value] of Object.entries(props)) {
-        if (value.type === 'relation' && value.relation && value.relation.length > 0) {
-          if (this.debugMode) {
-            console.info(`%c[Notion Debug] Auto-detected relation property: "${key}"`, 'color: #10b981');
-          }
-          return value;
-        }
-      }
-      // Even if empty, return the first relation property found
       for (const value of Object.values(props)) {
         if (value.type === 'relation') {
           return value;
@@ -258,13 +215,11 @@ class NotionService {
     return null;
   }
 
-  // Common property name aliases to try as fallbacks
   private getPropertyAliases(mappingName: string): string[] {
     const aliasMap: Record<string, string[]> = {
-      'Status': ['Status', 'State', 'Stage', 'Phase', 'Progress Status', 'Task Status', 'Item Status'],
-      'Type': ['Type', 'Category', 'Kind', 'Item Type', 'Work Type', 'Task Type'],
+      'Status': ['Status', 'State', 'Stage', 'Phase'],
       'Priority': ['Priority', 'Importance', 'Urgency', 'Level', 'P'],
-      'Parent': ['Parent', 'Parent Item', 'Parent Task', 'Belongs To', 'Part Of', 'Epic', 'Initiative'],
+      'Parent': ['Parent', 'Parent Item', 'Parent Task', 'Belongs To', 'Part Of', 'Epic', 'Initiative', 'Objective', 'Problem', 'Solution', 'Project'],
       'Owner': ['Owner', 'Assignee', 'Assigned To', 'Responsible', 'Lead', 'Person', 'People', 'Assigned'],
       'Progress': ['Progress', 'Completion', 'Percent Complete', '% Complete', 'Done %'],
       'Deadline': ['Deadline', 'Due Date', 'Due', 'Target Date', 'End Date', 'Finish Date', 'Due By'],
@@ -274,7 +229,6 @@ class NotionService {
   }
 
   private extractTitle(props: Record<string, NotionPropertyValue>, mappingName: string): string {
-    // First try the mapped property name
     const mapped = this.findProperty(props, mappingName);
     if (mapped) {
       if (mapped.type === 'title' && mapped.title) {
@@ -285,7 +239,7 @@ class NotionService {
       }
     }
 
-    // Fallback: find ANY title property (every Notion DB has exactly one)
+    // Fallback: find ANY title property
     for (const value of Object.values(props)) {
       if (value.type === 'title' && value.title && value.title.length > 0) {
         return value.title.map(t => t.plain_text).join('');
@@ -299,7 +253,6 @@ class NotionService {
     const prop = this.findProperty(props, mappingName);
     if (!prop) return null;
 
-    // Handle both 'select' and 'status' types (Notion has a special status type)
     if (prop.type === 'select' && prop.select) {
       return prop.select.name;
     }
@@ -310,32 +263,8 @@ class NotionService {
     return null;
   }
 
-  private extractSelect(props: Record<string, NotionPropertyValue>, mappingName: string, autoDetectType?: 'type'): string | null {
-    let prop = this.findProperty(props, mappingName);
-
-    // For 'type' mapping, try to auto-detect a suitable select property
-    if (!prop && autoDetectType === 'type') {
-      // Look for any select property with type-like values
-      for (const [key, value] of Object.entries(props)) {
-        if (value.type === 'select' && value.select) {
-          const name = value.select.name.toLowerCase();
-          if (
-            name.includes('project') || name.includes('task') ||
-            name.includes('mission') || name.includes('problem') ||
-            name.includes('solution') || name.includes('design') ||
-            name.includes('epic') || name.includes('story') ||
-            name.includes('bug') || name.includes('feature')
-          ) {
-            if (this.debugMode) {
-              console.info(`%c[Notion Debug] Auto-detected type property: "${key}" = "${value.select.name}"`, 'color: #10b981');
-            }
-            prop = value;
-            break;
-          }
-        }
-      }
-    }
-
+  private extractSelect(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
+    const prop = this.findProperty(props, mappingName);
     if (!prop) return null;
 
     if (prop.type === 'select' && prop.select) {
@@ -383,56 +312,8 @@ class NotionService {
     return prop.relation.map(r => r.id);
   }
 
-  private mapToItemType(notionType: string | null): ItemType {
-    if (!notionType) return 'project'; // Default to project if no type
-
-    const normalized = notionType.toLowerCase().trim();
-
-    // Check for exact matches first
-    const exactMap: Record<string, ItemType> = {
-      'mission': 'mission',
-      'problem': 'problem',
-      'solution': 'solution',
-      'design': 'design',
-      'project': 'project',
-      'task': 'project',
-      'feature': 'project',
-      'epic': 'mission',
-      'story': 'project',
-      'bug': 'problem',
-      'issue': 'problem',
-      'idea': 'solution',
-      'proposal': 'solution',
-      'spec': 'design',
-      'specification': 'design',
-      'mockup': 'design',
-      'prototype': 'design',
-    };
-
-    if (exactMap[normalized]) {
-      return exactMap[normalized];
-    }
-
-    // Check for partial matches (contains)
-    if (normalized.includes('mission') || normalized.includes('goal') || normalized.includes('objective')) {
-      return 'mission';
-    }
-    if (normalized.includes('problem') || normalized.includes('bug') || normalized.includes('issue') || normalized.includes('defect')) {
-      return 'problem';
-    }
-    if (normalized.includes('solution') || normalized.includes('fix') || normalized.includes('idea')) {
-      return 'solution';
-    }
-    if (normalized.includes('design') || normalized.includes('mockup') || normalized.includes('spec') || normalized.includes('ui') || normalized.includes('ux')) {
-      return 'design';
-    }
-
-    return 'project';
-  }
-
-  // Preserve original status from Notion - no longer map to fixed categories
+  // Preserve original status from Notion
   private mapToItemStatus(notionStatus: string | null): ItemStatus {
-    // Return the original status value, or a default if none
     return notionStatus?.trim() || 'Not Started';
   }
 
@@ -442,59 +323,35 @@ class NotionService {
     const normalized = notionPriority.toLowerCase().trim();
 
     const priorityMap: Record<string, Priority> = {
-      'p0': 'P0',
-      'p1': 'P1',
-      'p2': 'P2',
-      'p3': 'P3',
-      'p4': 'P3',
-      'critical': 'P0',
-      'highest': 'P0',
-      'urgent': 'P0',
-      'blocker': 'P0',
-      'high': 'P1',
-      'important': 'P1',
-      'medium': 'P2',
-      'normal': 'P2',
-      'moderate': 'P2',
-      'low': 'P3',
-      'minor': 'P3',
-      'trivial': 'P3',
-      'lowest': 'P3',
+      'p0': 'P0', 'p1': 'P1', 'p2': 'P2', 'p3': 'P3', 'p4': 'P3',
+      'critical': 'P0', 'highest': 'P0', 'urgent': 'P0', 'blocker': 'P0',
+      'high': 'P1', 'important': 'P1',
+      'medium': 'P2', 'normal': 'P2', 'moderate': 'P2',
+      'low': 'P3', 'minor': 'P3', 'trivial': 'P3', 'lowest': 'P3',
     };
 
-    // Check exact match
     if (priorityMap[normalized]) {
       return priorityMap[normalized];
     }
 
-    // Check for partial matches
-    if (normalized.includes('critical') || normalized.includes('urgent') || normalized.includes('blocker') || normalized.includes('highest')) {
-      return 'P0';
-    }
-    if (normalized.includes('high') || normalized.includes('important')) {
-      return 'P1';
-    }
-    if (normalized.includes('medium') || normalized.includes('normal') || normalized.includes('moderate')) {
-      return 'P2';
-    }
-    if (normalized.includes('low') || normalized.includes('minor') || normalized.includes('trivial')) {
-      return 'P3';
-    }
+    // Partial matches
+    if (normalized.includes('critical') || normalized.includes('urgent')) return 'P0';
+    if (normalized.includes('high')) return 'P1';
+    if (normalized.includes('medium') || normalized.includes('normal')) return 'P2';
+    if (normalized.includes('low')) return 'P3';
 
     return undefined;
   }
 
-  private pageToWorkItem(page: NotionPage): WorkItem {
-    if (!this.config) throw new Error('NotionService not initialized');
-
-    const { mappings } = this.config;
+  // Convert a Notion page to a WorkItem with a specified type
+  private pageToWorkItem(page: NotionPage, itemType: ItemType, dbConfig?: DatabaseConfig): WorkItem {
+    const mappings = this.getMappings(dbConfig);
     const props = page.properties;
 
-    // Log property names once in dev mode to help with debugging
-    this.logPropertyNames(props);
+    // Log property names once per database type
+    this.logPropertyNames(itemType, props);
 
     const title = this.extractTitle(props, mappings.title);
-    const type = this.extractSelect(props, mappings.type, 'type');
     const status = this.extractStatus(props, mappings.status);
     const priority = this.extractSelect(props, mappings.priority);
     const progress = this.extractNumber(props, mappings.progress);
@@ -506,7 +363,7 @@ class NotionService {
     return {
       id: page.id,
       title: title || 'Untitled',
-      type: this.mapToItemType(type),
+      type: itemType, // Type comes from which database we're fetching
       status: this.mapToItemStatus(status),
       priority: this.mapToPriority(priority),
       progress: progress ?? undefined,
@@ -524,21 +381,43 @@ class NotionService {
     };
   }
 
-  // Process pages in batches to convert to WorkItems without blocking
-  private processPagesInBatches(pages: NotionPage[], batchSize = 50): WorkItem[] {
-    const items: WorkItem[] = [];
-    for (let i = 0; i < pages.length; i += batchSize) {
-      const batch = pages.slice(i, i + batchSize);
-      for (const page of batch) {
-        if ('properties' in page) {
-          items.push(this.pageToWorkItem(page));
-        }
-      }
+  // Fetch a single page of results from a database
+  private async fetchPage(databaseId: string, cursor?: string): Promise<NotionQueryResponse> {
+    if (!this.config) {
+      throw new Error('NotionService not initialized');
     }
-    return items;
+
+    const body: Record<string, unknown> = { page_size: 100 };
+    if (cursor) {
+      body.start_cursor = cursor;
+    }
+
+    return this.notionFetch<NotionQueryResponse>(
+      `/databases/${databaseId}/query`,
+      { method: 'POST', body: JSON.stringify(body) }
+    );
   }
 
-  // Build parent-child relationships efficiently
+  // Fetch all pages from a single database
+  private async fetchAllFromDatabase(dbConfig: DatabaseConfig): Promise<WorkItem[]> {
+    const allPages: NotionPage[] = [];
+
+    let currentCursor: string | undefined;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.fetchPage(dbConfig.databaseId, currentCursor);
+      allPages.push(...response.results);
+      hasMore = response.has_more;
+      currentCursor = response.next_cursor ?? undefined;
+    }
+
+    return allPages
+      .filter(page => 'properties' in page)
+      .map(page => this.pageToWorkItem(page, dbConfig.type, dbConfig));
+  }
+
+  // Build parent-child relationships across all items
   private buildRelationships(items: WorkItem[]): void {
     const itemMap = new Map(items.map(item => [item.id, item]));
     for (const item of items) {
@@ -550,113 +429,83 @@ class NotionService {
     }
   }
 
-  // Fetch a single page of results
-  private async fetchPage(cursor?: string): Promise<NotionQueryResponse> {
-    if (!this.config) {
-      throw new Error('NotionService not initialized');
+  // Get database configs, handling both new and legacy formats
+  private getDatabaseConfigs(): DatabaseConfig[] {
+    if (!this.config) return [];
+
+    // New format: multiple databases
+    if (this.config.databases && this.config.databases.length > 0) {
+      return this.config.databases;
     }
 
-    const body: Record<string, unknown> = {
-      page_size: 100,
-    };
-    if (cursor) {
-      body.start_cursor = cursor;
+    // Legacy format: single database
+    if (this.config.databaseId) {
+      return [{
+        databaseId: this.config.databaseId,
+        type: 'project', // Default type for legacy single-database
+      }];
     }
 
-    return this.notionFetch<NotionQueryResponse>(
-      `/databases/${this.config.databaseId}/query`,
-      {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }
-    );
+    return [];
   }
 
-  // Fetch all items with progressive loading support
+  // Fetch all items from all configured databases
   async fetchAllItems(onProgress?: FetchProgressCallback): Promise<WorkItem[]> {
     if (!this.config) {
       throw new Error('NotionService not initialized. Call initialize() first.');
     }
 
-    // Check cache first
-    const cacheKey = this.config.databaseId;
+    const dbConfigs = this.getDatabaseConfigs();
+    if (dbConfigs.length === 0) {
+      throw new Error('No databases configured');
+    }
+
+    // Check cache
+    const cacheKey = dbConfigs.map(db => db.databaseId).sort().join('|');
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       onProgress?.({ loaded: cached.items.length, total: cached.items.length, items: cached.items, done: true });
       return cached.items;
     }
 
-    const allPages: NotionPage[] = [];
+    const allItems: WorkItem[] = [];
 
-    // First request to get initial data and check if there's more
-    const firstResponse = await this.fetchPage();
-    allPages.push(...firstResponse.results);
+    // Fetch from each database
+    for (let i = 0; i < dbConfigs.length; i++) {
+      const dbConfig = dbConfigs[i];
 
-    // Report initial progress
-    const initialItems = this.processPagesInBatches(allPages);
-    onProgress?.({ loaded: initialItems.length, total: null, items: initialItems, done: false });
+      if (this.debugMode) {
+        console.info(`%c[Notion] Fetching ${dbConfig.type} database...`, 'color: #10b981');
+      }
 
-    if (firstResponse.has_more && firstResponse.next_cursor) {
-      // Fetch remaining pages sequentially (cursor-based pagination requires this)
-      let currentCursor: string | null = firstResponse.next_cursor;
-
-      while (currentCursor) {
-        const response = await this.fetchPage(currentCursor);
-        allPages.push(...response.results);
-        currentCursor = response.has_more ? response.next_cursor : null;
+      try {
+        const items = await this.fetchAllFromDatabase(dbConfig);
+        allItems.push(...items);
 
         // Report progress
-        const currentItems = this.processPagesInBatches(allPages);
         onProgress?.({
-          loaded: currentItems.length,
+          loaded: allItems.length,
           total: null,
-          items: currentItems,
-          done: false
+          items: [...allItems],
+          done: i === dbConfigs.length - 1,
+          currentDatabase: dbConfig.type,
         });
+      } catch (error) {
+        console.error(`Failed to fetch ${dbConfig.type} database:`, error);
+        // Continue with other databases
       }
     }
 
-    // Final processing
-    const items = this.processPagesInBatches(allPages);
-    this.buildRelationships(items);
+    // Build relationships across all items
+    this.buildRelationships(allItems);
 
     // Cache the results
-    this.cache.set(cacheKey, { items, timestamp: Date.now() });
+    this.cache.set(cacheKey, { items: allItems, timestamp: Date.now() });
 
     // Final progress callback
-    onProgress?.({ loaded: items.length, total: items.length, items, done: true });
+    onProgress?.({ loaded: allItems.length, total: allItems.length, items: allItems, done: true });
 
-    return items;
-  }
-
-  // Fetch with streaming updates to the store
-  async fetchAllItemsStreaming(
-    onBatch: (items: WorkItem[], isComplete: boolean) => void
-  ): Promise<void> {
-    if (!this.config) {
-      throw new Error('NotionService not initialized. Call initialize() first.');
-    }
-
-    const allPages: NotionPage[] = [];
-    let hasMore = true;
-    let startCursor: string | undefined;
-    let batchCount = 0;
-
-    while (hasMore) {
-      const response = await this.fetchPage(startCursor);
-      allPages.push(...response.results);
-      batchCount++;
-
-      // Process and send batch update every few requests
-      if (batchCount % 2 === 0 || !response.has_more) {
-        const items = this.processPagesInBatches(allPages);
-        this.buildRelationships(items);
-        onBatch(items, !response.has_more);
-      }
-
-      hasMore = response.has_more;
-      startCursor = response.next_cursor ?? undefined;
-    }
+    return allItems;
   }
 
   async fetchItem(pageId: string): Promise<WorkItem> {
@@ -665,7 +514,8 @@ class NotionService {
     }
 
     const page = await this.notionFetch<NotionPage>(`/pages/${pageId}`);
-    return this.pageToWorkItem(page);
+    // Default to project type for single item fetch
+    return this.pageToWorkItem(page, 'project');
   }
 
   async updateItemStatus(pageId: string, status: ItemStatus): Promise<void> {
@@ -673,32 +523,20 @@ class NotionService {
       throw new Error('NotionService not initialized');
     }
 
-    const statusName = this.statusToNotionName(status);
+    const mappings = this.getMappings();
 
     await this.notionFetch(`/pages/${pageId}`, {
       method: 'PATCH',
       body: JSON.stringify({
         properties: {
-          [this.config.mappings.status]: {
-            select: { name: statusName },
+          [mappings.status]: {
+            select: { name: status },
           },
         },
       }),
     });
 
-    // Invalidate cache after update
     this.clearCache();
-  }
-
-  private statusToNotionName(status: ItemStatus): string {
-    const reverseMap: Record<ItemStatus, string> = {
-      'not-started': 'Not Started',
-      'in-progress': 'In Progress',
-      'blocked': 'Blocked',
-      'in-review': 'In Review',
-      'completed': 'Completed',
-    };
-    return reverseMap[status];
   }
 
   async updateItemProgress(pageId: string, progress: number): Promise<void> {
@@ -706,18 +544,19 @@ class NotionService {
       throw new Error('NotionService not initialized');
     }
 
+    const mappings = this.getMappings();
+
     await this.notionFetch(`/pages/${pageId}`, {
       method: 'PATCH',
       body: JSON.stringify({
         properties: {
-          [this.config.mappings.progress]: {
+          [mappings.progress]: {
             number: Math.min(100, Math.max(0, progress)),
           },
         },
       }),
     });
 
-    // Invalidate cache after update
     this.clearCache();
   }
 }
