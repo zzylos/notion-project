@@ -162,12 +162,13 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const filteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+  const fitViewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Handle fullscreen changes (including ESC key)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(Boolean(document.fullscreenElement));
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -183,8 +184,8 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       } else {
         await document.exitFullscreen();
       }
-    } catch (err) {
-      console.error('Fullscreen error:', err);
+    } catch {
+      // Fullscreen may not be available in some browsers/contexts
     }
   }, []);
 
@@ -233,9 +234,21 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     const newLayout = calculateLayout(filteredItems, selectedItemId);
     setNodes(newLayout.nodes);
     setEdges(newLayout.edges);
-    // Fit view after a short delay to allow nodes to update
-    setTimeout(() => fitView({ padding: 0.2 }), 50);
+    // Fit view after a short delay to allow nodes to update (clear any existing timeout first)
+    if (fitViewTimeoutRef.current) {
+      clearTimeout(fitViewTimeoutRef.current);
+    }
+    fitViewTimeoutRef.current = setTimeout(() => fitView({ padding: 0.2 }), 50);
   }, [filteredItems, selectedItemId, setNodes, setEdges, fitView]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (fitViewTimeoutRef.current) {
+        clearTimeout(fitViewTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {

@@ -41,13 +41,24 @@ export type FetchProgressCallback = (progress: {
   done: boolean;
 }) => void;
 
-// CORS proxy for browser requests (you can self-host one or use a service)
-// For production, you should use your own backend proxy
-const CORS_PROXY = 'https://corsproxy.io/?';
+/**
+ * SECURITY WARNING:
+ * This service makes browser-based API calls through a CORS proxy.
+ * The API key is stored in localStorage and transmitted through the proxy.
+ *
+ * For production deployments, you should:
+ * 1. Implement a server-side proxy to keep API keys secure
+ * 2. Never expose Notion API keys in client-side code
+ * 3. Use environment variables for sensitive configuration
+ *
+ * Configure CORS proxy via VITE_CORS_PROXY environment variable.
+ */
+const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || 'https://corsproxy.io/?';
 const NOTION_API_BASE = 'https://api.notion.com/v1';
 
-// Number of concurrent requests for parallel fetching
-const PARALLEL_REQUESTS = 3;
+// Note: Notion's cursor-based pagination requires sequential requests
+// (each cursor depends on the previous response), so true parallelization
+// is not possible. We fetch one page at a time.
 
 class NotionService {
   private config: NotionConfig | null = null;
@@ -85,7 +96,6 @@ class NotionService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Notion API error:', response.status, errorText);
       throw new Error(`Notion API error: ${response.status} - ${errorText}`);
     }
 
@@ -377,15 +387,11 @@ class NotionService {
     const cacheKey = this.config.databaseId;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      console.log('Using cached data:', cached.items.length, 'items');
       onProgress?.({ loaded: cached.items.length, total: cached.items.length, items: cached.items, done: true });
       return cached.items;
     }
 
     const allPages: NotionPage[] = [];
-
-    console.log('Starting optimized Notion fetch...');
-    const startTime = performance.now();
 
     // First request to get initial data and check if there's more
     const firstResponse = await this.fetchPage();
@@ -396,30 +402,13 @@ class NotionService {
     onProgress?.({ loaded: initialItems.length, total: null, items: initialItems, done: false });
 
     if (firstResponse.has_more && firstResponse.next_cursor) {
-      // Collect all cursors by making sequential requests first to get cursors
-      // Then we can parallelize future fetches
+      // Fetch remaining pages sequentially (cursor-based pagination requires this)
       let currentCursor: string | null = firstResponse.next_cursor;
 
       while (currentCursor) {
-        // Fetch in parallel batches
-        const batchPromises: Promise<NotionQueryResponse>[] = [];
-        const batchCursors: string[] = [];
-
-        // Queue up parallel requests
-        for (let i = 0; i < PARALLEL_REQUESTS && currentCursor; i++) {
-          batchCursors.push(currentCursor);
-          batchPromises.push(this.fetchPage(currentCursor));
-          // We'll get the next cursor from the response, so break for now
-          if (i === 0) break; // For first iteration, we need to get next cursor
-        }
-
-        // Execute batch
-        const responses = await Promise.all(batchPromises);
-
-        for (const response of responses) {
-          allPages.push(...response.results);
-          currentCursor = response.has_more ? response.next_cursor : null;
-        }
+        const response = await this.fetchPage(currentCursor);
+        allPages.push(...response.results);
+        currentCursor = response.has_more ? response.next_cursor : null;
 
         // Report progress
         const currentItems = this.processPagesInBatches(allPages);
@@ -429,17 +418,12 @@ class NotionService {
           items: currentItems,
           done: false
         });
-
-        console.log(`Fetched ${allPages.length} pages so far...`);
       }
     }
 
     // Final processing
     const items = this.processPagesInBatches(allPages);
     this.buildRelationships(items);
-
-    const endTime = performance.now();
-    console.log(`Fetched ${items.length} items in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
     // Cache the results
     this.cache.set(cacheKey, { items, timestamp: Date.now() });
@@ -463,9 +447,6 @@ class NotionService {
     let startCursor: string | undefined;
     let batchCount = 0;
 
-    console.log('Starting streaming Notion fetch...');
-    const startTime = performance.now();
-
     while (hasMore) {
       const response = await this.fetchPage(startCursor);
       allPages.push(...response.results);
@@ -481,9 +462,6 @@ class NotionService {
       hasMore = response.has_more;
       startCursor = response.next_cursor ?? undefined;
     }
-
-    const endTime = performance.now();
-    console.log(`Streaming fetch complete: ${allPages.length} items in ${((endTime - startTime) / 1000).toFixed(2)}s`);
   }
 
   async fetchItem(pageId: string): Promise<WorkItem> {

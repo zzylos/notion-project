@@ -1,4 +1,4 @@
-import React from 'react';
+import { useMemo } from 'react';
 import {
   Search,
   X,
@@ -29,7 +29,7 @@ const FilterPanel: React.FC = () => {
   const priorities: Priority[] = ['P0', 'P1', 'P2', 'P3'];
 
   // Get unique owners from items
-  const owners = React.useMemo(() => {
+  const owners = useMemo(() => {
     const ownerMap = new Map<string, { id: string; name: string }>();
     items.forEach((item) => {
       if (item.owner) {
