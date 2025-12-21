@@ -115,6 +115,7 @@ class NotionService {
       name,
       type: value.type,
       hasValue: this.hasPropertyValue(value),
+      sampleValue: this.getSampleValue(value),
     }));
 
     console.info(
@@ -122,10 +123,59 @@ class NotionService {
       'color: #0ea5e9; font-weight: bold'
     );
     console.table(propertyInfo);
+
+    // Check for common issues
+    const hasRelation = propertyInfo.some(p => p.type === 'relation');
+    const hasTypeProperty = propertyInfo.some(p =>
+      p.name.toLowerCase().includes('type') || p.name.toLowerCase().includes('category')
+    );
+
+    if (!hasRelation) {
+      console.warn(
+        '%c[Notion Warning] No relation property found. Parent/child hierarchy will not work. ' +
+        'Add a self-referencing relation property to enable hierarchy.',
+        'color: #f59e0b; font-weight: bold'
+      );
+    }
+
+    if (!hasTypeProperty) {
+      console.warn(
+        '%c[Notion Warning] No "Type" or "Category" property found. All items will show as "Project". ' +
+        'Add a select property named "Type" with values like Mission, Problem, Solution, Design, Project.',
+        'color: #f59e0b; font-weight: bold'
+      );
+    }
+
     console.info(
-      '%cConfigure these in Settings > Property Mappings if data is not showing correctly.',
+      '%cConfigure property names in Settings > Property Mappings if data is not showing correctly.',
       'color: #64748b'
     );
+  }
+
+  // Get a sample value from a property for debugging
+  private getSampleValue(prop: NotionPropertyValue): string {
+    switch (prop.type) {
+      case 'select':
+        return prop.select?.name || '(empty)';
+      case 'status':
+        return prop.status?.name || '(empty)';
+      case 'relation':
+        return prop.relation?.length ? `${prop.relation.length} linked` : '(empty)';
+      case 'people':
+        return prop.people?.length ? `${prop.people.length} people` : '(empty)';
+      case 'number':
+        return prop.number !== null ? String(prop.number) : '(empty)';
+      case 'date':
+        return prop.date?.start || '(empty)';
+      case 'title':
+        return prop.title?.map(t => t.plain_text).join('').substring(0, 30) || '(empty)';
+      case 'rich_text':
+        return prop.rich_text?.map(t => t.plain_text).join('').substring(0, 30) || '(empty)';
+      case 'multi_select':
+        return prop.multi_select?.map(s => s.name).join(', ').substring(0, 30) || '(empty)';
+      default:
+        return '...';
+    }
   }
 
   private hasPropertyValue(prop: NotionPropertyValue): boolean {
@@ -186,6 +236,25 @@ class NotionService {
       }
     }
 
+    // Special case: for relation properties, try to find ANY relation property
+    // (Most databases with hierarchy have exactly one self-referencing relation)
+    if (fallbackType === 'relation' || mappingName.toLowerCase() === 'parent') {
+      for (const [key, value] of Object.entries(props)) {
+        if (value.type === 'relation' && value.relation && value.relation.length > 0) {
+          if (this.debugMode) {
+            console.info(`%c[Notion Debug] Auto-detected relation property: "${key}"`, 'color: #10b981');
+          }
+          return value;
+        }
+      }
+      // Even if empty, return the first relation property found
+      for (const value of Object.values(props)) {
+        if (value.type === 'relation') {
+          return value;
+        }
+      }
+    }
+
     return null;
   }
 
@@ -241,8 +310,32 @@ class NotionService {
     return null;
   }
 
-  private extractSelect(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
-    const prop = this.findProperty(props, mappingName);
+  private extractSelect(props: Record<string, NotionPropertyValue>, mappingName: string, autoDetectType?: 'type'): string | null {
+    let prop = this.findProperty(props, mappingName);
+
+    // For 'type' mapping, try to auto-detect a suitable select property
+    if (!prop && autoDetectType === 'type') {
+      // Look for any select property with type-like values
+      for (const [key, value] of Object.entries(props)) {
+        if (value.type === 'select' && value.select) {
+          const name = value.select.name.toLowerCase();
+          if (
+            name.includes('project') || name.includes('task') ||
+            name.includes('mission') || name.includes('problem') ||
+            name.includes('solution') || name.includes('design') ||
+            name.includes('epic') || name.includes('story') ||
+            name.includes('bug') || name.includes('feature')
+          ) {
+            if (this.debugMode) {
+              console.info(`%c[Notion Debug] Auto-detected type property: "${key}" = "${value.select.name}"`, 'color: #10b981');
+            }
+            prop = value;
+            break;
+          }
+        }
+      }
+    }
+
     if (!prop) return null;
 
     if (prop.type === 'select' && prop.select) {
@@ -285,7 +378,7 @@ class NotionService {
   }
 
   private extractRelation(props: Record<string, NotionPropertyValue>, mappingName: string): string[] {
-    const prop = this.findProperty(props, mappingName);
+    const prop = this.findProperty(props, mappingName, 'relation');
     if (!prop || prop.type !== 'relation' || !prop.relation) return [];
     return prop.relation.map(r => r.id);
   }
@@ -401,7 +494,7 @@ class NotionService {
     this.logPropertyNames(props);
 
     const title = this.extractTitle(props, mappings.title);
-    const type = this.extractSelect(props, mappings.type);
+    const type = this.extractSelect(props, mappings.type, 'type');
     const status = this.extractStatus(props, mappings.status);
     const priority = this.extractSelect(props, mappings.priority);
     const progress = this.extractNumber(props, mappings.progress);
