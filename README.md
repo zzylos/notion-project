@@ -4,11 +4,41 @@ An interactive visualization tool for HouseSigma that displays work items (probl
 
 ## Features
 
-### Interactive Tree/Hierarchy View
+### Multiple View Modes
+
+#### Tree View (Default)
 - Expandable/collapsible tree nodes showing parent-child relationships
 - Visual connection lines between related items
 - Click to select and view detailed information
+- Expand/collapse all functionality
 - Navigate through the tree to understand how work items connect to company mission
+
+#### Canvas View
+- Interactive node-based visualization similar to Obsidian Canvas
+- Hierarchical layout with automatic node positioning
+- Drag and drop nodes to reorganize the view
+- Reset Layout button to restore original positions
+- Fullscreen mode for focused work
+- Smooth edge connections between parent-child items
+- Color-coded nodes by type
+
+#### Kanban View
+- Board-style view organized by status columns
+- Not Started, In Progress, Blocked, In Review, Completed columns
+- Click cards to view details
+- Visual item count per column
+
+#### List View
+- Spreadsheet-style tabular view of all items
+- Columns: Status, Title, Type, Priority, Owner, Progress
+- Virtualized scrolling for large datasets (1000+ items)
+- Smooth performance with @tanstack/react-virtual
+
+#### Timeline View
+- Chronological view of items with due dates
+- Visual timeline with status indicators
+- Overdue item highlighting
+- Sorted by due date
 
 ### Color Coding by Status
 - **Not Started** (gray) - Work that hasn't begun
@@ -44,6 +74,13 @@ An interactive visualization tool for HouseSigma that displays work items (probl
 - Sync work items from Notion database
 - Configurable property mappings
 - Open items directly in Notion
+- CORS proxy support for browser-based API calls
+
+### Performance Optimizations
+- **5-minute caching** - Reduces redundant API calls to Notion
+- **Progressive loading** - See items as they load with progress bar
+- **Virtualized lists** - Smooth scrolling for thousands of items
+- **Force refresh** - Clear cache and reload data when needed
 
 ## User Scenarios
 
@@ -73,12 +110,32 @@ npm run dev
 
 # Build for production
 npm run build
+
+# Run linter
+npm run lint
 ```
+
+### Testing Notion Connection
+
+Before configuring the app, you can validate your Notion API credentials:
+
+```bash
+npm run test:notion <API_KEY> <DATABASE_ID>
+
+# Example:
+npm run test:notion secret_abc123 abc123def456
+```
+
+This script will:
+1. Validate your API key
+2. Check database access permissions
+3. Test querying the database
+4. Provide helpful error messages for common issues
 
 ### Connecting to Notion
 
 1. Create a Notion integration at [notion.so/my-integrations](https://www.notion.so/my-integrations)
-2. Share your database with the integration
+2. Share your database with the integration (click "..." menu → "Add connections")
 3. Click the Settings icon in the app header
 4. Enter your API key and database ID
 5. Configure property mappings if needed
@@ -110,22 +167,28 @@ Your Notion database should have these properties (configurable in settings):
 - **Vite** - Build tool
 - **Tailwind CSS** - Styling
 - **Zustand** - State management
-- **@notionhq/client** - Notion API
+- **@xyflow/react** - Canvas/node visualization
+- **@tanstack/react-virtual** - List virtualization
 - **Lucide React** - Icons
+- **D3.js** - Data visualization utilities
 
 ## Project Structure
 
 ```
 src/
 ├── components/
+│   ├── canvas/         # Canvas view (CanvasView, CanvasNode)
 │   ├── tree/           # Tree visualization components
 │   ├── filters/        # Filter panel components
 │   └── common/         # Shared components (Header, DetailPanel, etc.)
-├── services/           # Notion API service
+├── services/           # Notion API service with caching
 ├── store/              # Zustand state management
 ├── types/              # TypeScript type definitions
 ├── utils/              # Utility functions (colors, sample data)
-└── App.tsx             # Main application component
+└── App.tsx             # Main application with all view modes
+
+scripts/
+└── test-notion-connection.js   # API credential validation script
 ```
 
 ## Key Features for Employee Feedback
@@ -149,3 +212,34 @@ src/
 - Self-service problem exploration
 - Clear visibility into problem resolution paths
 - Empowers individual contributors to push progress
+
+## Keyboard Shortcuts
+
+- **Escape** - Exit fullscreen mode (Canvas view)
+
+## Troubleshooting
+
+### Notion API Connection Issues
+
+If you're having trouble connecting to Notion:
+
+1. Run the test script: `npm run test:notion <API_KEY> <DATABASE_ID>`
+2. Common issues:
+   - **401 Unauthorized**: API key is invalid or expired
+   - **404 Not Found**: Database ID is wrong or integration not added to database
+   - **403 Forbidden**: Integration lacks permission to access the database
+
+### Slow Loading with Large Databases
+
+The app includes several optimizations for large databases:
+- Data is cached for 5 minutes
+- Use the refresh button to force-reload data
+- Progressive loading shows items as they arrive
+- List view uses virtualization for smooth scrolling
+
+### Canvas View Performance
+
+For databases with 500+ items:
+- The canvas will render all visible nodes
+- Use filters to reduce the number of visible items
+- Drag nodes to reorganize as needed
