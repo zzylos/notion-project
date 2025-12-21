@@ -133,6 +133,37 @@ npm run build
 npm run lint
 ```
 
+### Quick Setup with Environment Variables
+
+The easiest way to configure the app is with a `.env` file:
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env with your credentials
+```
+
+Example `.env` configuration:
+```bash
+# Required
+VITE_NOTION_API_KEY=secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Add your database IDs (at least one required)
+VITE_NOTION_DB_MISSION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_PROBLEM=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_SOLUTION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_PROJECT=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_DESIGN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+# Optional: Custom property mappings
+VITE_MAPPING_STATUS=Status
+VITE_MAPPING_PRIORITY=Priority
+VITE_MAPPING_OWNER=Owner
+```
+
+When using environment configuration, a green indicator appears below the header confirming the config source.
+
 ### Testing Notion Connection
 
 Before configuring the app, you can validate your Notion API credentials:
@@ -205,11 +236,16 @@ src/
 ├── services/           # Notion API service with multi-database support
 ├── store/              # Zustand state management
 ├── types/              # TypeScript type definitions
-├── utils/              # Utility functions (colors, sample data)
+├── utils/
+│   ├── colors.ts       # Color utilities and status mapping
+│   ├── config.ts       # Environment variable configuration loader
+│   └── sampleData.ts   # Demo data for offline use
 └── App.tsx             # Main application with all view modes
 
 scripts/
 └── test-notion-connection.js   # API credential validation script
+
+.env.example            # Template for environment configuration
 ```
 
 ## Key Features for Employee Feedback
@@ -277,3 +313,45 @@ For databases with 500+ items:
 - The canvas will render all visible nodes
 - Use filters to reduce the number of visible items
 - Drag nodes to reorganize as needed
+
+## Configuration Options
+
+The app supports two configuration methods:
+
+### 1. Environment Variables (Recommended for Development)
+
+Create a `.env` file based on `.env.example`. Environment config takes precedence over UI settings.
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_NOTION_API_KEY` | Your Notion API key (required) |
+| `VITE_NOTION_DB_MISSION` | Objectives database ID |
+| `VITE_NOTION_DB_PROBLEM` | Problems database ID |
+| `VITE_NOTION_DB_SOLUTION` | Solutions database ID |
+| `VITE_NOTION_DB_PROJECT` | Projects database ID |
+| `VITE_NOTION_DB_DESIGN` | Deliverables database ID |
+| `VITE_MAPPING_*` | Property name mappings (see `.env.example`) |
+| `VITE_CORS_PROXY` | Custom CORS proxy URL |
+
+### 2. UI Settings Modal
+
+Click the Settings icon in the header to configure via the UI. Settings are saved to localStorage.
+
+- Validates database ID format (UUID)
+- Shows green checkmark for valid IDs
+- Supports custom property mappings
+
+## Recent Improvements
+
+### Bug Fixes
+- **Race condition prevention** - Concurrent data fetches are properly cancelled
+- **Failed database notifications** - Warning banner when some databases fail to load
+- **Circular reference protection** - Tree view won't freeze on circular parent relationships
+- **Orphaned item logging** - Debug mode logs items with missing parent references
+- **Database ID validation** - UUID format validation with visual feedback
+
+### Quality of Life
+- **Environment variable config** - Configure via `.env` file instead of UI
+- **Sticky header/filters** - Header and filters stay visible while scrolling
+- **Improved canvas usability** - Canvas view works better without fullscreen mode
+- **Config source indicator** - Shows when using `.env` configuration
