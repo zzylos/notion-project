@@ -69,21 +69,36 @@ export interface FilterState {
 // View mode options
 export type ViewMode = 'tree' | 'canvas' | 'kanban' | 'timeline' | 'list';
 
-// Notion database configuration
+// Notion database configuration for a single database
+export interface DatabaseConfig {
+  databaseId: string;
+  type: ItemType; // What type items from this database should be
+  // Property mappings specific to this database (optional overrides)
+  mappings?: Partial<PropertyMappings>;
+}
+
+// Property mappings for Notion
+export interface PropertyMappings {
+  title: string;
+  status: string;
+  priority: string;
+  owner: string;
+  parent: string;
+  progress: string;
+  dueDate: string;
+  tags: string;
+}
+
+// Notion configuration with multiple databases
 export interface NotionConfig {
   apiKey: string;
-  databaseId: string;
-  mappings: {
-    title: string;
-    type: string;
-    status: string;
-    priority: string;
-    owner: string;
-    parent: string;
-    progress: string;
-    dueDate: string;
-    tags: string;
-  };
+  // Multiple databases, each mapped to a specific item type
+  databases: DatabaseConfig[];
+  // Default property mappings (can be overridden per database)
+  defaultMappings: PropertyMappings;
+  // Legacy single database support (for backwards compatibility)
+  databaseId?: string;
+  mappings?: PropertyMappings & { type: string };
 }
 
 // Application state

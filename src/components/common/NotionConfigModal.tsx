@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Key, Database, Settings, HelpCircle, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug } from 'lucide-react';
+import { X, Key, Database, Settings, HelpCircle, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug, Target, AlertTriangle, Lightbulb, FolderKanban, Package } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { NotionConfig } from '../../types';
+import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../../types';
 
 interface NotionConfigModalProps {
   isOpen: boolean;
@@ -9,22 +9,37 @@ interface NotionConfigModalProps {
   onConnect: () => void;
 }
 
-// Default mappings - title is auto-detected, others use common names
-const defaultMappings = {
-  title: 'Name',           // Auto-detected from any 'title' type property
-  type: 'Type',            // Optional: select property for item type
-  status: 'Status',        // Required: select/status property
-  priority: 'Priority',    // Optional: select property for priority
-  owner: 'Owner',          // Optional: people property
-  parent: 'Parent',        // Optional: relation property for hierarchy
-  progress: 'Progress',    // Optional: number property (0-100)
-  dueDate: 'Deadline',     // Optional: date property
-  tags: 'Tags',            // Optional: multi-select property
+// Database type configuration
+interface DatabaseTypeInfo {
+  type: ItemType;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+}
+
+const databaseTypes: DatabaseTypeInfo[] = [
+  { type: 'mission', label: 'Objectives', description: 'High-level goals and objectives', icon: Target, color: 'text-purple-600' },
+  { type: 'problem', label: 'Problems', description: 'Issues and challenges to solve', icon: AlertTriangle, color: 'text-red-600' },
+  { type: 'solution', label: 'Solutions', description: 'Proposed solutions and approaches', icon: Lightbulb, color: 'text-amber-600' },
+  { type: 'project', label: 'Projects', description: 'Active projects and initiatives', icon: FolderKanban, color: 'text-blue-600' },
+  { type: 'design', label: 'Deliverables', description: 'Outputs and deliverables', icon: Package, color: 'text-green-600' },
+];
+
+// Default property mappings
+const defaultMappings: PropertyMappings = {
+  title: 'Name',
+  status: 'Status',
+  priority: 'Priority',
+  owner: 'Owner',
+  parent: 'Parent',
+  progress: 'Progress',
+  dueDate: 'Deadline',
+  tags: 'Tags',
 };
 
-const mappingDescriptions: Record<string, string> = {
+const mappingDescriptions: Record<keyof PropertyMappings, string> = {
   title: 'Auto-detected (your title column)',
-  type: 'Item type (Mission, Problem, etc.)',
   status: 'Status column name',
   priority: 'Priority level (P0-P3)',
   owner: 'Person/Owner column',
@@ -34,11 +49,61 @@ const mappingDescriptions: Record<string, string> = {
   tags: 'Tags (multi-select)',
 };
 
+// Helper to convert legacy config to new format
+function migrateConfig(config: NotionConfig | null): { apiKey: string; databases: Record<ItemType, string>; mappings: PropertyMappings } {
+  const databases: Record<ItemType, string> = {
+    mission: '',
+    problem: '',
+    solution: '',
+    project: '',
+    design: '',
+  };
+
+  if (!config) {
+    return { apiKey: '', databases, mappings: defaultMappings };
+  }
+
+  // If we have the new format
+  if (config.databases && config.databases.length > 0) {
+    config.databases.forEach(db => {
+      databases[db.type] = db.databaseId;
+    });
+    return {
+      apiKey: config.apiKey,
+      databases,
+      mappings: config.defaultMappings || defaultMappings,
+    };
+  }
+
+  // Legacy format - put the single database ID in project
+  if (config.databaseId) {
+    databases.project = config.databaseId;
+  }
+
+  return {
+    apiKey: config.apiKey,
+    databases,
+    mappings: config.mappings ? {
+      title: config.mappings.title,
+      status: config.mappings.status,
+      priority: config.mappings.priority,
+      owner: config.mappings.owner,
+      parent: config.mappings.parent,
+      progress: config.mappings.progress,
+      dueDate: config.mappings.dueDate,
+      tags: config.mappings.tags,
+    } : defaultMappings,
+  };
+}
+
 const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, onConnect }) => {
   const { setNotionConfig, notionConfig } = useStore();
-  const [apiKey, setApiKey] = useState(notionConfig?.apiKey || '');
-  const [databaseId, setDatabaseId] = useState(notionConfig?.databaseId || '');
-  const [mappings, setMappings] = useState<NotionConfig['mappings']>(notionConfig?.mappings || defaultMappings);
+
+  const migrated = migrateConfig(notionConfig);
+
+  const [apiKey, setApiKey] = useState(migrated.apiKey);
+  const [databases, setDatabases] = useState<Record<ItemType, string>>(migrated.databases);
+  const [mappings, setMappings] = useState<PropertyMappings>(migrated.mappings);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,13 +113,29 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
     setIsConnecting(true);
     setError(null);
 
+    // Build database configs from non-empty entries
+    const databaseConfigs: DatabaseConfig[] = [];
+    for (const [type, dbId] of Object.entries(databases)) {
+      if (dbId.trim()) {
+        databaseConfigs.push({
+          databaseId: dbId.trim(),
+          type: type as ItemType,
+        });
+      }
+    }
+
+    if (databaseConfigs.length === 0) {
+      setError('Please enter at least one database ID');
+      setIsConnecting(false);
+      return;
+    }
+
     const config: NotionConfig = {
       apiKey,
-      databaseId,
-      mappings,
+      databases: databaseConfigs,
+      defaultMappings: mappings,
     };
 
-    // Save config - the App will handle loading
     setNotionConfig(config);
     setIsConnecting(false);
     onConnect();
@@ -64,7 +145,13 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
   const handleDisconnect = () => {
     setNotionConfig(null);
     setApiKey('');
-    setDatabaseId('');
+    setDatabases({
+      mission: '',
+      problem: '',
+      solution: '',
+      project: '',
+      design: '',
+    });
     setMappings(defaultMappings);
     onConnect();
     onClose();
@@ -76,13 +163,18 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
     onClose();
   };
 
+  const updateDatabase = (type: ItemType, value: string) => {
+    setDatabases(prev => ({ ...prev, [type]: value }));
+  };
+
   if (!isOpen) return null;
 
-  const isConnected = notionConfig && notionConfig.apiKey && notionConfig.databaseId;
+  const hasAnyDatabase = Object.values(databases).some(id => id.trim());
+  const isConnected = notionConfig && notionConfig.apiKey && (notionConfig.databases?.length > 0 || notionConfig.databaseId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-auto">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -91,7 +183,7 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Connect to Notion</h2>
-              <p className="text-sm text-gray-500">Configure your Notion integration</p>
+              <p className="text-sm text-gray-500">Configure your Notion databases</p>
             </div>
           </div>
           <button
@@ -164,24 +256,42 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
               >
                 notion.so/my-integrations
               </a>
+              {' '}and share all databases with it.
             </p>
           </div>
 
-          {/* Database ID */}
-          <div className="space-y-2">
+          {/* Multiple Databases */}
+          <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
               <Database className="w-4 h-4" />
-              Database ID
+              Database IDs
             </label>
-            <input
-              type="text"
-              value={databaseId}
-              onChange={(e) => setDatabaseId(e.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-            />
             <p className="text-xs text-gray-500">
-              Copy the database ID from your Notion database URL. Make sure to share the database with your integration.
+              Enter the database ID for each type. Leave empty if you don't have that database.
+            </p>
+
+            <div className="space-y-2">
+              {databaseTypes.map(({ type, label, description, icon: Icon, color }) => (
+                <div key={type} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 w-32 flex-shrink-0">
+                    <Icon className={`w-4 h-4 ${color}`} />
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">{label}</span>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={databases[type]}
+                    onChange={(e) => updateDatabase(type, e.target.value)}
+                    placeholder={description}
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Copy database IDs from your Notion database URLs. Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
             </p>
           </div>
 
@@ -202,10 +312,9 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             {showAdvanced && (
               <div className="p-3 bg-gray-50 rounded-lg space-y-3">
                 <p className="text-xs text-gray-600">
-                  Match these to your Notion database column names. Title is auto-detected.
-                  Leave others blank if you don't have them.
+                  Default property names for all databases. Most databases use the same column names.
                 </p>
-                {Object.entries(mappings).map(([key, value]) => (
+                {(Object.entries(mappings) as [keyof PropertyMappings, string][]).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-2">
                     <div className="w-28 flex-shrink-0">
                       <label className="text-xs font-medium text-gray-700 capitalize block">
@@ -226,9 +335,6 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
                     />
                   </div>
                 ))}
-                <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
-                  <strong>Tip:</strong> Check your Notion database column names and enter them exactly as shown (case-insensitive).
-                </p>
               </div>
             )}
           </div>
@@ -236,8 +342,8 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
           {/* Info box */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-xs text-blue-800">
-              <strong>Note:</strong> This app uses a CORS proxy to connect to the Notion API from the browser.
-              For production use, you should set up your own backend proxy for security.
+              <strong>Note:</strong> Each database type will be fetched separately and combined into a unified view.
+              Parent relations can link items across different databases.
             </p>
           </div>
 
@@ -245,7 +351,7 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={!apiKey || !databaseId || isConnecting}
+              disabled={!apiKey || !hasAnyDatabase || isConnecting}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isConnecting ? (
