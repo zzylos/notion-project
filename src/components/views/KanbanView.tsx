@@ -1,37 +1,39 @@
+import { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-
-const statusLabels: Record<string, string> = {
-  'not-started': 'Not Started',
-  'in-progress': 'In Progress',
-  'blocked': 'Blocked',
-  'in-review': 'In Review',
-  'completed': 'Completed',
-};
-
-const statusColors: Record<string, string> = {
-  'not-started': 'bg-slate-100 border-slate-300',
-  'in-progress': 'bg-blue-100 border-blue-300',
-  'blocked': 'bg-red-100 border-red-300',
-  'in-review': 'bg-amber-100 border-amber-300',
-  'completed': 'bg-green-100 border-green-300',
-};
-
-const statuses = ['not-started', 'in-progress', 'blocked', 'in-review', 'completed'] as const;
+import { getStatusColors } from '../../utils/colors';
 
 const KanbanView: React.FC = () => {
-  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
-  const items = getFilteredItems();
+  const { getFilteredItems, setSelectedItem, selectedItemId, items: allItems } = useStore();
+  const filteredItems = getFilteredItems();
+
+  // Get unique statuses from all items, preserving order of first occurrence
+  const statuses = useMemo(() => {
+    const statusSet = new Set<string>();
+    const statusOrder: string[] = [];
+
+    // Get statuses from all items to maintain consistent columns
+    Array.from(allItems.values()).forEach((item) => {
+      if (!statusSet.has(item.status)) {
+        statusSet.add(item.status);
+        statusOrder.push(item.status);
+      }
+    });
+
+    return statusOrder;
+  }, [allItems]);
 
   return (
     <div className="h-full overflow-auto p-4">
       <div className="flex gap-4 min-w-max">
         {statuses.map((status) => {
-          const statusItems = items.filter((item) => item.status === status);
+          const statusItems = filteredItems.filter((item) => item.status === status);
+          const colors = getStatusColors(status);
+
           return (
             <div key={status} className="w-72 flex-shrink-0">
-              <div className={`rounded-lg border ${statusColors[status]} p-3 mb-3`}>
-                <h3 className="font-semibold text-gray-800">
-                  {statusLabels[status]} ({statusItems.length})
+              <div className={`rounded-lg border ${colors.bg} ${colors.border} p-3 mb-3`}>
+                <h3 className={`font-semibold ${colors.text}`}>
+                  {status} ({statusItems.length})
                 </h3>
               </div>
               <div className="space-y-2">

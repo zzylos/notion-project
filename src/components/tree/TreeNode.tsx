@@ -11,7 +11,7 @@ import {
   Clock,
 } from 'lucide-react';
 import type { TreeNode as TreeNodeType } from '../../types';
-import { statusColors, typeColors, priorityColors, statusLabels, getProgressColor } from '../../utils/colors';
+import { getStatusColors, getStatusCategory, typeColors, priorityColors, getProgressColor } from '../../utils/colors';
 import { useStore } from '../../store/useStore';
 
 interface TreeNodeProps {
@@ -47,9 +47,9 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
     onNodeClick(item.id);
   };
 
-  const statusStyle = statusColors[item.status];
+  const statusStyle = getStatusColors(item.status);
   const typeStyle = typeColors[item.type];
-  const isInProgress = item.status === 'in-progress';
+  const isInProgress = getStatusCategory(item.status) === 'in-progress';
 
   return (
     <div className="select-none">
@@ -91,7 +91,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
             ${statusStyle.dot}
             ${isInProgress ? 'animate-pulse-status' : ''}
           `}
-          title={statusLabels[item.status]}
+          title={item.status}
         />
 
         {/* Type icon */}
@@ -101,7 +101,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
         <span
           className={`
             flex-1 text-sm font-medium truncate
-            ${item.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-800'}
+            ${getStatusCategory(item.status) === 'completed' ? 'text-gray-500 line-through' : 'text-gray-800'}
           `}
         >
           {item.title}
@@ -145,7 +145,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
           <div
             className={`
               flex items-center gap-1 text-xs
-              ${new Date(item.dueDate) < new Date() && item.status !== 'completed'
+              ${new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed'
                 ? 'text-red-500'
                 : 'text-gray-400'}
             `}

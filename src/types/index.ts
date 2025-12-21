@@ -1,13 +1,11 @@
 // Work item types in the opportunity tree
 export type ItemType = 'mission' | 'problem' | 'solution' | 'design' | 'project';
 
-// Status of work items
-export type ItemStatus =
-  | 'not-started'
-  | 'in-progress'
-  | 'blocked'
-  | 'in-review'
-  | 'completed';
+// Status of work items - now dynamic, stores the original Notion status
+export type ItemStatus = string;
+
+// Known status categories for color mapping (internal use)
+export type StatusCategory = 'not-started' | 'in-progress' | 'blocked' | 'in-review' | 'completed';
 
 // Priority levels
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
@@ -105,7 +103,7 @@ export interface AppState {
 // Stats for dashboard
 export interface DashboardStats {
   totalItems: number;
-  byStatus: Record<ItemStatus, number>;
+  byStatus: Record<string, number>;
   byType: Record<ItemType, number>;
   byPriority: Record<Priority, number>;
   completionRate: number;

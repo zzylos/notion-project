@@ -1,14 +1,7 @@
 import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useStore } from '../../store/useStore';
-
-const statusColors: Record<string, string> = {
-  'not-started': 'bg-slate-400',
-  'in-progress': 'bg-blue-500',
-  'blocked': 'bg-red-500',
-  'in-review': 'bg-amber-500',
-  'completed': 'bg-green-500',
-};
+import { getStatusColors } from '../../utils/colors';
 
 const ListView: React.FC = () => {
   const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
@@ -64,7 +57,7 @@ const ListView: React.FC = () => {
               onClick={() => setSelectedItem(item.id)}
             >
               <div>
-                <div className={`w-3 h-3 rounded-full ${statusColors[item.status]}`} />
+                <div className={`w-3 h-3 rounded-full ${getStatusColors(item.status).dot}`} />
               </div>
               <div className="text-sm font-medium text-gray-800 truncate pr-2">{item.title}</div>
               <div className="text-sm text-gray-600 capitalize">{item.type}</div>

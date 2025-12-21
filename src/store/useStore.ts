@@ -7,10 +7,10 @@ import type {
   ViewMode,
   NotionConfig,
   ItemType,
-  ItemStatus,
   Priority,
   DashboardStats,
 } from '../types';
+import { getStatusCategory } from '../utils/colors';
 
 interface StoreState {
   // Data
@@ -252,13 +252,8 @@ export const useStore = create<StoreState>()(
         const state = get();
         const items = Array.from(state.items.values());
 
-        const byStatus: Record<ItemStatus, number> = {
-          'not-started': 0,
-          'in-progress': 0,
-          'blocked': 0,
-          'in-review': 0,
-          'completed': 0,
-        };
+        // Dynamic status counting
+        const byStatus: Record<string, number> = {};
 
         const byType: Record<ItemType, number> = {
           'mission': 0,
@@ -276,21 +271,34 @@ export const useStore = create<StoreState>()(
         };
 
         let overdueItems = 0;
+        let completedItems = 0;
+        let blockedItems = 0;
         const now = new Date();
 
         items.forEach(item => {
-          byStatus[item.status]++;
+          // Count by original status
+          byStatus[item.status] = (byStatus[item.status] || 0) + 1;
+
           byType[item.type]++;
           if (item.priority) {
             byPriority[item.priority]++;
           }
-          if (item.dueDate && new Date(item.dueDate) < now && item.status !== 'completed') {
+
+          // Check status category for completion/blocked counts
+          const category = getStatusCategory(item.status);
+          if (category === 'completed') {
+            completedItems++;
+          }
+          if (category === 'blocked') {
+            blockedItems++;
+          }
+
+          if (item.dueDate && new Date(item.dueDate) < now && category !== 'completed') {
             overdueItems++;
           }
         });
 
         const totalItems = items.length;
-        const completedItems = byStatus['completed'];
         const completionRate = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
 
         return {
@@ -300,7 +308,7 @@ export const useStore = create<StoreState>()(
           byPriority,
           completionRate,
           overdueItems,
-          blockedItems: byStatus['blocked'],
+          blockedItems,
         };
       },
 
