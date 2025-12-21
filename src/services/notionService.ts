@@ -40,7 +40,14 @@ export type FetchProgressCallback = (progress: {
   items: WorkItem[];
   done: boolean;
   currentDatabase?: string;
+  failedDatabases?: Array<{ type: string; error: string }>;
 }) => void;
+
+// Options for fetch operations
+export interface FetchOptions {
+  signal?: AbortSignal;
+  onProgress?: FetchProgressCallback;
+}
 
 /**
  * SECURITY WARNING:
@@ -79,7 +86,7 @@ class NotionService {
     this.cache.clear();
   }
 
-  private async notionFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async notionFetch<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
     if (!this.config) {
       throw new Error('NotionService not initialized');
     }
@@ -88,6 +95,7 @@ class NotionService {
 
     const response = await fetch(url, {
       ...options,
+      signal,
       headers: {
         'Authorization': `Bearer ${this.config.apiKey}`,
         'Notion-Version': '2022-06-28',
@@ -382,7 +390,7 @@ class NotionService {
   }
 
   // Fetch a single page of results from a database
-  private async fetchPage(databaseId: string, cursor?: string): Promise<NotionQueryResponse> {
+  private async fetchPage(databaseId: string, cursor?: string, signal?: AbortSignal): Promise<NotionQueryResponse> {
     if (!this.config) {
       throw new Error('NotionService not initialized');
     }
@@ -394,19 +402,24 @@ class NotionService {
 
     return this.notionFetch<NotionQueryResponse>(
       `/databases/${databaseId}/query`,
-      { method: 'POST', body: JSON.stringify(body) }
+      { method: 'POST', body: JSON.stringify(body) },
+      signal
     );
   }
 
   // Fetch all pages from a single database
-  private async fetchAllFromDatabase(dbConfig: DatabaseConfig): Promise<WorkItem[]> {
+  private async fetchAllFromDatabase(dbConfig: DatabaseConfig, signal?: AbortSignal): Promise<WorkItem[]> {
     const allPages: NotionPage[] = [];
 
     let currentCursor: string | undefined;
     let hasMore = true;
 
     while (hasMore) {
-      const response = await this.fetchPage(dbConfig.databaseId, currentCursor);
+      // Check if aborted before each request
+      if (signal?.aborted) {
+        throw new DOMException('Fetch aborted', 'AbortError');
+      }
+      const response = await this.fetchPage(dbConfig.databaseId, currentCursor, signal);
       allPages.push(...response.results);
       hasMore = response.has_more;
       currentCursor = response.next_cursor ?? undefined;
@@ -420,12 +433,28 @@ class NotionService {
   // Build parent-child relationships across all items
   private buildRelationships(items: WorkItem[]): void {
     const itemMap = new Map(items.map(item => [item.id, item]));
+    const orphanedItems: Array<{ id: string; title: string; parentId: string }> = [];
+
     for (const item of items) {
-      if (item.parentId && itemMap.has(item.parentId)) {
-        const parent = itemMap.get(item.parentId)!;
-        if (!parent.children) parent.children = [];
-        parent.children.push(item.id);
+      if (item.parentId) {
+        if (itemMap.has(item.parentId)) {
+          const parent = itemMap.get(item.parentId)!;
+          if (!parent.children) parent.children = [];
+          parent.children.push(item.id);
+        } else {
+          // Track orphaned items (have parentId but parent not found)
+          orphanedItems.push({ id: item.id, title: item.title, parentId: item.parentId });
+        }
       }
+    }
+
+    // Log orphaned items in debug mode
+    if (this.debugMode && orphanedItems.length > 0) {
+      console.warn(
+        `%c[Notion] ${orphanedItems.length} orphaned items (parent not found):`,
+        'color: #f59e0b; font-weight: bold'
+      );
+      console.table(orphanedItems);
     }
   }
 
@@ -450,10 +479,12 @@ class NotionService {
   }
 
   // Fetch all items from all configured databases
-  async fetchAllItems(onProgress?: FetchProgressCallback): Promise<WorkItem[]> {
+  async fetchAllItems(options?: FetchOptions): Promise<WorkItem[]> {
     if (!this.config) {
       throw new Error('NotionService not initialized. Call initialize() first.');
     }
+
+    const { signal, onProgress } = options || {};
 
     const dbConfigs = this.getDatabaseConfigs();
     if (dbConfigs.length === 0) {
@@ -469,9 +500,15 @@ class NotionService {
     }
 
     const allItems: WorkItem[] = [];
+    const failedDatabases: Array<{ type: string; error: string }> = [];
 
     // Fetch from each database
     for (let i = 0; i < dbConfigs.length; i++) {
+      // Check if aborted before each database
+      if (signal?.aborted) {
+        throw new DOMException('Fetch aborted', 'AbortError');
+      }
+
       const dbConfig = dbConfigs[i];
 
       if (this.debugMode) {
@@ -479,7 +516,7 @@ class NotionService {
       }
 
       try {
-        const items = await this.fetchAllFromDatabase(dbConfig);
+        const items = await this.fetchAllFromDatabase(dbConfig, signal);
         allItems.push(...items);
 
         // Report progress
@@ -489,9 +526,16 @@ class NotionService {
           items: [...allItems],
           done: i === dbConfigs.length - 1,
           currentDatabase: dbConfig.type,
+          failedDatabases: failedDatabases.length > 0 ? [...failedDatabases] : undefined,
         });
       } catch (error) {
+        // Re-throw abort errors
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw error;
+        }
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error(`Failed to fetch ${dbConfig.type} database:`, error);
+        failedDatabases.push({ type: dbConfig.type, error: errorMessage });
         // Continue with other databases
       }
     }
@@ -499,11 +543,19 @@ class NotionService {
     // Build relationships across all items
     this.buildRelationships(allItems);
 
-    // Cache the results
-    this.cache.set(cacheKey, { items: allItems, timestamp: Date.now() });
+    // Cache the results (only if we got some items)
+    if (allItems.length > 0) {
+      this.cache.set(cacheKey, { items: allItems, timestamp: Date.now() });
+    }
 
-    // Final progress callback
-    onProgress?.({ loaded: allItems.length, total: allItems.length, items: allItems, done: true });
+    // Final progress callback with failed databases info
+    onProgress?.({
+      loaded: allItems.length,
+      total: allItems.length,
+      items: allItems,
+      done: true,
+      failedDatabases: failedDatabases.length > 0 ? failedDatabases : undefined,
+    });
 
     return allItems;
   }

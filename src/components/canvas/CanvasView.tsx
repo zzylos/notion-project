@@ -194,20 +194,27 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     () => filteredItems.map(i => i.id).sort().join(','),
     [filteredItems]
   );
-  const prevDataKeyRef = useRef(dataKey);
+  const prevDataKeyRef = useRef<string | null>(null);
+  const isInitialMountRef = useRef(true);
 
-  // Calculate initial layout
-  const initialLayout = useMemo(
+  // Calculate layout based on current data
+  const currentLayout = useMemo(
     () => calculateLayout(filteredItems, selectedItemId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [] // Only calculate on mount
+    [filteredItems, selectedItemId]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialLayout.nodes);
-  const [edges, setEdges] = useEdgesState(initialLayout.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(currentLayout.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(currentLayout.edges);
 
   // Update when underlying data changes (new items added/removed)
+  // Skip the initial mount since we already have the correct layout
   useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      prevDataKeyRef.current = dataKey;
+      return;
+    }
+
     if (prevDataKeyRef.current !== dataKey) {
       const newLayout = calculateLayout(filteredItems, selectedItemId);
       setNodes(newLayout.nodes);
@@ -270,6 +277,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
