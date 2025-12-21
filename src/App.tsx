@@ -12,7 +12,7 @@ import DetailPanel from './components/common/DetailPanel';
 import NotionConfigModal from './components/common/NotionConfigModal';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
-import { PanelRightClose, PanelRight, Loader2 } from 'lucide-react';
+import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 function App() {
   const {
@@ -28,6 +28,7 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showDetailPanel, setShowDetailPanel] = useState(true);
+  const [showStats, setShowStats] = useState(false); // Collapsed by default
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,8 +155,21 @@ function App() {
         </div>
       )}
 
-      {/* Stats Overview */}
-      <StatsOverview />
+      {/* Stats Overview - Collapsible */}
+      <div className="border-b border-gray-200">
+        <button
+          onClick={() => setShowStats(!showStats)}
+          className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+        >
+          <span className="text-sm font-medium text-gray-700">Statistics Overview</span>
+          {showStats ? (
+            <ChevronUp className="w-4 h-4 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-500" />
+          )}
+        </button>
+        {showStats && <StatsOverview />}
+      </div>
 
       {/* Filter Panel */}
       <FilterPanel />
