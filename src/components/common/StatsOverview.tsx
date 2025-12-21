@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Target,
   AlertCircle,
@@ -11,8 +11,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { ItemType, ItemStatus } from '../../types';
-import { typeLabels, statusLabels, statusColors, typeColors } from '../../utils/colors';
+import type { ItemType } from '../../types';
+import { typeLabels, getStatusColors, getStatusCategory, typeColors } from '../../utils/colors';
 
 const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> = {
   mission: Target,
@@ -23,10 +23,39 @@ const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> =
 };
 
 const StatsOverview: React.FC = () => {
-  const { getStats } = useStore();
+  const { getStats, items } = useStore();
   const stats = getStats();
 
-  const statusOrder: ItemStatus[] = ['not-started', 'in-progress', 'blocked', 'in-review', 'completed'];
+  // Get unique statuses from items in order of first occurrence
+  const statusOrder = useMemo(() => {
+    const statusList: string[] = [];
+    const statusSet = new Set<string>();
+    Array.from(items.values()).forEach((item) => {
+      if (!statusSet.has(item.status)) {
+        statusSet.add(item.status);
+        statusList.push(item.status);
+      }
+    });
+    return statusList;
+  }, [items]);
+
+  // Calculate in-progress and completed counts dynamically
+  const inProgressCount = useMemo(() => {
+    let count = 0;
+    Object.entries(stats.byStatus).forEach(([status, num]) => {
+      if (getStatusCategory(status) === 'in-progress') count += num;
+    });
+    return count;
+  }, [stats.byStatus]);
+
+  const completedCount = useMemo(() => {
+    let count = 0;
+    Object.entries(stats.byStatus).forEach(([status, num]) => {
+      if (getStatusCategory(status) === 'completed') count += num;
+    });
+    return count;
+  }, [stats.byStatus]);
+
   const typeOrder: ItemType[] = ['mission', 'problem', 'solution', 'design', 'project'];
 
   return (
@@ -76,7 +105,7 @@ const StatsOverview: React.FC = () => {
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse-status" />
             <span className="text-xs font-medium uppercase">In Progress</span>
           </div>
-          <div className="text-2xl font-bold text-blue-700">{stats.byStatus['in-progress']}</div>
+          <div className="text-2xl font-bold text-blue-700">{inProgressCount}</div>
         </div>
 
         {/* Completed */}
@@ -85,7 +114,7 @@ const StatsOverview: React.FC = () => {
             <CheckCircle2 className="w-4 h-4" />
             <span className="text-xs font-medium uppercase">Completed</span>
           </div>
-          <div className="text-2xl font-bold text-emerald-700">{stats.byStatus['completed']}</div>
+          <div className="text-2xl font-bold text-emerald-700">{completedCount}</div>
         </div>
       </div>
 
@@ -99,27 +128,27 @@ const StatsOverview: React.FC = () => {
             </h4>
             <div className="flex items-center gap-1 h-3 bg-gray-100 rounded-full overflow-hidden">
               {statusOrder.map((status) => {
-                const count = stats.byStatus[status];
+                const count = stats.byStatus[status] || 0;
                 const percent = stats.totalItems > 0 ? (count / stats.totalItems) * 100 : 0;
                 if (percent === 0) return null;
                 return (
                   <div
                     key={status}
-                    className={`h-full ${statusColors[status].dot} transition-all`}
+                    className={`h-full ${getStatusColors(status).dot} transition-all`}
                     style={{ width: `${percent}%` }}
-                    title={`${statusLabels[status]}: ${count} (${percent.toFixed(1)}%)`}
+                    title={`${status}: ${count} (${percent.toFixed(1)}%)`}
                   />
                 );
               })}
             </div>
             <div className="flex flex-wrap gap-3 mt-2">
               {statusOrder.map((status) => {
-                const count = stats.byStatus[status];
+                const count = stats.byStatus[status] || 0;
                 if (count === 0) return null;
                 return (
                   <div key={status} className="flex items-center gap-1.5 text-xs text-gray-600">
-                    <div className={`w-2 h-2 rounded-full ${statusColors[status].dot}`} />
-                    <span>{statusLabels[status]}</span>
+                    <div className={`w-2 h-2 rounded-full ${getStatusColors(status).dot}`} />
+                    <span>{status}</span>
                     <span className="font-medium">({count})</span>
                   </div>
                 );

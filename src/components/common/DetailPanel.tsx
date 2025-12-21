@@ -17,10 +17,10 @@ import {
 import { useStore } from '../../store/useStore';
 import type { WorkItem, ItemType } from '../../types';
 import {
-  statusColors,
+  getStatusColors,
+  getStatusCategory,
   typeColors,
   priorityColors,
-  statusLabels,
   typeLabels,
   getProgressColor,
 } from '../../utils/colors';
@@ -57,7 +57,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
 
   const path = getItemPath(selectedItemId);
   const TypeIcon = typeIcons[item.type];
-  const statusStyle = statusColors[item.status];
+  const statusStyle = getStatusColors(item.status);
   const typeStyle = typeColors[item.type];
 
   // Get parent and children
@@ -159,7 +159,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
               `}
             >
               <div className={`w-2.5 h-2.5 rounded-full ${statusStyle.dot}`} />
-              {statusLabels[item.status]}
+              {item.status}
             </span>
           </div>
         </div>
@@ -173,7 +173,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">{item.progress}% complete</span>
-                {item.progress >= 80 && item.status !== 'completed' && (
+                {item.progress >= 80 && getStatusCategory(item.status) !== 'completed' && (
                   <span className="text-amber-600 text-xs flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
                     Almost done - needs to close!
@@ -229,7 +229,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
             <div
               className={`
                 flex items-center gap-2 text-sm
-                ${new Date(item.dueDate) < new Date() && item.status !== 'completed'
+                ${new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed'
                   ? 'text-red-600'
                   : 'text-gray-700'}
               `}
@@ -241,7 +241,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
                 month: 'long',
                 day: 'numeric',
               })}
-              {new Date(item.dueDate) < new Date() && item.status !== 'completed' && (
+              {new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed' && (
                 <span className="text-red-500 text-xs font-medium">OVERDUE</span>
               )}
             </div>
@@ -289,10 +289,10 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
                     <span
                       className={`
                         ml-auto px-1.5 py-0.5 text-xs rounded
-                        ${statusColors[blocker.status].bg} ${statusColors[blocker.status].text}
+                        ${getStatusColors(blocker.status).bg} ${getStatusColors(blocker.status).text}
                       `}
                     >
-                      {statusLabels[blocker.status]}
+                      {blocker.status}
                     </span>
                   </button>
                 );
@@ -338,7 +338,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
                   >
                     <ChildIcon className={`w-4 h-4 ${typeColors[child.type].icon}`} />
                     <span className="text-sm text-gray-800 truncate flex-1">{child.title}</span>
-                    <div className={`w-2 h-2 rounded-full ${statusColors[child.status].dot}`} />
+                    <div className={`w-2 h-2 rounded-full ${getStatusColors(child.status).dot}`} />
                   </button>
                 );
               })}

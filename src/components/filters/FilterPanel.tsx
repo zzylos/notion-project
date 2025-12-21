@@ -10,8 +10,8 @@ import {
   FolderKanban,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { ItemType, ItemStatus, Priority } from '../../types';
-import { statusColors, typeColors, priorityColors, statusLabels, typeLabels, priorityLabels } from '../../utils/colors';
+import type { ItemType, Priority } from '../../types';
+import { typeColors, priorityColors, typeLabels, priorityLabels, getStatusColors } from '../../utils/colors';
 
 const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> = {
   mission: Target,
@@ -25,8 +25,16 @@ const FilterPanel: React.FC = () => {
   const { filters, setFilters, resetFilters, items } = useStore();
 
   const itemTypes: ItemType[] = ['mission', 'problem', 'solution', 'design', 'project'];
-  const itemStatuses: ItemStatus[] = ['not-started', 'in-progress', 'blocked', 'in-review', 'completed'];
   const priorities: Priority[] = ['P0', 'P1', 'P2', 'P3'];
+
+  // Get unique statuses from items dynamically
+  const itemStatuses = useMemo(() => {
+    const statusSet = new Set<string>();
+    items.forEach((item) => {
+      statusSet.add(item.status);
+    });
+    return Array.from(statusSet);
+  }, [items]);
 
   // Get unique owners from items
   const owners = useMemo(() => {
@@ -48,7 +56,7 @@ const FilterPanel: React.FC = () => {
     }
   };
 
-  const toggleStatus = (status: ItemStatus) => {
+  const toggleStatus = (status: string) => {
     const current = filters.statuses;
     if (current.includes(status)) {
       setFilters({ statuses: current.filter((s) => s !== status) });
@@ -144,7 +152,7 @@ const FilterPanel: React.FC = () => {
           <div className="flex flex-wrap gap-1.5">
             {itemStatuses.map((status) => {
               const isActive = filters.statuses.includes(status);
-              const style = statusColors[status];
+              const style = getStatusColors(status);
               return (
                 <button
                   key={status}
@@ -158,7 +166,7 @@ const FilterPanel: React.FC = () => {
                   `}
                 >
                   <div className={`w-2 h-2 rounded-full ${style.dot}`} />
-                  {statusLabels[status]}
+                  {status}
                 </button>
               );
             })}

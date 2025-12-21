@@ -16,7 +16,7 @@ import type { Node, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStore } from '../../store/useStore';
 import type { WorkItem } from '../../types';
-import { typeHexColors } from '../../utils/colors';
+import { typeHexColors, getStatusCategory } from '../../utils/colors';
 import CanvasNode from './CanvasNode';
 import { RotateCcw, Maximize, Minimize } from 'lucide-react';
 
@@ -114,7 +114,7 @@ const calculateLayout = (
         source: item.parentId,
         target: item.id,
         type: 'smoothstep',
-        animated: item.status === 'in-progress',
+        animated: getStatusCategory(item.status) === 'in-progress',
         style: {
           stroke: typeHexColors[item.type],
           strokeWidth: 2,

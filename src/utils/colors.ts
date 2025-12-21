@@ -1,7 +1,14 @@
-import type { ItemStatus, ItemType, Priority } from '../types';
+import type { ItemType, Priority, StatusCategory } from '../types';
 
-// Status colors
-export const statusColors: Record<ItemStatus, { bg: string; text: string; border: string; dot: string }> = {
+// Status color definitions by category
+interface StatusColorSet {
+  bg: string;
+  text: string;
+  border: string;
+  dot: string;
+}
+
+const statusCategoryColors: Record<StatusCategory, StatusColorSet> = {
   'not-started': {
     bg: 'bg-slate-100',
     text: 'text-slate-600',
@@ -33,6 +40,111 @@ export const statusColors: Record<ItemStatus, { bg: string; text: string; border
     dot: 'bg-green-500',
   },
 };
+
+// Additional color palette for unique statuses
+const dynamicColorPalette: StatusColorSet[] = [
+  { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300', dot: 'bg-purple-500' },
+  { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-300', dot: 'bg-cyan-500' },
+  { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-300', dot: 'bg-pink-500' },
+  { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-300', dot: 'bg-indigo-500' },
+  { bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-300', dot: 'bg-teal-500' },
+  { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', dot: 'bg-orange-500' },
+  { bg: 'bg-lime-100', text: 'text-lime-700', border: 'border-lime-300', dot: 'bg-lime-500' },
+  { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-300', dot: 'bg-rose-500' },
+];
+
+// Cache for consistent color assignment
+const statusColorCache = new Map<string, StatusColorSet>();
+
+// Categorize a status string to a known category for color mapping
+export function getStatusCategory(status: string): StatusCategory {
+  const normalized = status.toLowerCase().trim();
+
+  // Check for completion/closed statuses
+  if (
+    normalized.includes('done') ||
+    normalized.includes('complete') ||
+    normalized.includes('finish') ||
+    normalized.includes('closed') ||
+    normalized.includes('resolved') ||
+    normalized.includes('shipped') ||
+    normalized.includes('deployed') ||
+    normalized.includes('live')
+  ) {
+    return 'completed';
+  }
+
+  // Check for blocked/hold statuses
+  if (
+    normalized.includes('block') ||
+    normalized.includes('hold') ||
+    normalized.includes('wait') ||
+    normalized.includes('stuck') ||
+    normalized.includes('pause') ||
+    normalized.includes('duplicate')
+  ) {
+    return 'blocked';
+  }
+
+  // Check for review/testing statuses
+  if (
+    normalized.includes('review') ||
+    normalized.includes('test') ||
+    normalized.includes('qa') ||
+    normalized.includes('verif') ||
+    normalized.includes('post mortem') ||
+    normalized.includes('postmortem')
+  ) {
+    return 'in-review';
+  }
+
+  // Check for in-progress statuses
+  if (
+    normalized.includes('progress') ||
+    normalized.includes('doing') ||
+    normalized.includes('active') ||
+    normalized.includes('wip') ||
+    normalized.includes('working') ||
+    normalized.includes('develop') ||
+    normalized.includes('solutioning') ||
+    normalized.includes('priorit') ||
+    normalized.includes('schedul') ||
+    normalized.includes('analysis') ||
+    normalized.includes('research') ||
+    normalized.includes('project in')
+  ) {
+    return 'in-progress';
+  }
+
+  // Default to not-started
+  return 'not-started';
+}
+
+// Get colors for any status (dynamic)
+export function getStatusColors(status: string): StatusColorSet {
+  // Check cache first
+  if (statusColorCache.has(status)) {
+    return statusColorCache.get(status)!;
+  }
+
+  // Try to categorize and use category colors
+  const category = getStatusCategory(status);
+  const colors = statusCategoryColors[category];
+
+  // Cache and return
+  statusColorCache.set(status, colors);
+  return colors;
+}
+
+// Get a unique color for a status based on its index in the list
+export function getStatusColorByIndex(index: number): StatusColorSet {
+  // First use the category colors, then cycle through the palette
+  const allColors = [...Object.values(statusCategoryColors), ...dynamicColorPalette];
+  return allColors[index % allColors.length];
+}
+
+// Legacy export for backwards compatibility
+export const statusColors = statusCategoryColors;
 
 // Type colors
 export const typeColors: Record<ItemType, { bg: string; text: string; border: string; icon: string }> = {
@@ -92,8 +204,13 @@ export const priorityColors: Record<Priority, { bg: string; text: string; border
   },
 };
 
-// Get status label
-export const statusLabels: Record<ItemStatus, string> = {
+// Get status label - for dynamic statuses, just return the status itself
+export function getStatusLabel(status: string): string {
+  return status;
+}
+
+// Legacy status labels for backwards compatibility
+export const statusLabels: Record<StatusCategory, string> = {
   'not-started': 'Not Started',
   'in-progress': 'In Progress',
   'blocked': 'Blocked',
@@ -126,14 +243,23 @@ export const getProgressColor = (progress: number): string => {
   return 'bg-slate-400';
 };
 
-// SVG colors for tree lines (hex values)
-export const statusHexColors: Record<ItemStatus, string> = {
+// SVG colors for tree lines (hex values) by category
+const statusCategoryHexColors: Record<StatusCategory, string> = {
   'not-started': '#94a3b8',
   'in-progress': '#3b82f6',
   'blocked': '#ef4444',
   'in-review': '#f59e0b',
   'completed': '#22c55e',
 };
+
+// Get hex color for any status
+export function getStatusHexColor(status: string): string {
+  const category = getStatusCategory(status);
+  return statusCategoryHexColors[category];
+}
+
+// Legacy export for backwards compatibility
+export const statusHexColors = statusCategoryHexColors;
 
 export const typeHexColors: Record<ItemType, string> = {
   'mission': '#7c3aed',

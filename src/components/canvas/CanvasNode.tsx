@@ -9,9 +9,9 @@ import {
 } from 'lucide-react';
 import type { WorkItem, ItemType } from '../../types';
 import {
-  statusColors,
+  getStatusColors,
+  getStatusCategory,
   typeColors,
-  statusLabels,
   typeLabels,
   getProgressColor,
 } from '../../utils/colors';
@@ -34,9 +34,9 @@ const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> =
 const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
   const { item, isSelected } = data;
   const TypeIcon = typeIcons[item.type];
-  const statusStyle = statusColors[item.status];
+  const statusStyle = getStatusColors(item.status);
   const typeStyle = typeColors[item.type];
-  const isInProgress = item.status === 'in-progress';
+  const isInProgress = getStatusCategory(item.status) === 'in-progress';
 
   return (
     <div
@@ -80,7 +80,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
         <h3
           className={`
             text-sm font-medium leading-tight mb-2 line-clamp-2
-            ${item.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}
+            ${getStatusCategory(item.status) === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}
           `}
         >
           {item.title}
@@ -99,7 +99,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
                 isInProgress ? 'animate-pulse' : ''
               }`}
             />
-            {statusLabels[item.status]}
+            {item.status}
           </span>
         </div>
 

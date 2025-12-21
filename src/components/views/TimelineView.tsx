@@ -1,13 +1,6 @@
 import { Calendar } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-
-const statusColors: Record<string, string> = {
-  'not-started': 'bg-slate-400',
-  'in-progress': 'bg-blue-500',
-  'blocked': 'bg-red-500',
-  'in-review': 'bg-amber-500',
-  'completed': 'bg-green-500',
-};
+import { getStatusColors, getStatusCategory } from '../../utils/colors';
 
 const TimelineView: React.FC = () => {
   const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
@@ -37,14 +30,14 @@ const TimelineView: React.FC = () => {
 
           <div className="space-y-4">
             {sortedItems.map((item) => {
-              const isOverdue = item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'completed';
+              const isOverdue = item.dueDate && new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed';
               return (
                 <div
                   key={item.id}
                   className="flex items-start gap-4 pl-1 cursor-pointer"
                   onClick={() => setSelectedItem(item.id)}
                 >
-                  <div className={`w-3 h-3 rounded-full mt-1.5 ${statusColors[item.status]} ring-4 ring-white z-10`} />
+                  <div className={`w-3 h-3 rounded-full mt-1.5 ${getStatusColors(item.status).dot} ring-4 ring-white z-10`} />
                   <div className={`flex-1 bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow ${
                     selectedItemId === item.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
                   }`}>

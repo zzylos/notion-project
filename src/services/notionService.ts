@@ -337,85 +337,10 @@ class NotionService {
     return 'project';
   }
 
+  // Preserve original status from Notion - no longer map to fixed categories
   private mapToItemStatus(notionStatus: string | null): ItemStatus {
-    if (!notionStatus) return 'not-started';
-
-    const normalized = notionStatus.toLowerCase().trim();
-
-    // Check for exact matches first
-    const exactMap: Record<string, ItemStatus> = {
-      'not started': 'not-started',
-      'not-started': 'not-started',
-      'todo': 'not-started',
-      'to do': 'not-started',
-      'to-do': 'not-started',
-      'backlog': 'not-started',
-      'open': 'not-started',
-      'new': 'not-started',
-      'pending': 'not-started',
-      'planned': 'not-started',
-      'queued': 'not-started',
-      'in progress': 'in-progress',
-      'in-progress': 'in-progress',
-      'inprogress': 'in-progress',
-      'doing': 'in-progress',
-      'active': 'in-progress',
-      'started': 'in-progress',
-      'working': 'in-progress',
-      'wip': 'in-progress',
-      'development': 'in-progress',
-      'in development': 'in-progress',
-      'in-development': 'in-progress',
-      'implementing': 'in-progress',
-      'blocked': 'blocked',
-      'on hold': 'blocked',
-      'on-hold': 'blocked',
-      'onhold': 'blocked',
-      'waiting': 'blocked',
-      'paused': 'blocked',
-      'stuck': 'blocked',
-      'impediment': 'blocked',
-      'in review': 'in-review',
-      'in-review': 'in-review',
-      'inreview': 'in-review',
-      'review': 'in-review',
-      'reviewing': 'in-review',
-      'testing': 'in-review',
-      'qa': 'in-review',
-      'ready for review': 'in-review',
-      'pending review': 'in-review',
-      'awaiting review': 'in-review',
-      'done': 'completed',
-      'completed': 'completed',
-      'complete': 'completed',
-      'finished': 'completed',
-      'closed': 'completed',
-      'resolved': 'completed',
-      'shipped': 'completed',
-      'released': 'completed',
-      'deployed': 'completed',
-      'live': 'completed',
-    };
-
-    if (exactMap[normalized]) {
-      return exactMap[normalized];
-    }
-
-    // Check for partial matches (contains)
-    if (normalized.includes('progress') || normalized.includes('doing') || normalized.includes('active') || normalized.includes('wip') || normalized.includes('working') || normalized.includes('develop')) {
-      return 'in-progress';
-    }
-    if (normalized.includes('block') || normalized.includes('hold') || normalized.includes('wait') || normalized.includes('stuck') || normalized.includes('pause')) {
-      return 'blocked';
-    }
-    if (normalized.includes('review') || normalized.includes('test') || normalized.includes('qa') || normalized.includes('verif')) {
-      return 'in-review';
-    }
-    if (normalized.includes('done') || normalized.includes('complete') || normalized.includes('finish') || normalized.includes('closed') || normalized.includes('resolved') || normalized.includes('ship') || normalized.includes('deploy') || normalized.includes('live')) {
-      return 'completed';
-    }
-
-    return 'not-started';
+    // Return the original status value, or a default if none
+    return notionStatus?.trim() || 'Not Started';
   }
 
   private mapToPriority(notionPriority: string | null): Priority | undefined {
