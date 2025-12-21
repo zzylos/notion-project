@@ -102,7 +102,52 @@ class NotionService {
     return response.json();
   }
 
-  // Find property by name (case-insensitive) or by type
+  // Debug flag - set to true in dev to log property mappings
+  private debugMode = import.meta.env.DEV;
+  private hasLoggedProperties = false;
+
+  // Log property names once for debugging
+  private logPropertyNames(props: Record<string, NotionPropertyValue>): void {
+    if (!this.debugMode || this.hasLoggedProperties) return;
+    this.hasLoggedProperties = true;
+
+    const propertyInfo = Object.entries(props).map(([name, value]) => ({
+      name,
+      type: value.type,
+      hasValue: this.hasPropertyValue(value),
+    }));
+
+    console.info(
+      '%c[Notion Debug] Database properties detected:',
+      'color: #0ea5e9; font-weight: bold'
+    );
+    console.table(propertyInfo);
+    console.info(
+      '%cConfigure these in Settings > Property Mappings if data is not showing correctly.',
+      'color: #64748b'
+    );
+  }
+
+  private hasPropertyValue(prop: NotionPropertyValue): boolean {
+    switch (prop.type) {
+      case 'select':
+        return prop.select !== null;
+      case 'status':
+        return prop.status !== null;
+      case 'relation':
+        return (prop.relation?.length ?? 0) > 0;
+      case 'people':
+        return (prop.people?.length ?? 0) > 0;
+      case 'number':
+        return prop.number !== null;
+      case 'date':
+        return prop.date !== null;
+      default:
+        return true;
+    }
+  }
+
+  // Find property by name (case-insensitive) or by type, with auto-detection fallbacks
   private findProperty(
     props: Record<string, NotionPropertyValue>,
     mappingName: string,
@@ -121,6 +166,17 @@ class NotionService {
       }
     }
 
+    // Try common aliases based on the mapping name
+    const aliases = this.getPropertyAliases(mappingName);
+    for (const alias of aliases) {
+      const lowerAlias = alias.toLowerCase();
+      for (const [key, value] of Object.entries(props)) {
+        if (key.toLowerCase() === lowerAlias) {
+          return value;
+        }
+      }
+    }
+
     // Try to find by type (useful for title which is unique)
     if (fallbackType) {
       for (const value of Object.values(props)) {
@@ -131,6 +187,21 @@ class NotionService {
     }
 
     return null;
+  }
+
+  // Common property name aliases to try as fallbacks
+  private getPropertyAliases(mappingName: string): string[] {
+    const aliasMap: Record<string, string[]> = {
+      'Status': ['Status', 'State', 'Stage', 'Phase', 'Progress Status', 'Task Status', 'Item Status'],
+      'Type': ['Type', 'Category', 'Kind', 'Item Type', 'Work Type', 'Task Type'],
+      'Priority': ['Priority', 'Importance', 'Urgency', 'Level', 'P'],
+      'Parent': ['Parent', 'Parent Item', 'Parent Task', 'Belongs To', 'Part Of', 'Epic', 'Initiative'],
+      'Owner': ['Owner', 'Assignee', 'Assigned To', 'Responsible', 'Lead', 'Person', 'People', 'Assigned'],
+      'Progress': ['Progress', 'Completion', 'Percent Complete', '% Complete', 'Done %'],
+      'Deadline': ['Deadline', 'Due Date', 'Due', 'Target Date', 'End Date', 'Finish Date', 'Due By'],
+      'Tags': ['Tags', 'Labels', 'Categories', 'Keywords'],
+    };
+    return aliasMap[mappingName] || [];
   }
 
   private extractTitle(props: Record<string, NotionPropertyValue>, mappingName: string): string {
@@ -222,74 +293,177 @@ class NotionService {
   private mapToItemType(notionType: string | null): ItemType {
     if (!notionType) return 'project'; // Default to project if no type
 
-    const typeMap: Record<string, ItemType> = {
-      'Mission': 'mission',
-      'Problem': 'problem',
-      'Solution': 'solution',
-      'Design': 'design',
-      'Project': 'project',
-      'Task': 'project',
-      // Lowercase variants
+    const normalized = notionType.toLowerCase().trim();
+
+    // Check for exact matches first
+    const exactMap: Record<string, ItemType> = {
       'mission': 'mission',
       'problem': 'problem',
       'solution': 'solution',
       'design': 'design',
       'project': 'project',
       'task': 'project',
+      'feature': 'project',
+      'epic': 'mission',
+      'story': 'project',
+      'bug': 'problem',
+      'issue': 'problem',
+      'idea': 'solution',
+      'proposal': 'solution',
+      'spec': 'design',
+      'specification': 'design',
+      'mockup': 'design',
+      'prototype': 'design',
     };
-    return typeMap[notionType] || 'project';
+
+    if (exactMap[normalized]) {
+      return exactMap[normalized];
+    }
+
+    // Check for partial matches (contains)
+    if (normalized.includes('mission') || normalized.includes('goal') || normalized.includes('objective')) {
+      return 'mission';
+    }
+    if (normalized.includes('problem') || normalized.includes('bug') || normalized.includes('issue') || normalized.includes('defect')) {
+      return 'problem';
+    }
+    if (normalized.includes('solution') || normalized.includes('fix') || normalized.includes('idea')) {
+      return 'solution';
+    }
+    if (normalized.includes('design') || normalized.includes('mockup') || normalized.includes('spec') || normalized.includes('ui') || normalized.includes('ux')) {
+      return 'design';
+    }
+
+    return 'project';
   }
 
   private mapToItemStatus(notionStatus: string | null): ItemStatus {
     if (!notionStatus) return 'not-started';
 
-    const statusMap: Record<string, ItemStatus> = {
-      'Not Started': 'not-started',
-      'Not started': 'not-started',
-      'To Do': 'not-started',
-      'Todo': 'not-started',
-      'Backlog': 'not-started',
-      'In Progress': 'in-progress',
-      'In progress': 'in-progress',
-      'Doing': 'in-progress',
-      'Active': 'in-progress',
-      'Blocked': 'blocked',
-      'On Hold': 'blocked',
-      'On hold': 'blocked',
-      'Waiting': 'blocked',
-      'In Review': 'in-review',
-      'In review': 'in-review',
-      'Review': 'in-review',
-      'Done': 'completed',
-      'Completed': 'completed',
-      'Complete': 'completed',
-      'Finished': 'completed',
-      // Lowercase variants
+    const normalized = notionStatus.toLowerCase().trim();
+
+    // Check for exact matches first
+    const exactMap: Record<string, ItemStatus> = {
       'not started': 'not-started',
+      'not-started': 'not-started',
+      'todo': 'not-started',
+      'to do': 'not-started',
+      'to-do': 'not-started',
+      'backlog': 'not-started',
+      'open': 'not-started',
+      'new': 'not-started',
+      'pending': 'not-started',
+      'planned': 'not-started',
+      'queued': 'not-started',
       'in progress': 'in-progress',
+      'in-progress': 'in-progress',
+      'inprogress': 'in-progress',
+      'doing': 'in-progress',
+      'active': 'in-progress',
+      'started': 'in-progress',
+      'working': 'in-progress',
+      'wip': 'in-progress',
+      'development': 'in-progress',
+      'in development': 'in-progress',
+      'in-development': 'in-progress',
+      'implementing': 'in-progress',
       'blocked': 'blocked',
+      'on hold': 'blocked',
+      'on-hold': 'blocked',
+      'onhold': 'blocked',
+      'waiting': 'blocked',
+      'paused': 'blocked',
+      'stuck': 'blocked',
+      'impediment': 'blocked',
       'in review': 'in-review',
+      'in-review': 'in-review',
+      'inreview': 'in-review',
+      'review': 'in-review',
+      'reviewing': 'in-review',
+      'testing': 'in-review',
+      'qa': 'in-review',
+      'ready for review': 'in-review',
+      'pending review': 'in-review',
+      'awaiting review': 'in-review',
       'done': 'completed',
       'completed': 'completed',
+      'complete': 'completed',
+      'finished': 'completed',
+      'closed': 'completed',
+      'resolved': 'completed',
+      'shipped': 'completed',
+      'released': 'completed',
+      'deployed': 'completed',
+      'live': 'completed',
     };
-    return statusMap[notionStatus] || 'not-started';
+
+    if (exactMap[normalized]) {
+      return exactMap[normalized];
+    }
+
+    // Check for partial matches (contains)
+    if (normalized.includes('progress') || normalized.includes('doing') || normalized.includes('active') || normalized.includes('wip') || normalized.includes('working') || normalized.includes('develop')) {
+      return 'in-progress';
+    }
+    if (normalized.includes('block') || normalized.includes('hold') || normalized.includes('wait') || normalized.includes('stuck') || normalized.includes('pause')) {
+      return 'blocked';
+    }
+    if (normalized.includes('review') || normalized.includes('test') || normalized.includes('qa') || normalized.includes('verif')) {
+      return 'in-review';
+    }
+    if (normalized.includes('done') || normalized.includes('complete') || normalized.includes('finish') || normalized.includes('closed') || normalized.includes('resolved') || normalized.includes('ship') || normalized.includes('deploy') || normalized.includes('live')) {
+      return 'completed';
+    }
+
+    return 'not-started';
   }
 
   private mapToPriority(notionPriority: string | null): Priority | undefined {
     if (!notionPriority) return undefined;
 
+    const normalized = notionPriority.toLowerCase().trim();
+
     const priorityMap: Record<string, Priority> = {
-      'P0': 'P0',
-      'P1': 'P1',
-      'P2': 'P2',
-      'P3': 'P3',
-      'Critical': 'P0',
-      'High': 'P1',
-      'Medium': 'P2',
-      'Low': 'P3',
-      'Urgent': 'P0',
+      'p0': 'P0',
+      'p1': 'P1',
+      'p2': 'P2',
+      'p3': 'P3',
+      'p4': 'P3',
+      'critical': 'P0',
+      'highest': 'P0',
+      'urgent': 'P0',
+      'blocker': 'P0',
+      'high': 'P1',
+      'important': 'P1',
+      'medium': 'P2',
+      'normal': 'P2',
+      'moderate': 'P2',
+      'low': 'P3',
+      'minor': 'P3',
+      'trivial': 'P3',
+      'lowest': 'P3',
     };
-    return priorityMap[notionPriority];
+
+    // Check exact match
+    if (priorityMap[normalized]) {
+      return priorityMap[normalized];
+    }
+
+    // Check for partial matches
+    if (normalized.includes('critical') || normalized.includes('urgent') || normalized.includes('blocker') || normalized.includes('highest')) {
+      return 'P0';
+    }
+    if (normalized.includes('high') || normalized.includes('important')) {
+      return 'P1';
+    }
+    if (normalized.includes('medium') || normalized.includes('normal') || normalized.includes('moderate')) {
+      return 'P2';
+    }
+    if (normalized.includes('low') || normalized.includes('minor') || normalized.includes('trivial')) {
+      return 'P3';
+    }
+
+    return undefined;
   }
 
   private pageToWorkItem(page: NotionPage): WorkItem {
@@ -297,6 +471,9 @@ class NotionService {
 
     const { mappings } = this.config;
     const props = page.properties;
+
+    // Log property names once in dev mode to help with debugging
+    this.logPropertyNames(props);
 
     const title = this.extractTitle(props, mappings.title);
     const type = this.extractSelect(props, mappings.type);
