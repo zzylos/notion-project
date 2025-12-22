@@ -11,7 +11,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { WorkItem } from '../../types';
+import type { WorkItem, ItemType } from '../../types';
 import {
   getStatusColors,
   getStatusCategory,
@@ -21,6 +21,16 @@ import {
   getProgressColor,
 } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
+
+// Validate that a URL is a valid Notion URL
+const isValidNotionUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'notion.so' || parsed.hostname.endsWith('.notion.so');
+  } catch {
+    return false;
+  }
+};
 
 interface DetailPanelProps {
   onClose: () => void;
@@ -301,9 +311,13 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
               onClick={() => handleNavigate(parent.id)}
               className="flex items-center gap-2 w-full p-2 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              {React.createElement(typeIcons[parent.type], {
-                className: `w-4 h-4 ${typeColors[parent.type].icon}`,
-              })}
+              {(() => {
+                const ParentIcon = typeIcons[parent.type as ItemType];
+                const parentStyle = typeColors[parent.type as ItemType];
+                return ParentIcon ? (
+                  <ParentIcon className={`w-4 h-4 ${parentStyle?.icon || ''}`} />
+                ) : null;
+              })()}
               <span className="text-sm text-gray-800 truncate">{parent.title}</span>
             </button>
           </div>
@@ -337,7 +351,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
       </div>
 
       {/* Footer with Notion link - only show for valid Notion URLs */}
-      {item.notionUrl && item.notionUrl.includes('notion.so') && (
+      {item.notionUrl && isValidNotionUrl(item.notionUrl) && (
         <div className="p-4 border-t border-gray-200">
           <a
             href={item.notionUrl}

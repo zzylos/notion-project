@@ -1,16 +1,36 @@
+import { useMemo } from 'react';
 import { Calendar } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { getStatusColors, getStatusCategory } from '../../utils/colors';
 
+// Safe date parsing utility
+const parseDate = (dateString: string): Date | null => {
+  try {
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+};
+
 const TimelineView: React.FC = () => {
   const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
-  const items = getFilteredItems().filter((item) => item.dueDate);
 
-  // Sort by due date
-  const sortedItems = [...items].sort((a, b) => {
-    if (!a.dueDate || !b.dueDate) return 0;
-    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-  });
+  // Memoize filtered and sorted items to avoid recreation on every render
+  const sortedItems = useMemo(() => {
+    const items = getFilteredItems().filter((item) => {
+      if (!item.dueDate) return false;
+      // Validate date format
+      return parseDate(item.dueDate) !== null;
+    });
+
+    return [...items].sort((a, b) => {
+      const dateA = parseDate(a.dueDate!);
+      const dateB = parseDate(b.dueDate!);
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
+    });
+  }, [getFilteredItems]);
 
   return (
     <div className="h-full overflow-auto p-4">

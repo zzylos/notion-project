@@ -21,11 +21,19 @@ type NotionPropertyValue = {
   date?: { start: string; end?: string } | null;
   people?: Array<{ id: string; name?: string; avatar_url?: string; person?: { email?: string } }>;
   relation?: Array<{ id: string }>;
-  formula?: { string?: string; number?: number };
-  rollup?: { number?: number };
+  formula?: { string?: string; number?: number; boolean?: boolean; date?: { start: string; end?: string } };
+  rollup?: { number?: number; array?: NotionPropertyValue[]; type?: string };
   checkbox?: boolean;
   url?: string | null;
   status?: { name: string } | null;
+  email?: string | null;
+  phone_number?: string | null;
+  created_time?: string;
+  created_by?: { id: string; object: string };
+  last_edited_time?: string;
+  last_edited_by?: { id: string; object: string };
+  files?: Array<{ name: string; type: string; file?: { url: string }; external?: { url: string } }>;
+  unique_id?: { prefix?: string; number: number };
 };
 
 type NotionQueryResponse = {
@@ -69,6 +77,8 @@ class NotionService {
   private config: NotionConfig | null = null;
   private cache: Map<string, { items: WorkItem[]; timestamp: number }> = new Map();
   private cacheTimeout = NOTION.CACHE_TIMEOUT;
+  // Track pending requests to prevent race conditions
+  private pendingRequests: Map<string, Promise<WorkItem[]>> = new Map();
 
   // Debug flag - set to true in dev to log property mappings
   private debugMode = import.meta.env.DEV;
@@ -85,6 +95,7 @@ class NotionService {
 
   clearCache() {
     this.cache.clear();
+    this.pendingRequests.clear();
   }
 
   /**
@@ -134,16 +145,25 @@ class NotionService {
 
     const url = `${CORS_PROXY}${encodeURIComponent(NOTION_API_BASE + endpoint)}`;
 
-    const response = await fetch(url, {
-      ...options,
-      signal,
-      headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        signal,
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+    } catch (error) {
+      // Handle network errors (connection refused, DNS failure, CORS issues, etc.)
+      if (error instanceof TypeError) {
+        throw new Error('Network error: Unable to reach Notion API. Check your internet connection or CORS proxy.');
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -410,7 +430,7 @@ class NotionService {
       progress: progress ?? undefined,
       owner: people[0],
       assignees: people,
-      parentId: parentRelations[0],
+      parentId: parentRelations.length > 0 ? parentRelations[0] : undefined,
       children: [],
       description: '',
       dueDate: dueDate ?? undefined,
@@ -532,6 +552,35 @@ class NotionService {
       return cached.items;
     }
 
+    // Check for pending request to prevent race conditions
+    const pendingRequest = this.pendingRequests.get(cacheKey);
+    if (pendingRequest) {
+      // Wait for the pending request and return its result
+      const result = await pendingRequest;
+      onProgress?.({ loaded: result.length, total: result.length, items: result, done: true });
+      return result;
+    }
+
+    // Create and store the pending request promise
+    const fetchPromise = this.doFetchAllItems(dbConfigs, signal, onProgress);
+    this.pendingRequests.set(cacheKey, fetchPromise);
+
+    try {
+      const result = await fetchPromise;
+      return result;
+    } finally {
+      // Clean up pending request when done
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  // Internal method that actually fetches all items
+  private async doFetchAllItems(
+    dbConfigs: DatabaseConfig[],
+    signal?: AbortSignal,
+    onProgress?: FetchProgressCallback
+  ): Promise<WorkItem[]> {
+    const cacheKey = dbConfigs.map(db => db.databaseId).sort().join('|');
     const allItems: WorkItem[] = [];
     const failedDatabases: Array<{ type: string; error: string }> = [];
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 /**
  * A hook for type-safe localStorage access with JSON serialization.
@@ -41,31 +41,44 @@ export function useLocalStorage<T>(
     }
   });
 
+  // Use ref to access current value without adding to dependencies
+  // Sync ref in useEffect to comply with React Compiler rules
+  const storedValueRef = useRef(storedValue);
+  useEffect(() => {
+    storedValueRef.current = storedValue;
+  }, [storedValue]);
+
   // Setter that updates both state and localStorage
+  // Use functional update to get current value safely
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {
       try {
-        // Allow value to be a function for functional updates
-        const valueToStore =
-          value instanceof Function ? value(storedValue) : value;
-        setStoredValue(valueToStore);
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        setStoredValue((prevValue) => {
+          // Allow value to be a function for functional updates
+          const valueToStore =
+            value instanceof Function ? value(prevValue) : value;
+          window.localStorage.setItem(key, JSON.stringify(valueToStore));
+          return valueToStore;
+        });
       } catch (error) {
         console.warn(`Error setting localStorage key "${key}":`, error);
       }
     },
-    [key, storedValue]
+    [key]
   );
+
+  // Use ref for initialValue to avoid recreation
+  const initialValueRef = useRef(initialValue);
 
   // Remove value from localStorage and reset to initial
   const removeValue = useCallback(() => {
     try {
       window.localStorage.removeItem(key);
-      setStoredValue(initialValue);
+      setStoredValue(initialValueRef.current);
     } catch (error) {
       console.warn(`Error removing localStorage key "${key}":`, error);
     }
-  }, [key, initialValue]);
+  }, [key]);
 
   return [storedValue, setValue, removeValue];
 }

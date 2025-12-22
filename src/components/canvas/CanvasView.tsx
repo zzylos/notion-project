@@ -82,6 +82,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
 
   // Update when underlying data changes (new items added/removed)
   // Skip the initial mount since we already have the correct layout
+  // Note: setNodes and setEdges are stable from React Flow hooks, so not included in deps
   useEffect(() => {
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
@@ -95,9 +96,11 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       setEdges(newLayout.edges);
       prevDataKeyRef.current = dataKey;
     }
-  }, [dataKey, filteredItems, selectedItemId, setNodes, setEdges]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataKey, filteredItems, selectedItemId]);
 
   // Update node selection state without resetting positions
+  // Note: setNodes is stable from React Flow hooks, so not included in deps
   useEffect(() => {
     setNodes(currentNodes =>
       currentNodes.map(node => ({
@@ -108,9 +111,11 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
         },
       }))
     );
-  }, [selectedItemId, setNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItemId]);
 
   // Reset layout to original positions
+  // Note: setNodes/setEdges are stable from React Flow hooks
   const handleResetLayout = useCallback(() => {
     const newLayout = calculateLayout(filteredItems, selectedItemId);
     setNodes(newLayout.nodes);
@@ -120,7 +125,8 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       clearTimeout(fitViewTimeoutRef.current);
     }
     fitViewTimeoutRef.current = setTimeout(() => fitView({ padding: 0.2 }), 50);
-  }, [filteredItems, selectedItemId, setNodes, setEdges, fitView]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredItems, selectedItemId, fitView]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

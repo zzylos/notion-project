@@ -15,6 +15,7 @@ import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
 import { getMergedConfig, hasEnvConfig } from './utils/config';
 import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp, AlertTriangle, X, FileCode } from 'lucide-react';
+import type { NotionConfig } from './types';
 
 function App() {
   const {
@@ -42,7 +43,7 @@ function App() {
   const usingEnvConfig = hasEnvConfig();
 
   // Load data function with progressive updates
-  const loadData = useCallback(async (config: typeof notionConfig, forceRefresh = false) => {
+  const loadData = useCallback(async (config: NotionConfig | null, forceRefresh = false) => {
     // Cancel any previous in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -73,16 +74,20 @@ function App() {
             // Don't update state if aborted
             if (abortController.signal.aborted) return;
 
-            setLoadingProgress({ loaded: progress.loaded, total: progress.total });
+            try {
+              setLoadingProgress({ loaded: progress.loaded, total: progress.total });
 
-            // Track failed databases
-            if (progress.failedDatabases && progress.failedDatabases.length > 0) {
-              setFailedDatabases(progress.failedDatabases);
-            }
+              // Track failed databases
+              if (progress.failedDatabases && progress.failedDatabases.length > 0) {
+                setFailedDatabases(progress.failedDatabases);
+              }
 
-            // Update items progressively for faster perceived performance
-            if (progress.items.length > 0 && !progress.done) {
-              setItems(progress.items);
+              // Update items progressively for faster perceived performance
+              if (progress.items.length > 0 && !progress.done) {
+                setItems(progress.items);
+              }
+            } catch (e) {
+              console.error('Error in progress callback:', e);
             }
           },
         });
@@ -105,7 +110,9 @@ function App() {
       if (error instanceof DOMException && error.name === 'AbortError') {
         return;
       }
-      setError('Failed to load data from Notion. Using demo data instead.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to load data from Notion:', error);
+      setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
       setItems(sampleData);
     } finally {
       // Only update loading state if this is still the current request

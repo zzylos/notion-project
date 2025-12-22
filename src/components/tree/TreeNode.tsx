@@ -9,6 +9,7 @@ import type { TreeNode as TreeNodeType } from '../../types';
 import { getStatusColors, getStatusCategory, typeColors, priorityColors, getProgressColor } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
 import { useStore } from '../../store/useStore';
+import { TREE } from '../../constants';
 
 interface TreeNodeProps {
   node: TreeNodeType;
@@ -21,7 +22,9 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
 
   const TypeIcon = typeIcons[item.type];
   const hasChildren = children.length > 0;
-  const indentPx = level * 24;
+  const indentPx = level * TREE.INDENT_PX;
+  // Calculate status category once to avoid duplicate calls
+  const statusCategory = getStatusCategory(item.status);
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -37,7 +40,8 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
 
   const statusStyle = getStatusColors(item.status);
   const typeStyle = typeColors[item.type];
-  const isInProgress = getStatusCategory(item.status) === 'in-progress';
+  const isInProgress = statusCategory === 'in-progress';
+  const isCompleted = statusCategory === 'completed';
 
   return (
     <div className="select-none">
@@ -55,6 +59,8 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
         {/* Expand/collapse button */}
         <button
           onClick={handleToggle}
+          aria-label={hasChildren ? (isExpanded ? 'Collapse' : 'Expand') : undefined}
+          aria-expanded={hasChildren ? isExpanded : undefined}
           className={`
             flex items-center justify-center w-5 h-5 rounded
             transition-colors duration-150
@@ -89,7 +95,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
         <span
           className={`
             flex-1 text-sm font-medium truncate
-            ${getStatusCategory(item.status) === 'completed' ? 'text-gray-500 line-through' : 'text-gray-800'}
+            ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-800'}
           `}
         >
           {item.title}
@@ -133,7 +139,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
           <div
             className={`
               flex items-center gap-1 text-xs
-              ${new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed'
+              ${new Date(item.dueDate) < new Date() && !isCompleted
                 ? 'text-red-500'
                 : 'text-gray-400'}
             `}

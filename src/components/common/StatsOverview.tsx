@@ -28,21 +28,16 @@ const StatsOverview: React.FC = () => {
     return statusList;
   }, [items]);
 
-  // Calculate in-progress and completed counts dynamically
-  const inProgressCount = useMemo(() => {
-    let count = 0;
+  // Calculate in-progress and completed counts dynamically in a single pass
+  const { inProgressCount, completedCount } = useMemo(() => {
+    let inProgress = 0;
+    let completed = 0;
     Object.entries(stats.byStatus).forEach(([status, num]) => {
-      if (getStatusCategory(status) === 'in-progress') count += num;
+      const category = getStatusCategory(status);
+      if (category === 'in-progress') inProgress += num;
+      else if (category === 'completed') completed += num;
     });
-    return count;
-  }, [stats.byStatus]);
-
-  const completedCount = useMemo(() => {
-    let count = 0;
-    Object.entries(stats.byStatus).forEach(([status, num]) => {
-      if (getStatusCategory(status) === 'completed') count += num;
-    });
-    return count;
+    return { inProgressCount: inProgress, completedCount: completed };
   }, [stats.byStatus]);
 
   const typeOrder: ItemType[] = ['mission', 'problem', 'solution', 'design', 'project'];

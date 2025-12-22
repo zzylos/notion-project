@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Maximize2, Minimize2, RefreshCw, Search } from 'lucide-react';
 import TreeNode from './TreeNode';
 import { useStore } from '../../store/useStore';
@@ -19,9 +19,10 @@ const TreeView: React.FC<TreeViewProps> = ({ onNodeSelect }) => {
 
   const treeNodes = useMemo(() => getTreeNodes(), [getTreeNodes]);
 
-  const handleNodeClick = (id: string) => {
+  // Memoize handleNodeClick to prevent TreeNode re-renders
+  const handleNodeClick = useCallback((id: string) => {
     onNodeSelect?.(id);
-  };
+  }, [onNodeSelect]);
 
   const totalNodes = useMemo(() => {
     const countNodes = (nodes: TreeNodeType[]): number => {
