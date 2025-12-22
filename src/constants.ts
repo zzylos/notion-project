@@ -71,15 +71,15 @@ export const DEFAULT_PROPERTY_MAPPINGS = {
 } as const;
 
 /**
- * Common property name aliases for flexible matching
+ * Common property name aliases for flexible matching.
+ * Used by notionService to find properties with different names.
  */
 export const PROPERTY_ALIASES: Record<string, string[]> = {
-  title: ['Name', 'Title'],
-  status: ['Status', 'State'],
-  priority: ['Priority', 'Importance'],
-  owner: ['Owner', 'Assignee', 'Assigned To', 'Assigned'],
-  parent: ['Parent', 'Parent Item', 'Parent item'],
-  progress: ['Progress', 'Completion', '%'],
-  dueDate: ['Deadline', 'Due Date', 'Due', 'Due date', 'End Date'],
-  tags: ['Tags', 'Labels', 'Categories'],
+  Status: ['Status', 'State', 'Stage', 'Phase'],
+  Priority: ['Priority', 'Importance', 'Urgency', 'Level', 'P'],
+  Parent: ['Parent', 'Parent Item', 'Parent Task', 'Belongs To', 'Part Of', 'Epic', 'Initiative', 'Objective', 'Problem', 'Solution', 'Project'],
+  Owner: ['Owner', 'Assignee', 'Assigned To', 'Responsible', 'Lead', 'Person', 'People', 'Assigned'],
+  Progress: ['Progress', 'Completion', 'Percent Complete', '% Complete', 'Done %'],
+  Deadline: ['Deadline', 'Due Date', 'Due', 'Target Date', 'End Date', 'Finish Date', 'Due By'],
+  Tags: ['Tags', 'Labels', 'Categories', 'Keywords'],
 } as const;
