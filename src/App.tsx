@@ -10,6 +10,7 @@ import ListView from './components/views/ListView';
 import TimelineView from './components/views/TimelineView';
 import DetailPanel from './components/common/DetailPanel';
 import NotionConfigModal from './components/common/NotionConfigModal';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
 import { getMergedConfig, hasEnvConfig } from './utils/config';
@@ -259,7 +260,9 @@ function App() {
       <div className="flex-1 flex min-h-[500px]">
         {/* Main view - with minimum height for canvas usability */}
         <div className="flex-1 overflow-auto min-h-[500px]">
-          {renderMainView()}
+          <ErrorBoundary>
+            {renderMainView()}
+          </ErrorBoundary>
         </div>
 
         {/* Detail panel toggle button (mobile) */}

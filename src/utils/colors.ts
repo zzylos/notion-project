@@ -123,8 +123,9 @@ export function getStatusCategory(status: string): StatusCategory {
 // Get colors for any status (dynamic)
 export function getStatusColors(status: string): StatusColorSet {
   // Check cache first
-  if (statusColorCache.has(status)) {
-    return statusColorCache.get(status)!;
+  const cached = statusColorCache.get(status);
+  if (cached) {
+    return cached;
   }
 
   // Try to categorize and use category colors

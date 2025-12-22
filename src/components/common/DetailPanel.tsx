@@ -347,8 +347,8 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
         )}
       </div>
 
-      {/* Footer with Notion link */}
-      {item.notionUrl && (
+      {/* Footer with Notion link - only show for valid Notion URLs */}
+      {item.notionUrl && item.notionUrl.includes('notion.so') && (
         <div className="p-4 border-t border-gray-200">
           <a
             href={item.notionUrl}
