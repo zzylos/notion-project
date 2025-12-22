@@ -2,30 +2,18 @@ import React, { memo } from 'react';
 import {
   ChevronRight,
   ChevronDown,
-  Target,
-  AlertCircle,
-  Lightbulb,
-  Palette,
-  FolderKanban,
   ExternalLink,
   Clock,
 } from 'lucide-react';
 import type { TreeNode as TreeNodeType } from '../../types';
 import { getStatusColors, getStatusCategory, typeColors, priorityColors, getProgressColor } from '../../utils/colors';
+import { typeIcons } from '../../utils/icons';
 import { useStore } from '../../store/useStore';
 
 interface TreeNodeProps {
   node: TreeNodeType;
   onNodeClick: (id: string) => void;
 }
-
-const typeIcons = {
-  mission: Target,
-  problem: AlertCircle,
-  solution: Lightbulb,
-  design: Palette,
-  project: FolderKanban,
-};
 
 const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) => {
   const { toggleExpanded, setSelectedItem } = useStore();

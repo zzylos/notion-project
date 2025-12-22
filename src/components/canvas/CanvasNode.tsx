@@ -1,13 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import {
-  Target,
-  AlertCircle,
-  Lightbulb,
-  Palette,
-  FolderKanban,
-} from 'lucide-react';
-import type { WorkItem, ItemType } from '../../types';
+import type { WorkItem } from '../../types';
 import {
   getStatusColors,
   getStatusCategory,
@@ -15,6 +8,7 @@ import {
   typeLabels,
   getProgressColor,
 } from '../../utils/colors';
+import { typeIcons } from '../../utils/icons';
 
 interface CanvasNodeProps {
   data: {
@@ -22,14 +16,6 @@ interface CanvasNodeProps {
     isSelected: boolean;
   };
 }
-
-const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> = {
-  mission: Target,
-  problem: AlertCircle,
-  solution: Lightbulb,
-  design: Palette,
-  project: FolderKanban,
-};
 
 const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
   const { item, isSelected } = data;

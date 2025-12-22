@@ -3,23 +3,11 @@ import {
   Search,
   X,
   Filter,
-  Target,
-  AlertCircle,
-  Lightbulb,
-  Palette,
-  FolderKanban,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { ItemType, Priority } from '../../types';
 import { typeColors, priorityColors, typeLabels, priorityLabels, getStatusColors } from '../../utils/colors';
-
-const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> = {
-  mission: Target,
-  problem: AlertCircle,
-  solution: Lightbulb,
-  design: Palette,
-  project: FolderKanban,
-};
+import { typeIcons } from '../../utils/icons';
 
 const FilterPanel: React.FC = () => {
   const { filters, setFilters, resetFilters, items } = useStore();

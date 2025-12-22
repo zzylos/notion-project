@@ -1,4 +1,5 @@
 import type { WorkItem, ItemType, ItemStatus, Priority, Owner, NotionConfig, PropertyMappings, DatabaseConfig } from '../types';
+import { NOTION, DEFAULT_CORS_PROXY, PROPERTY_ALIASES } from '../constants';
 
 // Type for Notion API responses
 type NotionPage = {
@@ -61,13 +62,13 @@ export interface FetchOptions {
  *
  * Configure CORS proxy via VITE_CORS_PROXY environment variable.
  */
-const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || 'https://corsproxy.io/?';
-const NOTION_API_BASE = 'https://api.notion.com/v1';
+const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || DEFAULT_CORS_PROXY;
+const NOTION_API_BASE = NOTION.API_BASE;
 
 class NotionService {
   private config: NotionConfig | null = null;
   private cache: Map<string, { items: WorkItem[]; timestamp: number }> = new Map();
-  private cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
+  private cacheTimeout = NOTION.CACHE_TIMEOUT;
 
   // Debug flag - set to true in dev to log property mappings
   private debugMode = import.meta.env.DEV;
@@ -84,6 +85,46 @@ class NotionService {
 
   clearCache() {
     this.cache.clear();
+  }
+
+  /**
+   * Parse Notion API error response and return a user-friendly message.
+   */
+  private parseNotionError(status: number, errorText: string): string {
+    // Try to parse JSON error response from Notion
+    let errorCode = '';
+    let errorMessage = '';
+    try {
+      const parsed = JSON.parse(errorText);
+      errorCode = parsed.code || '';
+      errorMessage = parsed.message || '';
+    } catch {
+      // Not JSON, use raw text
+      errorMessage = errorText;
+    }
+
+    // Map common status codes to actionable messages
+    switch (status) {
+      case 401:
+        return 'Invalid API key. Please check your Notion integration token.';
+      case 403:
+        return 'Access denied. Make sure you have shared the database with your integration.';
+      case 404:
+        return 'Database not found. Please verify the database ID and ensure it is shared with your integration.';
+      case 429:
+        return 'Rate limited by Notion API. Please wait a moment and try again.';
+      case 400:
+        if (errorCode === 'validation_error') {
+          return `Invalid request: ${errorMessage}`;
+        }
+        return `Bad request: ${errorMessage || 'Please check your configuration.'}`;
+      case 500:
+      case 502:
+      case 503:
+        return 'Notion API is temporarily unavailable. Please try again later.';
+      default:
+        return `Notion API error (${status}): ${errorMessage || 'Unknown error'}`;
+    }
   }
 
   private async notionFetch<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
@@ -106,7 +147,7 @@ class NotionService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Notion API error: ${response.status} - ${errorText}`);
+      throw new Error(this.parseNotionError(response.status, errorText));
     }
 
     return response.json();
@@ -224,16 +265,8 @@ class NotionService {
   }
 
   private getPropertyAliases(mappingName: string): string[] {
-    const aliasMap: Record<string, string[]> = {
-      'Status': ['Status', 'State', 'Stage', 'Phase'],
-      'Priority': ['Priority', 'Importance', 'Urgency', 'Level', 'P'],
-      'Parent': ['Parent', 'Parent Item', 'Parent Task', 'Belongs To', 'Part Of', 'Epic', 'Initiative', 'Objective', 'Problem', 'Solution', 'Project'],
-      'Owner': ['Owner', 'Assignee', 'Assigned To', 'Responsible', 'Lead', 'Person', 'People', 'Assigned'],
-      'Progress': ['Progress', 'Completion', 'Percent Complete', '% Complete', 'Done %'],
-      'Deadline': ['Deadline', 'Due Date', 'Due', 'Target Date', 'End Date', 'Finish Date', 'Due By'],
-      'Tags': ['Tags', 'Labels', 'Categories', 'Keywords'],
-    };
-    return aliasMap[mappingName] || [];
+    // Use centralized property aliases from constants
+    return PROPERTY_ALIASES[mappingName] || [];
   }
 
   private extractTitle(props: Record<string, NotionPropertyValue>, mappingName: string): string {

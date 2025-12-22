@@ -8,14 +8,10 @@ import {
   ArrowDown,
   AlertTriangle,
   Target,
-  AlertCircle,
-  Lightbulb,
-  Palette,
-  FolderKanban,
   ChevronRight,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { WorkItem, ItemType } from '../../types';
+import type { WorkItem } from '../../types';
 import {
   getStatusColors,
   getStatusCategory,
@@ -24,18 +20,11 @@ import {
   typeLabels,
   getProgressColor,
 } from '../../utils/colors';
+import { typeIcons } from '../../utils/icons';
 
 interface DetailPanelProps {
   onClose: () => void;
 }
-
-const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> = {
-  mission: Target,
-  problem: AlertCircle,
-  solution: Lightbulb,
-  design: Palette,
-  project: FolderKanban,
-};
 
 const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
   const { selectedItemId, items, getItemPath, expandToItem } = useStore();

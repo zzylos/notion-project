@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Key, Database, Settings, HelpCircle, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug, Target, AlertTriangle, Lightbulb, FolderKanban, Package } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../../types';
+import { DEFAULT_PROPERTY_MAPPINGS } from '../../constants';
 
 interface NotionConfigModalProps {
   isOpen: boolean;
@@ -26,17 +27,8 @@ const databaseTypes: DatabaseTypeInfo[] = [
   { type: 'design', label: 'Deliverables', description: 'Outputs and deliverables', icon: Package, color: 'text-green-600' },
 ];
 
-// Default property mappings
-const defaultMappings: PropertyMappings = {
-  title: 'Name',
-  status: 'Status',
-  priority: 'Priority',
-  owner: 'Owner',
-  parent: 'Parent',
-  progress: 'Progress',
-  dueDate: 'Deadline',
-  tags: 'Tags',
-};
+// Use centralized default property mappings
+const defaultMappings: PropertyMappings = { ...DEFAULT_PROPERTY_MAPPINGS };
 
 const mappingDescriptions: Record<keyof PropertyMappings, string> = {
   title: 'Auto-detected (your title column)',
