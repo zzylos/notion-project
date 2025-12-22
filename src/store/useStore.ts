@@ -170,23 +170,69 @@ export const useStore = create<StoreState>()(
       // Notion config
       setNotionConfig: (config: NotionConfig | null) => set({ notionConfig: config }),
 
-      // Helper methods
-      getTreeNodes: () => {
+      /**
+       * Builds a hierarchical tree structure from filtered work items.
+       *
+       * ## Algorithm Overview
+       *
+       * 1. **Filter items**: Start with items that pass current filter criteria
+       * 2. **Identify roots**: Items with no parent OR whose parent isn't in the filtered set
+       * 3. **Build recursively**: For each root, recursively attach children
+       * 4. **Track state**: Mark each node with expansion, selection, and highlight status
+       *
+       * ## Safety Features
+       *
+       * - **Circular reference detection**: Tracks ancestors during traversal to prevent
+       *   infinite loops if data has circular parent references
+       * - **Depth limiting**: Stops recursion at TREE.MAX_DEPTH to prevent stack overflow
+       *   from extremely deep hierarchies
+       *
+       * ## Root Item Identification
+       *
+       * An item becomes a "root" in the tree if:
+       * - It has no parentId (true root), OR
+       * - Its parent was filtered out (orphaned by filter)
+       *
+       * This ensures the tree always shows something useful even when filters hide parents.
+       *
+       * ## Performance Notes
+       *
+       * - Called on every render that needs tree data (not memoized internally)
+       * - Callers should use useMemo with appropriate dependencies
+       * - O(n²) in worst case due to repeated filtering, but acceptable for typical data sizes
+       *
+       * @returns Array of TreeNode objects representing the tree structure
+       *
+       * @example
+       * // In a component:
+       * const { getTreeNodes } = useStore();
+       * const treeNodes = useMemo(() => getTreeNodes(), [getTreeNodes]);
+       */
+      getTreeNodes: (): TreeNode[] => {
         const state = get();
         const filteredItems = state.getFilteredItems();
         const filteredIds = new Set(filteredItems.map(i => i.id));
 
-        // Build tree from items with cycle detection and depth limit
+        /**
+         * Recursively builds tree nodes for children of a given parent.
+         *
+         * @param parentId - ID of the parent item (undefined for finding root children)
+         * @param level - Current depth in the tree (0 = root level)
+         * @param ancestors - Set of ancestor IDs for cycle detection
+         * @returns Array of TreeNode objects for this level
+         */
         const buildTree = (parentId: string | undefined, level: number, ancestors: Set<string>): TreeNode[] => {
-          // Prevent stack overflow with very deep nesting
+          // Safety: Prevent stack overflow with very deep nesting
           if (level > TREE.MAX_DEPTH) {
             console.warn(`[Store] Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`);
             return [];
           }
 
+          // Find all children of this parent
           const children = filteredItems.filter(item => item.parentId === parentId);
+
           return children.map(item => {
-            // Check for circular reference
+            // Safety: Check for circular reference
             if (ancestors.has(item.id)) {
               console.warn(`[Store] Circular reference detected in tree at item: ${item.id}`);
               return {
@@ -199,6 +245,7 @@ export const useStore = create<StoreState>()(
               };
             }
 
+            // Track this item as an ancestor for deeper levels
             const newAncestors = new Set(ancestors);
             newAncestors.add(item.id);
 
@@ -213,11 +260,12 @@ export const useStore = create<StoreState>()(
           });
         };
 
-        // Start with root items (no parent or parent not in filtered set)
+        // Identify root items: no parent OR parent not in filtered set
         const rootItems = filteredItems.filter(
           item => !item.parentId || !filteredIds.has(item.parentId)
         );
 
+        // Build tree starting from each root
         return rootItems.map(item => {
           const ancestors = new Set<string>([item.id]);
           return {

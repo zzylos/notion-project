@@ -44,67 +44,85 @@ const statusCategoryColors: Record<StatusCategory, StatusColorSet> = {
 // Cache for consistent color assignment
 const statusColorCache = new Map<string, StatusColorSet>();
 
-// Categorize a status string to a known category for color mapping
+// Cache for status category lookups (performance optimization)
+const statusCategoryCache = new Map<string, StatusCategory>();
+
+/**
+ * Keyword mapping for status categorization.
+ * Order matters: checked from top to bottom, first match wins.
+ * Each category maps to an array of keywords that indicate that status.
+ *
+ * Keywords are matched using includes() on the normalized (lowercase, trimmed) status string.
+ *
+ * Categories:
+ * - completed: Work is done, shipped, or closed
+ * - blocked: Work is stopped, waiting, or on hold
+ * - in-review: Work is being tested, reviewed, or verified
+ * - in-progress: Work is actively being done
+ * - not-started: Default for unrecognized statuses
+ */
+const STATUS_CATEGORY_KEYWORDS: Record<StatusCategory, string[]> = {
+  'completed': [
+    'done', 'complete', 'finish', 'closed', 'resolved',
+    'shipped', 'deployed', 'live', 'released', 'launched',
+  ],
+  'blocked': [
+    'block', 'hold', 'wait', 'stuck', 'pause',
+    'duplicate', 'wontfix', 'cancelled', 'canceled',
+  ],
+  'in-review': [
+    'review', 'test', 'qa', 'verif', 'post mortem',
+    'postmortem', 'staging', 'approval',
+  ],
+  'in-progress': [
+    'progress', 'doing', 'active', 'wip', 'working',
+    'develop', 'solutioning', 'priorit', 'schedul',
+    'analysis', 'research', 'project in', 'implementation',
+    'coding', 'building',
+  ],
+  'not-started': [], // Default fallback, no keywords needed
+};
+
+/**
+ * Categorizes a status string to a known StatusCategory for color mapping.
+ *
+ * Uses fuzzy keyword matching on the normalized (lowercase, trimmed) status
+ * string to determine which category it belongs to.
+ *
+ * Results are cached for performance - each unique status string is only
+ * processed once.
+ *
+ * @param status - The status string from Notion (e.g., "In Progress", "Done")
+ * @returns The StatusCategory for color mapping
+ *
+ * @example
+ * getStatusCategory("In Progress")     // returns 'in-progress'
+ * getStatusCategory("Completed")       // returns 'completed'
+ * getStatusCategory("On Hold")         // returns 'blocked'
+ * getStatusCategory("Custom Status")   // returns 'not-started' (default)
+ */
 export function getStatusCategory(status: string): StatusCategory {
+  // Check cache first
+  const cached = statusCategoryCache.get(status);
+  if (cached) {
+    return cached;
+  }
+
   const normalized = status.toLowerCase().trim();
 
-  // Check for completion/closed statuses
-  if (
-    normalized.includes('done') ||
-    normalized.includes('complete') ||
-    normalized.includes('finish') ||
-    normalized.includes('closed') ||
-    normalized.includes('resolved') ||
-    normalized.includes('shipped') ||
-    normalized.includes('deployed') ||
-    normalized.includes('live')
-  ) {
-    return 'completed';
-  }
+  // Check each category in priority order (completed → blocked → in-review → in-progress)
+  const categories: StatusCategory[] = ['completed', 'blocked', 'in-review', 'in-progress'];
 
-  // Check for blocked/hold statuses
-  if (
-    normalized.includes('block') ||
-    normalized.includes('hold') ||
-    normalized.includes('wait') ||
-    normalized.includes('stuck') ||
-    normalized.includes('pause') ||
-    normalized.includes('duplicate')
-  ) {
-    return 'blocked';
-  }
-
-  // Check for review/testing statuses
-  if (
-    normalized.includes('review') ||
-    normalized.includes('test') ||
-    normalized.includes('qa') ||
-    normalized.includes('verif') ||
-    normalized.includes('post mortem') ||
-    normalized.includes('postmortem')
-  ) {
-    return 'in-review';
-  }
-
-  // Check for in-progress statuses
-  if (
-    normalized.includes('progress') ||
-    normalized.includes('doing') ||
-    normalized.includes('active') ||
-    normalized.includes('wip') ||
-    normalized.includes('working') ||
-    normalized.includes('develop') ||
-    normalized.includes('solutioning') ||
-    normalized.includes('priorit') ||
-    normalized.includes('schedul') ||
-    normalized.includes('analysis') ||
-    normalized.includes('research') ||
-    normalized.includes('project in')
-  ) {
-    return 'in-progress';
+  for (const category of categories) {
+    const keywords = STATUS_CATEGORY_KEYWORDS[category];
+    if (keywords.some(keyword => normalized.includes(keyword))) {
+      statusCategoryCache.set(status, category);
+      return category;
+    }
   }
 
   // Default to not-started
+  statusCategoryCache.set(status, 'not-started');
   return 'not-started';
 }
 
