@@ -279,7 +279,7 @@ export const useStore = create<StoreState>()(
         });
       },
 
-      getFilteredItems: () => {
+      getFilteredItems: (): WorkItem[] => {
         const state = get();
         const { filters } = state;
         const allItems = Array.from(state.items.values());

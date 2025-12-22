@@ -61,8 +61,8 @@ export function calculateLayout(
       childCount++;
     }
 
-    // Parent is centered above children
-    const avgChildX = childXSum / childCount;
+    // Parent is centered above children (guard against division by zero)
+    const avgChildX = childCount > 0 ? childXSum / childCount : currentX;
     positionMap.set(item.id, { x: avgChildX, y: level * VERTICAL_SPACING });
 
     return avgChildX;
