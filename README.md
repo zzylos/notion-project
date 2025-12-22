@@ -134,7 +134,7 @@ npm run lint
 ```
 
 ### Quick Setup with Environment Variables
-
+### note to self - use .env config or everythings fucked, fix that later
 The easiest way to configure the app is with a `.env` file:
 
 ```bash
