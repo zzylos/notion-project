@@ -1,10 +1,6 @@
 import React, { useMemo } from 'react';
 import {
   Target,
-  AlertCircle,
-  Lightbulb,
-  Palette,
-  FolderKanban,
   TrendingUp,
   AlertTriangle,
   Clock,
@@ -13,14 +9,7 @@ import {
 import { useStore } from '../../store/useStore';
 import type { ItemType } from '../../types';
 import { typeLabels, getStatusColors, getStatusCategory, typeColors } from '../../utils/colors';
-
-const typeIcons: Record<ItemType, React.ComponentType<{ className?: string }>> = {
-  mission: Target,
-  problem: AlertCircle,
-  solution: Lightbulb,
-  design: Palette,
-  project: FolderKanban,
-};
+import { typeIcons } from '../../utils/icons';
 
 const StatsOverview: React.FC = () => {
   const { getStats, items } = useStore();

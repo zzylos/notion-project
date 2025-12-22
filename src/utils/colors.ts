@@ -41,18 +41,6 @@ const statusCategoryColors: Record<StatusCategory, StatusColorSet> = {
   },
 };
 
-// Additional color palette for unique statuses
-const dynamicColorPalette: StatusColorSet[] = [
-  { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300', dot: 'bg-purple-500' },
-  { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-300', dot: 'bg-cyan-500' },
-  { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-300', dot: 'bg-pink-500' },
-  { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-300', dot: 'bg-indigo-500' },
-  { bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-300', dot: 'bg-teal-500' },
-  { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', dot: 'bg-orange-500' },
-  { bg: 'bg-lime-100', text: 'text-lime-700', border: 'border-lime-300', dot: 'bg-lime-500' },
-  { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-300', dot: 'bg-rose-500' },
-];
-
 // Cache for consistent color assignment
 const statusColorCache = new Map<string, StatusColorSet>();
 
@@ -137,13 +125,6 @@ export function getStatusColors(status: string): StatusColorSet {
   return colors;
 }
 
-// Get a unique color for a status based on its index in the list
-export function getStatusColorByIndex(index: number): StatusColorSet {
-  // First use the category colors, then cycle through the palette
-  const allColors = [...Object.values(statusCategoryColors), ...dynamicColorPalette];
-  return allColors[index % allColors.length];
-}
-
 // Legacy export for backwards compatibility
 export const statusColors = statusCategoryColors;
 
@@ -210,15 +191,6 @@ export function getStatusLabel(status: string): string {
   return status;
 }
 
-// Legacy status labels for backwards compatibility
-export const statusLabels: Record<StatusCategory, string> = {
-  'not-started': 'Not Started',
-  'in-progress': 'In Progress',
-  'blocked': 'Blocked',
-  'in-review': 'In Review',
-  'completed': 'Completed',
-};
-
 // Get type label
 export const typeLabels: Record<ItemType, string> = {
   'mission': 'Mission',
@@ -258,9 +230,6 @@ export function getStatusHexColor(status: string): string {
   const category = getStatusCategory(status);
   return statusCategoryHexColors[category];
 }
-
-// Legacy export for backwards compatibility
-export const statusHexColors = statusCategoryHexColors;
 
 export const typeHexColors: Record<ItemType, string> = {
   'mission': '#7c3aed',

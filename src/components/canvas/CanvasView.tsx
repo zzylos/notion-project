@@ -19,17 +19,15 @@ import type { WorkItem } from '../../types';
 import { typeHexColors, getStatusCategory } from '../../utils/colors';
 import CanvasNode from './CanvasNode';
 import { RotateCcw, Maximize, Minimize } from 'lucide-react';
+import { CANVAS } from '../../constants';
 
 // Custom node types
 const nodeTypes = {
   workItem: CanvasNode,
 };
 
-// Layout configuration
-const HORIZONTAL_SPACING = 400;
-const VERTICAL_SPACING = 280;
-const NODE_WIDTH = 250;
-const TREE_GAP = 200; // Extra gap between separate trees
+// Destructure layout constants for convenience
+const { HORIZONTAL_SPACING, VERTICAL_SPACING, NODE_WIDTH, TREE_GAP } = CANVAS;
 
 interface CanvasViewProps {
   onNodeSelect?: (id: string) => void;

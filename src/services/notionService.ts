@@ -1,4 +1,5 @@
 import type { WorkItem, ItemType, ItemStatus, Priority, Owner, NotionConfig, PropertyMappings, DatabaseConfig } from '../types';
+import { NOTION, DEFAULT_CORS_PROXY } from '../constants';
 
 // Type for Notion API responses
 type NotionPage = {
@@ -61,13 +62,13 @@ export interface FetchOptions {
  *
  * Configure CORS proxy via VITE_CORS_PROXY environment variable.
  */
-const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || 'https://corsproxy.io/?';
-const NOTION_API_BASE = 'https://api.notion.com/v1';
+const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || DEFAULT_CORS_PROXY;
+const NOTION_API_BASE = NOTION.API_BASE;
 
 class NotionService {
   private config: NotionConfig | null = null;
   private cache: Map<string, { items: WorkItem[]; timestamp: number }> = new Map();
-  private cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
+  private cacheTimeout = NOTION.CACHE_TIMEOUT;
 
   // Debug flag - set to true in dev to log property mappings
   private debugMode = import.meta.env.DEV;
