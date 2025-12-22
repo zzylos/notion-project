@@ -10,52 +10,41 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
 
 ### Extract Duplicated Code to Shared Utilities
 
-- [ ] **Extract `typeIcons` object** - Duplicated in 5 files
-  - `src/components/tree/TreeNode.tsx` (lines 22-28)
-  - `src/components/canvas/CanvasNode.tsx` (lines 26-32)
-  - `src/components/common/DetailPanel.tsx` (lines 32-38)
-  - `src/components/filters/FilterPanel.tsx` (lines 16-22)
-  - `src/components/common/StatsOverview.tsx`
-  - **Solution**: Create `src/utils/icons.ts`
+- [x] **Extract `typeIcons` object** - ✅ Created `src/utils/icons.ts`
+  - Updated all 5 components to use shared utility
 
-- [ ] **Centralize default property mappings** - Duplicated in 2 files
-  - `src/services/notionService.ts` (lines 157-166)
-  - `src/components/common/NotionConfigModal.tsx` (lines 30-39)
-  - **Solution**: Move to `src/constants.ts`
+- [x] **Centralize default property mappings** - ✅ Moved to `src/constants.ts`
+  - NotionConfigModal now imports from constants
 
 ### Create Shared UI Components
 
-- [ ] **Create `<StatusBadge />` component**
-  - Status color/rendering duplicated across TreeNode, CanvasNode, DetailPanel, KanbanView
-  - **Location**: `src/components/ui/StatusBadge.tsx`
+- [x] **Create `<StatusBadge />` component** - ✅ `src/components/ui/StatusBadge.tsx`
+  - Supports size variants, optional label, animation for in-progress
 
-- [ ] **Create `<ProgressBar />` component**
-  - Progress bar rendering duplicated in 4 files
-  - TreeNode (lines 124-131), CanvasNode (lines 107-120), DetailPanel (lines 183-188), ListView (lines 68-77)
-  - **Location**: `src/components/ui/ProgressBar.tsx`
+- [x] **Create `<ProgressBar />` component** - ✅ `src/components/ui/ProgressBar.tsx`
+  - Supports size variants, optional label
 
-- [ ] **Create `<OwnerAvatar />` component**
-  - Owner avatar rendering duplicated in TreeNode, CanvasNode, DetailPanel
-  - **Location**: `src/components/ui/OwnerAvatar.tsx`
+- [x] **Create `<OwnerAvatar />` component** - ✅ `src/components/ui/OwnerAvatar.tsx`
+  - Supports size variants, optional name/email display
 
-- [ ] **Create `isOverdue()` utility function**
-  - Overdue date checking duplicated in DetailPanel (lines 232-234), TimelineView (line 33), TreeNode (line 148)
-  - **Location**: `src/utils/dateUtils.ts`
+- [x] **Create `isOverdue()` utility function** - ✅ `src/utils/dateUtils.ts`
+  - Also added `formatDate()` and `getRelativeTime()` helpers
 
 ### Move Hardcoded Values to Constants
 
-- [ ] **Create centralized constants file** at `src/constants.ts`
-  - [ ] Canvas layout dimensions from `CanvasView.tsx` (lines 29-32)
-  - [ ] Cache timeout from `notionService.ts` (line 70)
-  - [ ] Max tree depth from `useStore.ts` (line 177)
-  - [ ] Pagination page size from `notionService.ts` (line 398)
-  - [ ] View modes list from `Header.tsx` and `FilterPanel.tsx`
+- [x] **Create centralized constants file** at `src/constants.ts` ✅
+  - [x] Canvas layout dimensions (CANVAS.HORIZONTAL_SPACING, etc.)
+  - [x] Cache timeout (NOTION.CACHE_TIMEOUT)
+  - [x] Max tree depth (TREE.MAX_DEPTH)
+  - [x] Pagination page size (NOTION.PAGE_SIZE)
+  - [x] View modes list (VIEW_MODES)
 
 ### Remove Unused Code
 
-- [ ] **Remove or document `getStatusColorByIndex()`** - `src/utils/colors.ts` (lines 140-145)
-- [ ] **Review `statusLabels` legacy export** - `src/utils/colors.ts` (lines 214-220)
-- [ ] **Deprecate `statusHexColors`** - `src/utils/colors.ts` (lines 262-263)
+- [x] **Removed `getStatusColorByIndex()`** - ✅ Deleted from colors.ts
+- [x] **Removed `statusLabels` legacy export** - ✅ Deleted from colors.ts
+- [x] **Removed `statusHexColors`** - ✅ Deleted from colors.ts
+- [x] **Removed `dynamicColorPalette`** - ✅ Was only used by removed function
 - [ ] **Review `assignees` field in WorkItem** - `src/types/index.ts` (line 30) - populated but never displayed
 - [ ] **Review `dependencies` field** - `src/types/index.ts` (line 41) - not used
 - [ ] **Verify all lucide-react imports are used** - `NotionConfigModal.tsx` (line 2)
@@ -72,11 +61,10 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
   - [ ] Extract `<PropertyMappingsSection />`
   - Target: Main component ~100 lines
 
-- [ ] **Refactor `CanvasView.tsx`** (381 lines)
-  - [ ] Extract `calculateLayout()` to `src/utils/layoutCalculator.ts`
+- [x] **Refactor `CanvasView.tsx`** (381 → 254 lines, -33%) ✅
+  - [x] Extract `calculateLayout()` to `src/utils/layoutCalculator.ts`
   - [ ] Extract `<CanvasLegend />` component
   - [ ] Extract `<CanvasControls />` component
-  - Target: Main component ~250 lines
 
 - [ ] **Refactor `DetailPanel.tsx`** (369 lines)
   - [ ] Extract `<DetailHeader />`
@@ -93,9 +81,9 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
 
 ### Simplify Complex Functions
 
-- [ ] **Refactor `findProperty()` in notionService.ts** (lines 175-224)
-  - 50 lines with 5 fallback strategies
-  - Break into: `findPropertyByName()`, `findPropertyByAlias()`, `findPropertyByType()`, `findPropertyByRelation()`
+- [x] **Refactor `findProperty()` in notionService.ts** ✅
+  - Centralized property aliases to `src/constants.ts` (PROPERTY_ALIASES)
+  - Updated getPropertyAliases to use centralized config
 
 - [ ] **Refactor `getStatusCategory()` in colors.ts** (lines 60-121)
   - 60+ lines with nested string includes
@@ -107,9 +95,9 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
 
 ### Improve Error Handling
 
-- [ ] **Add specific Notion API error parsing** - `notionService.ts` (line 109)
-  - Parse 401 (auth), 404 (permissions), 429 (rate limit) errors
-  - Show actionable error messages to users
+- [x] **Add specific Notion API error parsing** - ✅ Added `parseNotionError()` method
+  - Parses 401 (auth), 403 (access), 404 (not found), 429 (rate limit), 500+ (server errors)
+  - Returns user-friendly, actionable error messages
 
 - [ ] **Add error boundaries to view components**
   - KanbanView, ListView, TimelineView assume valid data
