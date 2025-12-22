@@ -437,8 +437,8 @@ class NotionService {
 
     for (const item of items) {
       if (item.parentId) {
-        if (itemMap.has(item.parentId)) {
-          const parent = itemMap.get(item.parentId)!;
+        const parent = itemMap.get(item.parentId);
+        if (parent) {
           if (!parent.children) parent.children = [];
           parent.children.push(item.id);
         } else {

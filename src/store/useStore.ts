@@ -174,9 +174,16 @@ export const useStore = create<StoreState>()(
         const state = get();
         const filteredItems = state.getFilteredItems();
         const filteredIds = new Set(filteredItems.map(i => i.id));
+        const MAX_DEPTH = 50; // Prevent stack overflow with very deep trees
 
-        // Build tree from items with cycle detection
+        // Build tree from items with cycle detection and depth limit
         const buildTree = (parentId: string | undefined, level: number, ancestors: Set<string>): TreeNode[] => {
+          // Prevent stack overflow with very deep nesting
+          if (level > MAX_DEPTH) {
+            console.warn(`[Store] Maximum tree depth (${MAX_DEPTH}) exceeded, stopping recursion`);
+            return [];
+          }
+
           const children = filteredItems.filter(item => item.parentId === parentId);
           return children.map(item => {
             // Check for circular reference
