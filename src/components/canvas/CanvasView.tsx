@@ -18,7 +18,8 @@ import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import { calculateLayout } from '../../utils/layoutCalculator';
 import CanvasNode from './CanvasNode';
-import { RotateCcw, Maximize, Minimize } from 'lucide-react';
+import CanvasLegend from './CanvasLegend';
+import CanvasControls from './CanvasControls';
 
 // Custom node types
 const nodeTypes = {
@@ -176,61 +177,14 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
         />
 
         {/* Legend */}
-        <Panel position="top-left" className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-          <div className="text-xs font-semibold text-gray-700 mb-2">Legend</div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: typeHexColors.mission }} />
-              <span className="text-xs text-gray-600">Mission</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: typeHexColors.problem }} />
-              <span className="text-xs text-gray-600">Problem</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: typeHexColors.solution }} />
-              <span className="text-xs text-gray-600">Solution</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: typeHexColors.design }} />
-              <span className="text-xs text-gray-600">Design</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: typeHexColors.project }} />
-              <span className="text-xs text-gray-600">Project</span>
-            </div>
-          </div>
-          <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-0.5 bg-gray-400" />
-              <span className="text-xs text-gray-600">Parent → Child</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-0.5 bg-red-400" style={{ borderStyle: 'dashed' }} />
-              <span className="text-xs text-gray-600">Blocked by</span>
-            </div>
-          </div>
-        </Panel>
+        <CanvasLegend />
 
         {/* Action buttons */}
-        <Panel position="top-right" className="flex gap-2">
-          <button
-            onClick={handleResetLayout}
-            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-            title="Reset layout to original positions"
-          >
-            <RotateCcw size={16} />
-            Reset Layout
-          </button>
-          <button
-            onClick={handleToggleFullscreen}
-            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          >
-            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-            {isFullscreen ? 'Exit' : 'Fullscreen'}
-          </button>
-        </Panel>
+        <CanvasControls
+          onResetLayout={handleResetLayout}
+          onToggleFullscreen={handleToggleFullscreen}
+          isFullscreen={isFullscreen}
+        />
 
         {/* Instructions */}
         <Panel position="bottom-left" className="bg-white/90 px-3 py-2 rounded-lg text-xs text-gray-500">

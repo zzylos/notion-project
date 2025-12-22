@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { X, Key, Database, Settings, HelpCircle, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug, Target, AlertTriangle, Lightbulb, FolderKanban, Package } from 'lucide-react';
+import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../../types';
 import { DEFAULT_PROPERTY_MAPPINGS } from '../../constants';
+import ApiKeySection from './modal/ApiKeySection';
+import DatabaseConfigSection from './modal/DatabaseConfigSection';
+import PropertyMappingsSection from './modal/PropertyMappingsSection';
+import { isValidDatabaseId } from '../../utils/validation';
 
 interface NotionConfigModalProps {
   isOpen: boolean;
@@ -10,47 +14,8 @@ interface NotionConfigModalProps {
   onConnect: () => void;
 }
 
-// Database type configuration
-interface DatabaseTypeInfo {
-  type: ItemType;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-}
-
-const databaseTypes: DatabaseTypeInfo[] = [
-  { type: 'mission', label: 'Objectives', description: 'High-level goals and objectives', icon: Target, color: 'text-purple-600' },
-  { type: 'problem', label: 'Problems', description: 'Issues and challenges to solve', icon: AlertTriangle, color: 'text-red-600' },
-  { type: 'solution', label: 'Solutions', description: 'Proposed solutions and approaches', icon: Lightbulb, color: 'text-amber-600' },
-  { type: 'project', label: 'Projects', description: 'Active projects and initiatives', icon: FolderKanban, color: 'text-blue-600' },
-  { type: 'design', label: 'Deliverables', description: 'Outputs and deliverables', icon: Package, color: 'text-green-600' },
-];
-
 // Use centralized default property mappings
 const defaultMappings: PropertyMappings = { ...DEFAULT_PROPERTY_MAPPINGS };
-
-const mappingDescriptions: Record<keyof PropertyMappings, string> = {
-  title: 'Auto-detected (your title column)',
-  status: 'Status column name',
-  priority: 'Priority level (P0-P3)',
-  owner: 'Person/Owner column',
-  parent: 'Parent relation column',
-  progress: 'Progress % (number)',
-  dueDate: 'Due date / Deadline',
-  tags: 'Tags (multi-select)',
-};
-
-// Validate Notion database ID format (UUID with or without hyphens)
-const isValidDatabaseId = (id: string): boolean => {
-  if (!id.trim()) return true; // Empty is valid (optional field)
-  const trimmed = id.trim();
-  // UUID with hyphens: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  const uuidWithHyphens = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  // UUID without hyphens: 32 hex characters
-  const uuidWithoutHyphens = /^[0-9a-f]{32}$/i;
-  return uuidWithHyphens.test(trimmed) || uuidWithoutHyphens.test(trimmed);
-};
 
 // Helper to convert legacy config to new format
 function migrateConfig(config: NotionConfig | null): { apiKey: string; databases: Record<ItemType, string>; mappings: PropertyMappings } {
@@ -269,138 +234,22 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* API Key */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <Key className="w-4 h-4" />
-              Notion API Key
-              <a
-                href="https://www.notion.so/my-integrations"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-600"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </a>
-            </label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="secret_..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-            />
-            <p className="text-xs text-gray-500">
-              Create an integration at{' '}
-              <a
-                href="https://www.notion.so/my-integrations"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
-              >
-                notion.so/my-integrations
-              </a>
-              {' '}and share all databases with it.
-            </p>
-          </div>
+          <ApiKeySection apiKey={apiKey} onChange={setApiKey} />
 
           {/* Multiple Databases */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <Database className="w-4 h-4" />
-              Database IDs
-            </label>
-            <p className="text-xs text-gray-500">
-              Enter the database ID for each type. Leave empty if you don't have that database.
-            </p>
-
-            <div className="space-y-2">
-              {databaseTypes.map(({ type, label, description, icon: Icon, color }) => {
-                const hasError = validationErrors[type] !== null;
-                const hasValidValue = databases[type].trim() && isValidDatabaseId(databases[type]);
-                return (
-                  <div key={type} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2 w-32 flex-shrink-0">
-                      <Icon className={`w-4 h-4 ${color}`} />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">{label}</span>
-                      </div>
-                    </div>
-                    <div className="flex-1 relative">
-                      <input
-                        type="text"
-                        value={databases[type]}
-                        onChange={(e) => updateDatabase(type, e.target.value)}
-                        placeholder={description}
-                        className={`w-full px-3 py-1.5 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition ${
-                          hasError
-                            ? 'border-red-400 bg-red-50'
-                            : hasValidValue
-                            ? 'border-green-400 bg-green-50'
-                            : 'border-gray-300'
-                        }`}
-                      />
-                      {hasError && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-red-500">
-                          {validationErrors[type]}
-                        </span>
-                      )}
-                      {hasValidValue && (
-                        <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="text-xs text-gray-500">
-              Copy database IDs from your Notion database URLs. Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-            </p>
-          </div>
+          <DatabaseConfigSection
+            databases={databases}
+            validationErrors={validationErrors}
+            onDatabaseChange={updateDatabase}
+          />
 
           {/* Property Mappings */}
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              <Settings className="w-4 h-4" />
-              Property Mappings
-              <span className="text-xs text-gray-500">
-                ({showAdvanced ? 'hide' : 'show'})
-              </span>
-            </button>
-
-            {showAdvanced && (
-              <div className="p-3 bg-gray-50 rounded-lg space-y-3">
-                <p className="text-xs text-gray-600">
-                  Default property names for all databases. Most databases use the same column names.
-                </p>
-                {(Object.entries(mappings) as [keyof PropertyMappings, string][]).map(([key, value]) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <div className="w-28 flex-shrink-0">
-                      <label className="text-xs font-medium text-gray-700 capitalize block">
-                        {key}
-                      </label>
-                      <span className="text-[10px] text-gray-400">
-                        {mappingDescriptions[key]}
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={(e) =>
-                        setMappings((prev) => ({ ...prev, [key]: e.target.value }))
-                      }
-                      placeholder={key === 'title' ? '(auto-detected)' : '(optional)'}
-                      className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <PropertyMappingsSection
+            mappings={mappings}
+            showAdvanced={showAdvanced}
+            onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
+            onMappingChange={(key, value) => setMappings(prev => ({ ...prev, [key]: value }))}
+          />
 
           {/* Info box */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">

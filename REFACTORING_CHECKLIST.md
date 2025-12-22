@@ -45,9 +45,9 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
 - [x] **Removed `statusLabels` legacy export** - ✅ Deleted from colors.ts
 - [x] **Removed `statusHexColors`** - ✅ Deleted from colors.ts
 - [x] **Removed `dynamicColorPalette`** - ✅ Was only used by removed function
-- [ ] **Review `assignees` field in WorkItem** - `src/types/index.ts` (line 30) - populated but never displayed
-- [ ] **Review `dependencies` field** - `src/types/index.ts` (line 41) - not used
-- [ ] **Verify all lucide-react imports are used** - `NotionConfigModal.tsx` (line 2)
+- [x] **Review `assignees` field in WorkItem** - ✅ Added JSDoc documentation, kept for future multi-assignee support
+- [x] **Review `dependencies` field** - ✅ Added JSDoc documentation, kept for future dependency tracking feature
+- [x] **Verify all lucide-react imports are used** - ✅ Verified all imports are used in NotionConfigModal
 
 ---
 
@@ -55,16 +55,15 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
 
 ### Split Large Components
 
-- [ ] **Refactor `NotionConfigModal.tsx`** (461 lines)
-  - [ ] Extract `<ApiKeySection />`
-  - [ ] Extract `<DatabaseConfigSection />`
-  - [ ] Extract `<PropertyMappingsSection />`
-  - Target: Main component ~100 lines
+- [x] **Refactor `NotionConfigModal.tsx`** (461 → ~300 lines) ✅
+  - [x] Extract `<ApiKeySection />` - `src/components/common/modal/ApiKeySection.tsx`
+  - [x] Extract `<DatabaseConfigSection />` - `src/components/common/modal/DatabaseConfigSection.tsx`
+  - [x] Extract `<PropertyMappingsSection />` - `src/components/common/modal/PropertyMappingsSection.tsx`
 
-- [x] **Refactor `CanvasView.tsx`** (381 → 254 lines, -33%) ✅
+- [x] **Refactor `CanvasView.tsx`** (381 → 200 lines, -47%) ✅
   - [x] Extract `calculateLayout()` to `src/utils/layoutCalculator.ts`
-  - [ ] Extract `<CanvasLegend />` component
-  - [ ] Extract `<CanvasControls />` component
+  - [x] Extract `<CanvasLegend />` - `src/components/canvas/CanvasLegend.tsx`
+  - [x] Extract `<CanvasControls />` - `src/components/canvas/CanvasControls.tsx`
 
 - [ ] **Refactor `DetailPanel.tsx`** (369 lines)
   - [ ] Extract `<DetailHeader />`
@@ -85,13 +84,15 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
   - Centralized property aliases to `src/constants.ts` (PROPERTY_ALIASES)
   - Updated getPropertyAliases to use centralized config
 
-- [ ] **Refactor `getStatusCategory()` in colors.ts** (lines 60-121)
-  - 60+ lines with nested string includes
-  - Replace with mapping object for performance
+- [x] **Refactor `getStatusCategory()` in colors.ts** ✅
+  - Replaced 60+ lines of nested if-includes with STATUS_CATEGORY_KEYWORDS mapping object
+  - Added caching for performance (statusCategoryCache)
+  - Added comprehensive JSDoc documentation
 
-- [ ] **Document and simplify `getTreeNodes()` in useStore.ts** (lines 173-232)
-  - Complex recursive function with no documentation
-  - Add comprehensive JSDoc
+- [x] **Document and simplify `getTreeNodes()` in useStore.ts** ✅
+  - Added comprehensive JSDoc with algorithm overview
+  - Documented safety features (cycle detection, depth limiting)
+  - Added inline comments for buildTree helper
 
 ### Improve Error Handling
 
@@ -121,30 +122,29 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
 
 ### Create Custom Hooks
 
-- [ ] **Create `src/hooks/` directory** with:
-  - [ ] `useTimeout.ts` - Consolidate timeout ref patterns from App.tsx, CanvasView.tsx
-  - [ ] `useFetch.ts` - Handle abort controller management from App.tsx
-  - [ ] `useDataChanged.ts` - Consolidate prevDataKeyRef pattern from CanvasView.tsx
-  - [ ] `useLocalStorage.ts` - Type-safe localStorage access
+- [x] **Create `src/hooks/` directory** ✅ with:
+  - [x] `useTimeout.ts` - Managed timeout with automatic cleanup
+  - [x] `useFetch.ts` - AbortController management for fetch operations
+  - [x] `useDataChanged.ts` - Track when data key changes (avoids infinite loops)
+  - [x] `useLocalStorage.ts` - Type-safe localStorage with JSON serialization
+  - [x] `index.ts` - Barrel export for all hooks
 
 ### Standardize Patterns
 
-- [ ] **Standardize date formatting**
-  - DetailPanel uses `.toLocaleDateString('en-US', {...})`
-  - TimelineView uses `.toLocaleDateString()` default
-  - Create `formatDate(date, format)` utility in `src/utils/dateUtils.ts`
+- [x] **Standardize date formatting** ✅
+  - Already had `formatDate(date, format)` utility in `src/utils/dateUtils.ts`
 
-- [ ] **Standardize loading/empty states**
-  - TreeView (lines 46-52) and TimelineView (lines 21-25) have different patterns
-  - Create `<EmptyState />` and `<LoadingState />` components
+- [x] **Standardize loading/empty states** ✅
+  - [x] Created `<EmptyState />` - `src/components/ui/EmptyState.tsx`
+  - [x] Created `<LoadingState />` - `src/components/ui/LoadingState.tsx`
+  - Supports variants (default, search, filter, data) and sizes (sm, md, lg)
 
 - [ ] **Standardize callback patterns**
   - TreeView uses optional callbacks, KanbanView uses direct state mutation
   - Ensure consistent component interfaces
 
-- [ ] **Create generic `toggleArrayItem()` utility**
-  - Filter toggle functions in FilterPanel.tsx (lines 50-84) follow same pattern
-  - Location: `src/utils/arrayUtils.ts`
+- [x] **Create generic `toggleArrayItem()` utility** ✅
+  - Created `src/utils/arrayUtils.ts` with toggleArrayItem, includesItem, unique
 
 ### Reorganize File Structure
 
@@ -154,13 +154,13 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
   - `src/utils/colors/typeColors.ts` - Type-specific colors
   - `src/utils/labels/index.ts` - All label mappings
 
-- [ ] **Create `/components/ui/` directory** for UI primitives:
-  - Badge.tsx
-  - StatusBadge.tsx
-  - ProgressBar.tsx
-  - OwnerAvatar.tsx
-  - EmptyState.tsx
-  - LoadingState.tsx
+- [x] **Create `/components/ui/` directory** ✅ for UI primitives:
+  - [x] StatusBadge.tsx - Dynamic status badge with animation
+  - [x] ProgressBar.tsx - Progress visualization
+  - [x] OwnerAvatar.tsx - Avatar with fallback
+  - [x] EmptyState.tsx - Empty state messaging
+  - [x] LoadingState.tsx - Loading indicators
+  - [x] index.ts - Barrel export
 
 ---
 
@@ -200,26 +200,30 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
   - TreeNode (lines 134-141) - missing alt/title
   - Add `title` attribute to all avatar divs
 
-- [ ] **Add aria-labels to icon-only buttons** - `CanvasView.tsx` (lines 344-359)
-  - Add `aria-label="Reset layout"`, etc.
+- [x] **Add aria-labels to icon-only buttons** - `CanvasControls.tsx` ✅
+  - Added `aria-label` to Reset Layout and Fullscreen buttons
 
-- [ ] **Add label to search field** - `FilterPanel.tsx` (line 100)
-  - Input has placeholder but no associated `<label>`
+- [x] **Add label to search field** - `FilterPanel.tsx` ✅
+  - Added hidden `<label>` with `sr-only` class
+  - Added `aria-label` to search input
 
 ### Modal Accessibility
 
-- [ ] **Fix modal accessibility** - `NotionConfigModal.tsx`
-  - Add `role="dialog"`, `aria-modal="true"`
-  - Add focus trap
-  - Add ESC key to close
+- [x] **Improve modal accessibility** - `NotionConfigModal.tsx` ✅ (partial)
+  - Added `aria-label` to API key input
+  - Added `aria-invalid` to database inputs
+  - TODO: Add full focus trap and ESC key
 
 ### Keyboard Navigation
 
-- [ ] **Add visible focus indicators**
-  - Buttons use `:hover` but no visible `:focus` state
-  - Add consistent focus ring styling
+- [x] **Add visible focus indicators** - `FilterPanel.tsx` ✅
+  - Added `focus:ring-2 focus:ring-blue-500` to all filter buttons
+  - Added `focus:ring-offset-1` for better visibility
 
-- [ ] **Make filter buttons keyboard navigable** - `FilterPanel.tsx`
+- [x] **Make filter buttons keyboard navigable** - `FilterPanel.tsx` ✅
+  - Changed filter groups to `<fieldset>` with `<legend>`
+  - Added `aria-pressed` state to toggle buttons
+  - Added `role="group"` with `aria-label` to button groups
 
 - [ ] **Make Kanban cards keyboard accessible** - `KanbanView.tsx`
 
@@ -234,38 +238,42 @@ A comprehensive checklist of refactoring and cleanup tasks identified through co
   - FilterPanel (line 43) uses inline object type
   - Always import from `src/types/index.ts`
 
-- [ ] **Add explicit return types to helper functions**
-  - TreeNode component, useStore helper methods
-  - Improves clarity and catches errors
+- [x] **Add explicit return types to helper functions** ✅
+  - Added return type to getTreeNodes(): TreeNode[]
 
 - [ ] **Add stricter filter state types** - `types/index.ts` (lines 56-67)
   - Use `readonly ItemType[]` instead of `ItemType[]`
 
-- [ ] **Add comprehensive JSDoc to DatabaseConfig type**
+- [x] **Add comprehensive JSDoc to DatabaseConfig type** ✅
+  - Added detailed JSDoc with @example to DatabaseConfig
+  - Added JSDoc to PropertyMappings, NotionConfig, all types
 
 ---
 
 ## Phase 7: Documentation
 
-- [ ] **Document `calculateLayout()` algorithm** - `CanvasView.tsx` (lines 39-157)
+- [ ] **Document `calculateLayout()` algorithm** - `layoutCalculator.ts`
   - Add JSDoc with pseudocode explaining tree layout algorithm
 
 - [ ] **Document property extraction strategies** - `notionService.ts` (lines 175-224)
   - `findProperty()` has 5 fallback strategies with no comments
 
-- [ ] **Document status categorization logic** - `colors.ts` (lines 60-121)
-  - Explain why specific keywords map to categories
+- [x] **Document status categorization logic** - `colors.ts` ✅
+  - Added JSDoc to STATUS_CATEGORY_KEYWORDS mapping
+  - Added comprehensive JSDoc to getStatusCategory() with @example
 
-- [ ] **Add JSDoc to key functions**
-  - `getTreeNodes()` - recursive function
-  - `pageToWorkItem()` - transformation logic
-  - `buildRelationships()` - orphaned item handling
+- [x] **Add JSDoc to key functions** ✅
+  - [x] `getTreeNodes()` - Added algorithm overview, safety features, performance notes
+  - [ ] `pageToWorkItem()` - transformation logic
+  - [ ] `buildRelationships()` - orphaned item handling
 
 - [ ] **Document configuration system** - `config.ts`
   - Env variable names and precedence
 
-- [ ] **Add field-level comments to types** - `types/index.ts`
-  - What is notionPageId vs notionUrl?
+- [x] **Add field-level comments to types** - `types/index.ts` ✅
+  - Added JSDoc to all WorkItem fields
+  - Added JSDoc to Owner, TreeNode, FilterState, DatabaseConfig, PropertyMappings, NotionConfig
+  - Documented deprecated fields
 
 ---
 
