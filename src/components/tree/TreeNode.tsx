@@ -1,12 +1,13 @@
 import React, { memo } from 'react';
-import {
-  ChevronRight,
-  ChevronDown,
-  ExternalLink,
-  Clock,
-} from 'lucide-react';
+import { ChevronRight, ChevronDown, ExternalLink, Clock } from 'lucide-react';
 import type { TreeNode as TreeNodeType } from '../../types';
-import { getStatusColors, getStatusCategory, typeColors, priorityColors, getProgressColor } from '../../utils/colors';
+import {
+  getStatusColors,
+  getStatusCategory,
+  typeColors,
+  priorityColors,
+  getProgressColor,
+} from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
 import { useStore } from '../../store/useStore';
 import { TREE } from '../../constants';
@@ -175,9 +176,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
           <div
             className={`
               flex items-center gap-1 text-xs
-              ${isOverdue(item.dueDate, item.status)
-                ? 'text-red-500'
-                : 'text-gray-400'}
+              ${isOverdue(item.dueDate, item.status) ? 'text-red-500' : 'text-gray-400'}
             `}
             title={`Due: ${formatDate(item.dueDate, 'medium')}`}
           >
@@ -192,7 +191,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
             target="_blank"
             rel="noopener noreferrer"
             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
             title="Open in Notion"
           >
             <ExternalLink className="w-4 h-4" />
@@ -212,7 +211,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
               height: '100%',
             }}
           />
-          {children.map((child) => (
+          {children.map(child => (
             <TreeNodeComponent key={child.item.id} node={child} onNodeClick={onNodeClick} />
           ))}
         </div>

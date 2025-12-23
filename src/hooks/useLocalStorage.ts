@@ -53,7 +53,7 @@ export function useLocalStorage<T>(
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {
       try {
-        setStoredValue((prevValue) => {
+        setStoredValue(prevValue => {
           // Allow value to be a function for functional updates
           // Use typeof check instead of instanceof for more reliable function detection
           const valueToStore =

@@ -18,11 +18,13 @@ npm run test:notion <API_KEY> <DATABASE_ID>  # Test Notion API connection
 The app supports configuration through environment variables (`.env` file) or through the UI settings modal. Environment variables take precedence.
 
 ### Quick Setup with .env
+
 1. Copy `.env.example` to `.env`
 2. Fill in your Notion API key and database IDs
 3. Run `npm run dev`
 
 ### Environment Variables
+
 ```bash
 # Required
 VITE_NOTION_API_KEY=secret_xxx          # Your Notion API key
@@ -53,11 +55,13 @@ The config loader (`src/utils/config.ts`) merges env config with localStorage se
 ## Architecture
 
 ### State Management
+
 - **Zustand** store at `src/store/useStore.ts`
 - Key state: `items`, `filters`, `expandedIds`, `selectedItemId`, `viewMode`, `notionConfig`
 - Computed: `getFilteredItems()`, `getTreeNodes()`
 
 ### View Modes
+
 - **Tree View** (`src/components/tree/TreeView.tsx`) - Default hierarchical view
 - **Canvas View** (`src/components/canvas/CanvasView.tsx`) - Node-based visualization with @xyflow/react
 - **Kanban View** (`src/components/views/KanbanView.tsx`) - Board by dynamic status columns
@@ -65,6 +69,7 @@ The config loader (`src/utils/config.ts`) merges env config with localStorage se
 - **Timeline View** (`src/components/views/TimelineView.tsx`) - Chronological view by due date
 
 ### Notion Integration
+
 - Service at `src/services/notionService.ts`
 - **Multi-database support**: Fetches from up to 5 databases (Objectives, Problems, Solutions, Projects, Deliverables)
 - Uses CORS proxy (`corsproxy.io`) for browser-based API calls
@@ -74,39 +79,42 @@ The config loader (`src/utils/config.ts`) merges env config with localStorage se
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/App.tsx` | Main app, view switching, collapsible stats |
-| `src/store/useStore.ts` | Zustand state management |
-| `src/services/notionService.ts` | Multi-database Notion API integration |
-| `src/components/common/NotionConfigModal.tsx` | Settings with multi-database inputs |
-| `src/components/canvas/CanvasView.tsx` | React Flow canvas with hierarchical layout |
-| `src/components/canvas/CanvasNode.tsx` | Custom node component for canvas |
-| `src/components/tree/TreeView.tsx` | Tree view with expand/collapse |
-| `src/components/tree/TreeNode.tsx` | Individual tree node component |
-| `src/components/views/KanbanView.tsx` | Dynamic status columns from data |
-| `src/components/views/ListView.tsx` | Virtualized list view |
-| `src/components/views/TimelineView.tsx` | Timeline view |
-| `src/components/common/DetailPanel.tsx` | Selected item details sidebar |
-| `src/components/common/StatsOverview.tsx` | Collapsible statistics panel |
-| `src/components/filters/FilterPanel.tsx` | Dynamic filter controls |
-| `src/types/index.ts` | TypeScript type definitions |
-| `src/utils/colors.ts` | Color utilities with dynamic status support |
-| `src/utils/sampleData.ts` | Demo data for offline use |
+| File                                          | Purpose                                     |
+| --------------------------------------------- | ------------------------------------------- |
+| `src/App.tsx`                                 | Main app, view switching, collapsible stats |
+| `src/store/useStore.ts`                       | Zustand state management                    |
+| `src/services/notionService.ts`               | Multi-database Notion API integration       |
+| `src/components/common/NotionConfigModal.tsx` | Settings with multi-database inputs         |
+| `src/components/canvas/CanvasView.tsx`        | React Flow canvas with hierarchical layout  |
+| `src/components/canvas/CanvasNode.tsx`        | Custom node component for canvas            |
+| `src/components/tree/TreeView.tsx`            | Tree view with expand/collapse              |
+| `src/components/tree/TreeNode.tsx`            | Individual tree node component              |
+| `src/components/views/KanbanView.tsx`         | Dynamic status columns from data            |
+| `src/components/views/ListView.tsx`           | Virtualized list view                       |
+| `src/components/views/TimelineView.tsx`       | Timeline view                               |
+| `src/components/common/DetailPanel.tsx`       | Selected item details sidebar               |
+| `src/components/common/StatsOverview.tsx`     | Collapsible statistics panel                |
+| `src/components/filters/FilterPanel.tsx`      | Dynamic filter controls                     |
+| `src/types/index.ts`                          | TypeScript type definitions                 |
+| `src/utils/colors.ts`                         | Color utilities with dynamic status support |
+| `src/utils/sampleData.ts`                     | Demo data for offline use                   |
 
 ## Important Patterns
 
 ### Multi-Database Configuration
+
 The app supports multiple Notion databases, each mapped to a specific item type:
+
 ```typescript
 interface NotionConfig {
   apiKey: string;
-  databases: DatabaseConfig[];  // Array of {databaseId, type}
+  databases: DatabaseConfig[]; // Array of {databaseId, type}
   defaultMappings: PropertyMappings;
 }
 ```
 
 Database types:
+
 - `mission` → Objectives database
 - `problem` → Problems database
 - `solution` → Solutions database
@@ -114,9 +122,11 @@ Database types:
 - `design` → Deliverables database
 
 ### Dynamic Status Labels
+
 Status is now a string type (not a union) to preserve original Notion values:
+
 ```typescript
-type ItemStatus = string;  // Preserves "Analysis/Research", "Solutioning", etc.
+type ItemStatus = string; // Preserves "Analysis/Research", "Solutioning", etc.
 type StatusCategory = 'not-started' | 'in-progress' | 'blocked' | 'in-review' | 'completed';
 
 // Get color category from any status string
@@ -125,7 +135,9 @@ const colors = getStatusColors(item.status);
 ```
 
 ### Canvas View - Avoiding Infinite Loops
+
 The canvas uses `useNodesState` and `useEdgesState` from React Flow. To avoid infinite update loops when data changes:
+
 ```typescript
 const prevDataRef = useRef<string>('');
 const dataKey = JSON.stringify(items.map(i => i.id));
@@ -136,15 +148,19 @@ if (dataKey !== prevDataRef.current) {
 ```
 
 ### Progressive Loading
+
 The Notion service supports progress callbacks:
+
 ```typescript
-await notionService.fetchAllItems((progress) => {
+await notionService.fetchAllItems(progress => {
   // progress.loaded, progress.total, progress.items, progress.done, progress.currentDatabase
 });
 ```
 
 ### Virtualization for Large Lists
+
 List view uses @tanstack/react-virtual for performance with 1000+ items:
+
 ```typescript
 const rowVirtualizer = useVirtualizer({
   count: items.length,
@@ -157,12 +173,13 @@ const rowVirtualizer = useVirtualizer({
 ## Data Types
 
 ### WorkItem (main data type)
+
 ```typescript
 interface WorkItem {
   id: string;
   title: string;
   type: 'mission' | 'problem' | 'solution' | 'design' | 'project';
-  status: string;  // Dynamic - preserves original Notion status
+  status: string; // Dynamic - preserves original Notion status
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   parentId?: string;
   owner?: { id: string; name: string; avatar?: string };
@@ -175,10 +192,11 @@ interface WorkItem {
 ```
 
 ### NotionConfig
+
 ```typescript
 interface NotionConfig {
   apiKey: string;
-  databases: DatabaseConfig[];  // Multiple databases
+  databases: DatabaseConfig[]; // Multiple databases
   defaultMappings: PropertyMappings;
   // Legacy support
   databaseId?: string;
@@ -188,7 +206,7 @@ interface NotionConfig {
 interface DatabaseConfig {
   databaseId: string;
   type: ItemType;
-  mappings?: Partial<PropertyMappings>;  // Optional per-database overrides
+  mappings?: Partial<PropertyMappings>; // Optional per-database overrides
 }
 ```
 
@@ -211,6 +229,7 @@ interface DatabaseConfig {
 ## Notion Database Schema
 
 Each database should have these properties (configurable in app settings):
+
 - Name (title) - Work item title
 - Status (select/status) - Your custom status labels (preserved as-is)
 - Priority (select) - P0, P1, P2, P3 (or High, Medium, Low variants)
@@ -225,11 +244,13 @@ Each database should have these properties (configurable in app settings):
 ## Testing Notion Connection
 
 Before integrating, test credentials with:
+
 ```bash
 npm run test:notion secret_xxx abc123
 ```
 
 This validates:
+
 1. API key is valid (401 = invalid)
 2. Database is accessible (404 = not shared with integration)
 3. Query works (returns sample items)
@@ -237,12 +258,14 @@ This validates:
 ## Build & Lint
 
 Always run before committing:
+
 ```bash
 npm run build   # Catches TypeScript errors
 npm run lint    # Catches ESLint issues
 ```
 
 Common lint fixes:
+
 - Remove unused variables (prefix with `_` if intentionally unused)
 - Fix useMemo/useCallback dependencies
 - Remove unused imports
@@ -250,6 +273,7 @@ Common lint fixes:
 ## Debug Mode
 
 In development mode, the app logs helpful debug info to the console:
+
 - Property names detected from each database
 - Warnings when Type or Parent properties are not found
 - Which database is currently being fetched

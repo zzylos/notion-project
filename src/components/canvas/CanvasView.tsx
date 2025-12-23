@@ -34,7 +34,14 @@ interface CanvasViewProps {
 
 // Inner component that uses React Flow hooks
 const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
-  const { getFilteredItems, setSelectedItem, selectedItemId, hideOrphanItems, setHideOrphanItems, items } = useStore();
+  const {
+    getFilteredItems,
+    setSelectedItem,
+    selectedItemId,
+    hideOrphanItems,
+    setHideOrphanItems,
+    items,
+  } = useStore();
   const allFilteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -167,7 +174,11 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   }, [allFilteredItems, hideOrphanItems, focusMode, connectedItemIds, items]);
 
   // Apply item limit for performance
-  const { limitedItems: filteredItems, totalCount, isLimited } = useItemLimit(itemsAfterOrphanFilter);
+  const {
+    limitedItems: filteredItems,
+    totalCount,
+    isLimited,
+  } = useItemLimit(itemsAfterOrphanFilter);
 
   // Handle fullscreen changes (including ESC key)
   useEffect(() => {
@@ -209,7 +220,11 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
 
   // Track the data key to detect when underlying data changes
   const dataKey = useMemo(
-    () => filteredItems.map(i => i.id).sort().join(','),
+    () =>
+      filteredItems
+        .map(i => i.id)
+        .sort()
+        .join(','),
     [filteredItems]
   );
   const prevDataKeyRef = useRef<string | null>(null);
@@ -309,63 +324,66 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       )}
 
       <div className="flex-1 relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        nodeTypes={nodeTypes}
-        connectionMode={ConnectionMode.Loose}
-        nodesDraggable={true}
-        nodesConnectable={false}
-        elementsSelectable={true}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
-        maxZoom={2}
-        defaultEdgeOptions={{
-          type: 'smoothstep',
-        }}
-      >
-        <Background color="#e5e7eb" gap={20} />
-        <Controls />
-        <MiniMap
-          nodeColor={nodeColor}
-          nodeStrokeWidth={3}
-          zoomable
-          pannable
-          className="bg-white border border-gray-200 rounded-lg"
-        />
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          nodeTypes={nodeTypes}
+          connectionMode={ConnectionMode.Loose}
+          nodesDraggable={true}
+          nodesConnectable={false}
+          elementsSelectable={true}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.1}
+          maxZoom={2}
+          defaultEdgeOptions={{
+            type: 'smoothstep',
+          }}
+        >
+          <Background color="#e5e7eb" gap={20} />
+          <Controls />
+          <MiniMap
+            nodeColor={nodeColor}
+            nodeStrokeWidth={3}
+            zoomable
+            pannable
+            className="bg-white border border-gray-200 rounded-lg"
+          />
 
-        {/* Legend */}
-        <CanvasLegend />
+          {/* Legend */}
+          <CanvasLegend />
 
-        {/* Action buttons */}
-        <CanvasControls
-          onResetLayout={handleResetLayout}
-          onToggleFullscreen={handleToggleFullscreen}
-          isFullscreen={isFullscreen}
-          hideOrphanItems={hideOrphanItems}
-          onToggleOrphanItems={handleToggleOrphanItems}
-          orphanCount={orphanCount}
-          focusMode={focusMode}
-          onToggleFocusMode={handleToggleFocusMode}
-          hasSelection={!!selectedItemId}
-        />
+          {/* Action buttons */}
+          <CanvasControls
+            onResetLayout={handleResetLayout}
+            onToggleFullscreen={handleToggleFullscreen}
+            isFullscreen={isFullscreen}
+            hideOrphanItems={hideOrphanItems}
+            onToggleOrphanItems={handleToggleOrphanItems}
+            orphanCount={orphanCount}
+            focusMode={focusMode}
+            onToggleFocusMode={handleToggleFocusMode}
+            hasSelection={!!selectedItemId}
+          />
 
-        {/* Instructions */}
-        <Panel position="bottom-left" className="bg-white/90 px-3 py-2 rounded-lg text-xs text-gray-500">
-          Drag nodes to reorganize • Scroll to zoom • Click nodes to select
-        </Panel>
-      </ReactFlow>
+          {/* Instructions */}
+          <Panel
+            position="bottom-left"
+            className="bg-white/90 px-3 py-2 rounded-lg text-xs text-gray-500"
+          >
+            Drag nodes to reorganize • Scroll to zoom • Click nodes to select
+          </Panel>
+        </ReactFlow>
       </div>
     </div>
   );
 };
 
 // Wrapper component that provides ReactFlowProvider
-const CanvasView: React.FC<CanvasViewProps> = (props) => {
+const CanvasView: React.FC<CanvasViewProps> = props => {
   return (
     <ReactFlowProvider>
       <CanvasViewInner {...props} />

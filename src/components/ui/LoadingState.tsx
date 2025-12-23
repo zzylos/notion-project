@@ -67,9 +67,7 @@ const LoadingState: React.FC<LoadingStateProps> = ({
       aria-label={message || 'Loading'}
     >
       <Loader2 className={`${iconClass} text-blue-500 animate-spin mb-3`} />
-      {message && (
-        <p className={`${textClass} text-gray-600`}>{message}</p>
-      )}
+      {message && <p className={`${textClass} text-gray-600`}>{message}</p>}
     </div>
   );
 };

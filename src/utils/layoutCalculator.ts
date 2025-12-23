@@ -28,9 +28,7 @@ export function calculateLayout(
 
   // Find root items (no parent or parent not in filtered set)
   const filteredIds = new Set(filteredItems.map(i => i.id));
-  const rootItems = filteredItems.filter(
-    item => !item.parentId || !filteredIds.has(item.parentId)
-  );
+  const rootItems = filteredItems.filter(item => !item.parentId || !filteredIds.has(item.parentId));
 
   // Calculate positions using a tree layout algorithm
   const positionMap = new Map<string, { x: number; y: number }>();

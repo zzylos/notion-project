@@ -33,7 +33,7 @@ async function testConnection(apiKey, databaseId) {
     const userResponse = await fetch(`${NOTION_API_BASE}/users/me`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Notion-Version': '2022-06-28',
       },
     });
@@ -71,7 +71,7 @@ async function testConnection(apiKey, databaseId) {
     const dbResponse = await fetch(`${NOTION_API_BASE}/databases/${databaseId}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Notion-Version': '2022-06-28',
       },
     });
@@ -133,7 +133,7 @@ async function testConnection(apiKey, databaseId) {
     const queryResponse = await fetch(`${NOTION_API_BASE}/databases/${databaseId}/query`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
       },

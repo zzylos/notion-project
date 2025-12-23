@@ -234,10 +234,16 @@ export const useStore = create<StoreState>()(
          * @param ancestors - Set of ancestor IDs for cycle detection
          * @returns Array of TreeNode objects for this level
          */
-        const buildTree = (parentId: string | undefined, level: number, ancestors: Set<string>): TreeNode[] => {
+        const buildTree = (
+          parentId: string | undefined,
+          level: number,
+          ancestors: Set<string>
+        ): TreeNode[] => {
           // Safety: Prevent stack overflow with very deep nesting
           if (level > TREE.MAX_DEPTH) {
-            console.warn(`[Store] Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`);
+            console.warn(
+              `[Store] Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`
+            );
             return [];
           }
 
@@ -342,10 +348,11 @@ export const useStore = create<StoreState>()(
           // In hide mode: return true if item does NOT match filters (hide matching items)
           // In show mode: return true if item DOES match filters (show matching items)
           // If no filters are set, show all items regardless of mode
-          const hasActiveFilters = filters.types.length > 0 ||
-                                   filters.statuses.length > 0 ||
-                                   filters.priorities.length > 0 ||
-                                   filters.owners.length > 0;
+          const hasActiveFilters =
+            filters.types.length > 0 ||
+            filters.statuses.length > 0 ||
+            filters.priorities.length > 0 ||
+            filters.owners.length > 0;
 
           if (!hasActiveFilters) {
             return true; // No filters = show all
@@ -363,18 +370,18 @@ export const useStore = create<StoreState>()(
         const byStatus: Record<string, number> = {};
 
         const byType: Record<ItemType, number> = {
-          'mission': 0,
-          'problem': 0,
-          'solution': 0,
-          'design': 0,
-          'project': 0,
+          mission: 0,
+          problem: 0,
+          solution: 0,
+          design: 0,
+          project: 0,
         };
 
         const byPriority: Record<Priority, number> = {
-          'P0': 0,
-          'P1': 0,
-          'P2': 0,
-          'P3': 0,
+          P0: 0,
+          P1: 0,
+          P2: 0,
+          P3: 0,
         };
 
         let overdueItems = 0;
@@ -447,7 +454,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'notion-tree-storage',
-      partialize: (state) => ({
+      partialize: state => ({
         expandedIds: Array.from(state.expandedIds),
         viewMode: state.viewMode,
         hideOrphanItems: state.hideOrphanItems,

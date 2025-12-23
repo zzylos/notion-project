@@ -41,9 +41,12 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
   const { selectedItemId, items, getItemPath, expandToItem } = useStore();
 
   // Memoize navigation handler - must be before early returns for consistent hook order
-  const handleNavigate = useCallback((id: string) => {
-    expandToItem(id);
-  }, [expandToItem]);
+  const handleNavigate = useCallback(
+    (id: string) => {
+      expandToItem(id);
+    },
+    [expandToItem]
+  );
 
   if (!selectedItemId) {
     return (
@@ -67,14 +70,14 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
 
   // Get parent and children
   const parent = item.parentId ? items.get(item.parentId) : undefined;
-  const children = item.children
-    ?.map((childId) => items.get(childId))
-    .filter((c): c is WorkItem => c !== undefined) || [];
+  const children =
+    item.children
+      ?.map(childId => items.get(childId))
+      .filter((c): c is WorkItem => c !== undefined) || [];
 
   // Get blocked by items
-  const blockedBy = item.blockedBy
-    ?.map((id) => items.get(id))
-    .filter((i): i is WorkItem => i !== undefined) || [];
+  const blockedBy =
+    item.blockedBy?.map(id => items.get(id)).filter((i): i is WorkItem => i !== undefined) || [];
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -132,9 +135,11 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
                     onClick={() => handleNavigate(pathItem.id)}
                     className={`
                       flex items-center gap-1 px-2 py-0.5 rounded
-                      ${pathItem.id === item.id
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'hover:bg-gray-100 text-gray-600'}
+                      ${
+                        pathItem.id === item.id
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'hover:bg-gray-100 text-gray-600'
+                      }
                       transition-colors
                     `}
                   >
@@ -230,9 +235,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
             <div
               className={`
                 flex items-center gap-2 text-sm
-                ${isOverdue(item.dueDate, item.status)
-                  ? 'text-red-600'
-                  : 'text-gray-700'}
+                ${isOverdue(item.dueDate, item.status) ? 'text-red-600' : 'text-gray-700'}
               `}
             >
               <Clock className="w-4 h-4" />
@@ -251,7 +254,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
               Tags
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {item.tags.map((tag) => (
+              {item.tags.map(tag => (
                 <span
                   key={tag}
                   className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded"
@@ -272,7 +275,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
               Blocked By
             </label>
             <div className="space-y-1">
-              {blockedBy.map((blocker) => {
+              {blockedBy.map(blocker => {
                 const BlockerIcon = typeIcons[blocker.type];
                 return (
                   <button
@@ -310,7 +313,13 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
             >
               {(() => {
                 // Validate parent.type is a valid ItemType before using
-                const validTypes: ItemType[] = ['mission', 'problem', 'solution', 'design', 'project'];
+                const validTypes: ItemType[] = [
+                  'mission',
+                  'problem',
+                  'solution',
+                  'design',
+                  'project',
+                ];
                 const isValidType = validTypes.includes(parent.type as ItemType);
                 if (!isValidType) return null;
 
@@ -333,7 +342,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
               Children ({children.length})
             </label>
             <div className="space-y-1">
-              {children.map((child) => {
+              {children.map(child => {
                 const ChildIcon = typeIcons[child.type];
                 return (
                   <button

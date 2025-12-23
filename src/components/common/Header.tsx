@@ -52,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSettings, onRefresh, isRefreshing
 
         {/* View mode selector */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          {(Object.keys(viewModeIcons) as ViewMode[]).map((mode) => {
+          {(Object.keys(viewModeIcons) as ViewMode[]).map(mode => {
             const Icon = viewModeIcons[mode];
             const isActive = viewMode === mode;
             return (
@@ -62,9 +62,11 @@ const Header: React.FC<HeaderProps> = ({ onOpenSettings, onRefresh, isRefreshing
                 className={`
                   flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium
                   transition-all duration-150
-                  ${isActive
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'}
+                  ${
+                    isActive
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }
                 `}
                 title={viewModeLabels[mode]}
               >

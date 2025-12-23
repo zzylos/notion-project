@@ -72,9 +72,12 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   }, [allTreeNodes, totalFilteredCount, disableItemLimit]);
 
   // Memoize handleNodeClick to prevent TreeNode re-renders
-  const handleNodeClick = useCallback((id: string) => {
-    onNodeSelect?.(id);
-  }, [onNodeSelect]);
+  const handleNodeClick = useCallback(
+    (id: string) => {
+      onNodeSelect?.(id);
+    },
+    [onNodeSelect]
+  );
 
   const totalNodes = useMemo(() => {
     const countNodes = (nodes: TreeNodeType[]): number => {
@@ -156,7 +159,7 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
       {/* Tree content */}
       <div className="flex-1 overflow-auto p-4">
         <div className="space-y-0.5">
-          {treeNodes.map((node) => (
+          {treeNodes.map(node => (
             <TreeNode key={node.item.id} node={node} onNodeClick={handleNodeClick} />
           ))}
         </div>

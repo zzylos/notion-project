@@ -158,15 +158,17 @@ export function migrateConfig(config: NotionConfig | null): MigratedConfig {
   return {
     apiKey: config.apiKey,
     databases,
-    mappings: config.mappings ? {
-      title: config.mappings.title,
-      status: config.mappings.status,
-      priority: config.mappings.priority,
-      owner: config.mappings.owner,
-      parent: config.mappings.parent,
-      progress: config.mappings.progress,
-      dueDate: config.mappings.dueDate,
-      tags: config.mappings.tags,
-    } : { ...DEFAULT_PROPERTY_MAPPINGS },
+    mappings: config.mappings
+      ? {
+          title: config.mappings.title,
+          status: config.mappings.status,
+          priority: config.mappings.priority,
+          owner: config.mappings.owner,
+          parent: config.mappings.parent,
+          progress: config.mappings.progress,
+          dueDate: config.mappings.dueDate,
+          tags: config.mappings.tags,
+        }
+      : { ...DEFAULT_PROPERTY_MAPPINGS },
   };
 }

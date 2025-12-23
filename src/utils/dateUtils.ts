@@ -36,7 +36,11 @@ export function isOverdue(dueDate: string | undefined, status: string): boolean 
   if (!parsedDate) return false;
 
   // Normalize both dates to start-of-day for accurate comparison
-  const dueDateStart = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+  const dueDateStart = new Date(
+    parsedDate.getFullYear(),
+    parsedDate.getMonth(),
+    parsedDate.getDate()
+  );
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 

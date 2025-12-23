@@ -48,14 +48,10 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
       />
 
       {/* Header with type indicator */}
-      <div
-        className={`px-3 py-2 rounded-t-md ${typeStyle.bg} border-b ${typeStyle.border}`}
-      >
+      <div className={`px-3 py-2 rounded-t-md ${typeStyle.bg} border-b ${typeStyle.border}`}>
         <div className="flex items-center gap-2">
           <TypeIcon className={`w-4 h-4 ${typeStyle.icon}`} />
-          <span className={`text-xs font-semibold ${typeStyle.text}`}>
-            {typeLabels[item.type]}
-          </span>
+          <span className={`text-xs font-semibold ${typeStyle.text}`}>{typeLabels[item.type]}</span>
           {item.priority && (
             <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-white/50 rounded">
               {item.priority}
@@ -115,16 +111,14 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
             <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600">
               {item.owner.name.charAt(0)}
             </div>
-            <span className="text-[10px] text-gray-500 truncate">
-              {item.owner.name}
-            </span>
+            <span className="text-[10px] text-gray-500 truncate">{item.owner.name}</span>
           </div>
         )}
 
         {/* Tags */}
         {item.tags && item.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
-            {item.tags.slice(0, 3).map((tag) => (
+            {item.tags.slice(0, 3).map(tag => (
               <span
                 key={tag}
                 className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-600 rounded"
@@ -133,9 +127,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
               </span>
             ))}
             {item.tags.length > 3 && (
-              <span className="text-[9px] text-gray-400">
-                +{item.tags.length - 3}
-              </span>
+              <span className="text-[9px] text-gray-400">+{item.tags.length - 3}</span>
             )}
           </div>
         )}

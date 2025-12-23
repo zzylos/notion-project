@@ -1,4 +1,12 @@
-import { Database, Target, AlertTriangle, Lightbulb, FolderKanban, Package, CheckCircle2 } from 'lucide-react';
+import {
+  Database,
+  Target,
+  AlertTriangle,
+  Lightbulb,
+  FolderKanban,
+  Package,
+  CheckCircle2,
+} from 'lucide-react';
 import type { ItemType } from '../../../types';
 import { isValidDatabaseId } from '../../../utils/validation';
 
@@ -11,11 +19,41 @@ interface DatabaseTypeInfo {
 }
 
 const databaseTypes: DatabaseTypeInfo[] = [
-  { type: 'mission', label: 'Objectives', description: 'High-level goals and objectives', icon: Target, color: 'text-purple-600' },
-  { type: 'problem', label: 'Problems', description: 'Issues and challenges to solve', icon: AlertTriangle, color: 'text-red-600' },
-  { type: 'solution', label: 'Solutions', description: 'Proposed solutions and approaches', icon: Lightbulb, color: 'text-amber-600' },
-  { type: 'project', label: 'Projects', description: 'Active projects and initiatives', icon: FolderKanban, color: 'text-blue-600' },
-  { type: 'design', label: 'Deliverables', description: 'Outputs and deliverables', icon: Package, color: 'text-green-600' },
+  {
+    type: 'mission',
+    label: 'Objectives',
+    description: 'High-level goals and objectives',
+    icon: Target,
+    color: 'text-purple-600',
+  },
+  {
+    type: 'problem',
+    label: 'Problems',
+    description: 'Issues and challenges to solve',
+    icon: AlertTriangle,
+    color: 'text-red-600',
+  },
+  {
+    type: 'solution',
+    label: 'Solutions',
+    description: 'Proposed solutions and approaches',
+    icon: Lightbulb,
+    color: 'text-amber-600',
+  },
+  {
+    type: 'project',
+    label: 'Projects',
+    description: 'Active projects and initiatives',
+    icon: FolderKanban,
+    color: 'text-blue-600',
+  },
+  {
+    type: 'design',
+    label: 'Deliverables',
+    description: 'Outputs and deliverables',
+    icon: Package,
+    color: 'text-green-600',
+  },
 ];
 
 interface DatabaseConfigSectionProps {
@@ -58,7 +96,7 @@ const DatabaseConfigSection: React.FC<DatabaseConfigSectionProps> = ({
                 <input
                   type="text"
                   value={databases[type]}
-                  onChange={(e) => onDatabaseChange(type, e.target.value)}
+                  onChange={e => onDatabaseChange(type, e.target.value)}
                   placeholder={description}
                   aria-label={`${label} database ID`}
                   aria-invalid={hasError}
@@ -66,8 +104,8 @@ const DatabaseConfigSection: React.FC<DatabaseConfigSectionProps> = ({
                     hasError
                       ? 'border-red-400 bg-red-50'
                       : hasValidValue
-                      ? 'border-green-400 bg-green-50'
-                      : 'border-gray-300'
+                        ? 'border-green-400 bg-green-50'
+                        : 'border-gray-300'
                   }`}
                 />
                 {hasError && (
@@ -76,7 +114,10 @@ const DatabaseConfigSection: React.FC<DatabaseConfigSectionProps> = ({
                   </span>
                 )}
                 {hasValidValue && (
-                  <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" aria-label="Valid database ID" />
+                  <CheckCircle2
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500"
+                    aria-label="Valid database ID"
+                  />
                 )}
               </div>
             </div>
@@ -85,7 +126,8 @@ const DatabaseConfigSection: React.FC<DatabaseConfigSectionProps> = ({
       </div>
 
       <p className="text-xs text-gray-500">
-        Copy database IDs from your Notion database URLs. Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        Copy database IDs from your Notion database URLs. Format:
+        xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
       </p>
     </div>
   );

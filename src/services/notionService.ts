@@ -1,4 +1,13 @@
-import type { WorkItem, ItemType, ItemStatus, Priority, Owner, NotionConfig, PropertyMappings, DatabaseConfig } from '../types';
+import type {
+  WorkItem,
+  ItemType,
+  ItemStatus,
+  Priority,
+  Owner,
+  NotionConfig,
+  PropertyMappings,
+  DatabaseConfig,
+} from '../types';
 import { NOTION, DEFAULT_CORS_PROXY, PROPERTY_ALIASES } from '../constants';
 
 // Type for Notion API responses
@@ -21,7 +30,12 @@ type NotionPropertyValue = {
   date?: { start: string; end?: string } | null;
   people?: Array<{ id: string; name?: string; avatar_url?: string; person?: { email?: string } }>;
   relation?: Array<{ id: string }>;
-  formula?: { string?: string; number?: number; boolean?: boolean; date?: { start: string; end?: string } };
+  formula?: {
+    string?: string;
+    number?: number;
+    boolean?: boolean;
+    date?: { start: string; end?: string };
+  };
   rollup?: { number?: number; array?: NotionPropertyValue[]; type?: string };
   checkbox?: boolean;
   url?: string | null;
@@ -153,7 +167,10 @@ class NotionService {
         if (now - cached.timestamp < PERSISTENT_CACHE_TIMEOUT) {
           this.cache.set(key, cached);
           if (this.debugMode) {
-            console.info(`%c[Notion] Loaded ${cached.items.length} items from persistent cache`, 'color: #10b981');
+            console.info(
+              `%c[Notion] Loaded ${cached.items.length} items from persistent cache`,
+              'color: #10b981'
+            );
           }
         } else {
           // Clean up expired cache
@@ -185,7 +202,10 @@ class NotionService {
       localStorage.setItem(CACHE_METADATA_KEY, JSON.stringify(metadata));
 
       if (this.debugMode) {
-        console.info(`%c[Notion] Saved ${items.length} items to persistent cache`, 'color: #10b981');
+        console.info(
+          `%c[Notion] Saved ${items.length} items to persistent cache`,
+          'color: #10b981'
+        );
       }
     } catch (error) {
       // localStorage might be full or unavailable
@@ -261,7 +281,11 @@ class NotionService {
     }
   }
 
-  private async notionFetch<T>(endpoint: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
+  private async notionFetch<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    signal?: AbortSignal
+  ): Promise<T> {
     if (!this.config) {
       throw new Error('NotionService not initialized');
     }
@@ -274,7 +298,7 @@ class NotionService {
         ...options,
         signal,
         headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
+          Authorization: `Bearer ${this.config.apiKey}`,
           'Notion-Version': '2022-06-28',
           'Content-Type': 'application/json',
           ...options.headers,
@@ -283,7 +307,9 @@ class NotionService {
     } catch (error) {
       // Handle network errors (connection refused, DNS failure, CORS issues, etc.)
       if (error instanceof TypeError) {
-        throw new Error('Network error: Unable to reach Notion API. Check your internet connection or CORS proxy.');
+        throw new Error(
+          'Network error: Unable to reach Notion API. Check your internet connection or CORS proxy.'
+        );
       }
       throw error;
     }
@@ -297,7 +323,10 @@ class NotionService {
   }
 
   // Log property names once per database for debugging
-  private logPropertyNames(databaseType: ItemType, props: Record<string, NotionPropertyValue>): void {
+  private logPropertyNames(
+    databaseType: ItemType,
+    props: Record<string, NotionPropertyValue>
+  ): void {
     if (!this.debugMode) return;
 
     const dbKey = databaseType;
@@ -433,7 +462,10 @@ class NotionService {
     return '';
   }
 
-  private extractStatus(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
+  private extractStatus(
+    props: Record<string, NotionPropertyValue>,
+    mappingName: string
+  ): string | null {
     const prop = this.findProperty(props, mappingName);
     if (!prop) return null;
 
@@ -447,7 +479,10 @@ class NotionService {
     return null;
   }
 
-  private extractSelect(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
+  private extractSelect(
+    props: Record<string, NotionPropertyValue>,
+    mappingName: string
+  ): string | null {
     const prop = this.findProperty(props, mappingName);
     if (!prop) return null;
 
@@ -461,19 +496,28 @@ class NotionService {
     return null;
   }
 
-  private extractMultiSelect(props: Record<string, NotionPropertyValue>, mappingName: string): string[] {
+  private extractMultiSelect(
+    props: Record<string, NotionPropertyValue>,
+    mappingName: string
+  ): string[] {
     const prop = this.findProperty(props, mappingName);
     if (!prop || prop.type !== 'multi_select' || !prop.multi_select) return [];
     return prop.multi_select.map(s => s.name);
   }
 
-  private extractNumber(props: Record<string, NotionPropertyValue>, mappingName: string): number | null {
+  private extractNumber(
+    props: Record<string, NotionPropertyValue>,
+    mappingName: string
+  ): number | null {
     const prop = this.findProperty(props, mappingName);
     if (!prop || prop.type !== 'number') return null;
     return prop.number ?? null;
   }
 
-  private extractDate(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
+  private extractDate(
+    props: Record<string, NotionPropertyValue>,
+    mappingName: string
+  ): string | null {
     const prop = this.findProperty(props, mappingName);
     if (!prop || prop.type !== 'date' || !prop.date) return null;
     return prop.date.start;
@@ -490,7 +534,10 @@ class NotionService {
     }));
   }
 
-  private extractRelation(props: Record<string, NotionPropertyValue>, mappingName: string): string[] {
+  private extractRelation(
+    props: Record<string, NotionPropertyValue>,
+    mappingName: string
+  ): string[] {
     const prop = this.findProperty(props, mappingName, 'relation');
     if (!prop || prop.type !== 'relation' || !prop.relation) return [];
     return prop.relation.map(r => r.id);
@@ -507,11 +554,24 @@ class NotionService {
     const normalized = notionPriority.toLowerCase().trim();
 
     const priorityMap: Record<string, Priority> = {
-      'p0': 'P0', 'p1': 'P1', 'p2': 'P2', 'p3': 'P3', 'p4': 'P3',
-      'critical': 'P0', 'highest': 'P0', 'urgent': 'P0', 'blocker': 'P0',
-      'high': 'P1', 'important': 'P1',
-      'medium': 'P2', 'normal': 'P2', 'moderate': 'P2',
-      'low': 'P3', 'minor': 'P3', 'trivial': 'P3', 'lowest': 'P3',
+      p0: 'P0',
+      p1: 'P1',
+      p2: 'P2',
+      p3: 'P3',
+      p4: 'P3',
+      critical: 'P0',
+      highest: 'P0',
+      urgent: 'P0',
+      blocker: 'P0',
+      high: 'P1',
+      important: 'P1',
+      medium: 'P2',
+      normal: 'P2',
+      moderate: 'P2',
+      low: 'P3',
+      minor: 'P3',
+      trivial: 'P3',
+      lowest: 'P3',
     };
 
     if (priorityMap[normalized]) {
@@ -528,7 +588,11 @@ class NotionService {
   }
 
   // Convert a Notion page to a WorkItem with a specified type
-  private pageToWorkItem(page: NotionPage, itemType: ItemType, dbConfig?: DatabaseConfig): WorkItem {
+  private pageToWorkItem(
+    page: NotionPage,
+    itemType: ItemType,
+    dbConfig?: DatabaseConfig
+  ): WorkItem {
     const mappings = this.getMappings(dbConfig);
     const props = page.properties;
 
@@ -566,7 +630,11 @@ class NotionService {
   }
 
   // Fetch a single page of results from a database
-  private async fetchPage(databaseId: string, cursor?: string, signal?: AbortSignal): Promise<NotionQueryResponse> {
+  private async fetchPage(
+    databaseId: string,
+    cursor?: string,
+    signal?: AbortSignal
+  ): Promise<NotionQueryResponse> {
     if (!this.config) {
       throw new Error('NotionService not initialized');
     }
@@ -587,7 +655,10 @@ class NotionService {
   private onPageProgress?: (itemsLoaded: number, databaseType: string) => void;
 
   // Fetch all pages from a single database
-  private async fetchAllFromDatabase(dbConfig: DatabaseConfig, signal?: AbortSignal): Promise<WorkItem[]> {
+  private async fetchAllFromDatabase(
+    dbConfig: DatabaseConfig,
+    signal?: AbortSignal
+  ): Promise<WorkItem[]> {
     const allPages: NotionPage[] = [];
 
     let currentCursor: string | undefined;
@@ -637,7 +708,7 @@ class NotionService {
     if (orphanedItems.length > 0) {
       console.warn(
         `[Notion] ${orphanedItems.length} orphaned items (parent not found). ` +
-        `This may indicate missing databases or cross-database relations that couldn't be resolved.`
+          `This may indicate missing databases or cross-database relations that couldn't be resolved.`
       );
       if (this.debugMode) {
         console.table(orphanedItems);
@@ -658,10 +729,12 @@ class NotionService {
 
     // Legacy format: single database
     if (this.config.databaseId) {
-      return [{
-        databaseId: this.config.databaseId,
-        type: 'project', // Default type for legacy single-database
-      }];
+      return [
+        {
+          databaseId: this.config.databaseId,
+          type: 'project', // Default type for legacy single-database
+        },
+      ];
     }
 
     return [];
@@ -681,10 +754,18 @@ class NotionService {
     }
 
     // Check cache
-    const cacheKey = dbConfigs.map(db => db.databaseId).sort().join('|');
+    const cacheKey = dbConfigs
+      .map(db => db.databaseId)
+      .sort()
+      .join('|');
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      onProgress?.({ loaded: cached.items.length, total: cached.items.length, items: cached.items, done: true });
+      onProgress?.({
+        loaded: cached.items.length,
+        total: cached.items.length,
+        items: cached.items,
+        done: true,
+      });
       return cached.items;
     }
 
@@ -716,7 +797,10 @@ class NotionService {
     signal?: AbortSignal,
     onProgress?: FetchProgressCallback
   ): Promise<WorkItem[]> {
-    const cacheKey = dbConfigs.map(db => db.databaseId).sort().join('|');
+    const cacheKey = dbConfigs
+      .map(db => db.databaseId)
+      .sort()
+      .join('|');
     const allItems: WorkItem[] = [];
     const failedDatabases: Array<{ type: string; error: string }> = [];
 
@@ -758,13 +842,19 @@ class NotionService {
     }
 
     if (this.debugMode) {
-      console.info(`%c[Notion] Fetching ${dbConfigs.length} databases in parallel...`, 'color: #10b981');
+      console.info(
+        `%c[Notion] Fetching ${dbConfigs.length} databases in parallel...`,
+        'color: #10b981'
+      );
     }
 
     // Fetch all databases in parallel for faster loading
-    const fetchPromises = dbConfigs.map(async (dbConfig) => {
+    const fetchPromises = dbConfigs.map(async dbConfig => {
       if (this.debugMode) {
-        console.info(`%c[Notion] Starting fetch for ${dbConfig.type} database...`, 'color: #10b981');
+        console.info(
+          `%c[Notion] Starting fetch for ${dbConfig.type} database...`,
+          'color: #10b981'
+        );
       }
 
       try {
@@ -792,7 +882,10 @@ class NotionService {
       if (result.success) {
         allItems.push(...result.items);
         if (this.debugMode) {
-          console.info(`%c[Notion] Fetched ${result.items.length} items from ${result.type}`, 'color: #10b981');
+          console.info(
+            `%c[Notion] Fetched ${result.items.length} items from ${result.type}`,
+            'color: #10b981'
+          );
         }
       } else {
         failedDatabases.push({ type: result.type, error: result.error });

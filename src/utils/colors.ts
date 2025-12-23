@@ -21,7 +21,7 @@ const statusCategoryColors: Record<StatusCategory, StatusColorSet> = {
     border: 'border-blue-300',
     dot: 'bg-blue-500',
   },
-  'blocked': {
+  blocked: {
     bg: 'bg-red-100',
     text: 'text-red-700',
     border: 'border-red-300',
@@ -33,7 +33,7 @@ const statusCategoryColors: Record<StatusCategory, StatusColorSet> = {
     border: 'border-amber-300',
     dot: 'bg-amber-500',
   },
-  'completed': {
+  completed: {
     bg: 'bg-green-100',
     text: 'text-green-700',
     border: 'border-green-300',
@@ -102,23 +102,55 @@ function getFromCache<K, V>(cache: Map<K, V>, key: K): V | undefined {
  * - not-started: Default for unrecognized statuses
  */
 const STATUS_CATEGORY_KEYWORDS: Record<StatusCategory, string[]> = {
-  'completed': [
-    'done', 'complete', 'finish', 'closed', 'resolved',
-    'shipped', 'deployed', 'live', 'released', 'launched',
+  completed: [
+    'done',
+    'complete',
+    'finish',
+    'closed',
+    'resolved',
+    'shipped',
+    'deployed',
+    'live',
+    'released',
+    'launched',
   ],
-  'blocked': [
-    'block', 'hold', 'wait', 'stuck', 'pause',
-    'duplicate', 'wontfix', 'cancelled', 'canceled',
+  blocked: [
+    'block',
+    'hold',
+    'wait',
+    'stuck',
+    'pause',
+    'duplicate',
+    'wontfix',
+    'cancelled',
+    'canceled',
   ],
   'in-review': [
-    'review', 'test', 'qa', 'verif', 'post mortem',
-    'postmortem', 'staging', 'approval',
+    'review',
+    'test',
+    'qa',
+    'verif',
+    'post mortem',
+    'postmortem',
+    'staging',
+    'approval',
   ],
   'in-progress': [
-    'progress', 'doing', 'active', 'wip', 'working',
-    'develop', 'solutioning', 'priorit', 'schedul',
-    'analysis', 'research', 'project in', 'implementation',
-    'coding', 'building',
+    'progress',
+    'doing',
+    'active',
+    'wip',
+    'working',
+    'develop',
+    'solutioning',
+    'priorit',
+    'schedul',
+    'analysis',
+    'research',
+    'project in',
+    'implementation',
+    'coding',
+    'building',
   ],
   'not-started': [], // Default fallback, no keywords needed
 };
@@ -187,32 +219,35 @@ export function getStatusColors(status: string): StatusColorSet {
 export const statusColors = statusCategoryColors;
 
 // Type colors
-export const typeColors: Record<ItemType, { bg: string; text: string; border: string; icon: string }> = {
-  'mission': {
+export const typeColors: Record<
+  ItemType,
+  { bg: string; text: string; border: string; icon: string }
+> = {
+  mission: {
     bg: 'bg-violet-100',
     text: 'text-violet-700',
     border: 'border-violet-300',
     icon: 'text-violet-600',
   },
-  'problem': {
+  problem: {
     bg: 'bg-red-100',
     text: 'text-red-700',
     border: 'border-red-300',
     icon: 'text-red-600',
   },
-  'solution': {
+  solution: {
     bg: 'bg-blue-100',
     text: 'text-blue-700',
     border: 'border-blue-300',
     icon: 'text-blue-600',
   },
-  'design': {
+  design: {
     bg: 'bg-fuchsia-100',
     text: 'text-fuchsia-700',
     border: 'border-fuchsia-300',
     icon: 'text-fuchsia-600',
   },
-  'project': {
+  project: {
     bg: 'bg-cyan-100',
     text: 'text-cyan-700',
     border: 'border-cyan-300',
@@ -222,22 +257,22 @@ export const typeColors: Record<ItemType, { bg: string; text: string; border: st
 
 // Priority colors
 export const priorityColors: Record<Priority, { bg: string; text: string; border: string }> = {
-  'P0': {
+  P0: {
     bg: 'bg-red-100',
     text: 'text-red-800',
     border: 'border-red-400',
   },
-  'P1': {
+  P1: {
     bg: 'bg-orange-100',
     text: 'text-orange-800',
     border: 'border-orange-400',
   },
-  'P2': {
+  P2: {
     bg: 'bg-yellow-100',
     text: 'text-yellow-800',
     border: 'border-yellow-400',
   },
-  'P3': {
+  P3: {
     bg: 'bg-gray-100',
     text: 'text-gray-700',
     border: 'border-gray-300',
@@ -251,19 +286,19 @@ export function getStatusLabel(status: string): string {
 
 // Get type label
 export const typeLabels: Record<ItemType, string> = {
-  'mission': 'Mission',
-  'problem': 'Problem',
-  'solution': 'Solution',
-  'design': 'Design',
-  'project': 'Project',
+  mission: 'Mission',
+  problem: 'Problem',
+  solution: 'Solution',
+  design: 'Design',
+  project: 'Project',
 };
 
 // Get priority label
 export const priorityLabels: Record<Priority, string> = {
-  'P0': 'Critical',
-  'P1': 'High',
-  'P2': 'Medium',
-  'P3': 'Low',
+  P0: 'Critical',
+  P1: 'High',
+  P2: 'Medium',
+  P3: 'Low',
 };
 
 // Progress bar color based on completion
@@ -278,9 +313,9 @@ export const getProgressColor = (progress: number): string => {
 const statusCategoryHexColors: Record<StatusCategory, string> = {
   'not-started': '#94a3b8',
   'in-progress': '#3b82f6',
-  'blocked': '#ef4444',
+  blocked: '#ef4444',
   'in-review': '#f59e0b',
-  'completed': '#22c55e',
+  completed: '#22c55e',
 };
 
 // Get hex color for any status
@@ -290,11 +325,11 @@ export function getStatusHexColor(status: string): string {
 }
 
 export const typeHexColors: Record<ItemType, string> = {
-  'mission': '#7c3aed',
-  'problem': '#dc2626',
-  'solution': '#2563eb',
-  'design': '#d946ef',
-  'project': '#0891b2',
+  mission: '#7c3aed',
+  problem: '#dc2626',
+  solution: '#2563eb',
+  design: '#d946ef',
+  project: '#0891b2',
 };
 
 /**
