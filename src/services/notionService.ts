@@ -781,7 +781,9 @@ class NotionService {
       }
     });
 
-    // Process results as they come in for progressive updates
+    // Process results in order for progressive updates
+    // Note: Databases are fetched in parallel above, but results are processed
+    // sequentially to provide ordered progress updates to the UI
     let completedCount = 0;
     for (const promise of fetchPromises) {
       const result = await promise;

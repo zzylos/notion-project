@@ -45,12 +45,24 @@ export function isOverdue(dueDate: string | undefined, status: string): boolean 
 
 /**
  * Format a date for display using consistent formatting.
+ * Returns empty string if the date is invalid.
+ *
+ * @param date - The date to format (string or Date object)
+ * @param format - The format to use ('short', 'medium', or 'long')
+ * @returns Formatted date string, or empty string if date is invalid
  */
 export function formatDate(
-  date: string | Date,
+  date: string | Date | undefined | null,
   format: 'short' | 'medium' | 'long' = 'medium'
 ): string {
+  if (!date) return '';
+
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) {
+    return '';
+  }
 
   const optionsMap: Record<'short' | 'medium' | 'long', Intl.DateTimeFormatOptions> = {
     short: { month: 'short', day: 'numeric' },
@@ -63,9 +75,21 @@ export function formatDate(
 
 /**
  * Get relative time description (e.g., "2 days ago", "in 3 days").
+ * Returns empty string if the date is invalid.
+ *
+ * @param date - The date to compare (string or Date object)
+ * @returns Relative time string, or empty string if date is invalid
  */
-export function getRelativeTime(date: string | Date): string {
+export function getRelativeTime(date: string | Date | undefined | null): string {
+  if (!date) return '';
+
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) {
+    return '';
+  }
+
   const now = new Date();
   const diffMs = dateObj.getTime() - now.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
