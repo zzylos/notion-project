@@ -60,7 +60,13 @@ function App() {
     setFailedDatabases(null);
 
     try {
-      if (config && config.apiKey && config.databaseId) {
+      // Check for valid config - support both legacy databaseId and new databases array
+      const hasValidConfig = config && config.apiKey && (
+        config.databaseId ||
+        (config.databases && config.databases.length > 0)
+      );
+
+      if (hasValidConfig) {
         // Clear cache if force refresh
         if (forceRefresh) {
           notionService.clearCache();
@@ -304,7 +310,16 @@ function App() {
               <PanelRightClose className="w-5 h-5" />
             </button>
           </div>
-          <DetailPanel onClose={handleCloseDetail} />
+          <ErrorBoundary fallback={
+            <div className="h-full flex items-center justify-center p-8 text-center">
+              <div className="text-gray-500">
+                <p className="font-medium">Failed to load item details</p>
+                <p className="text-sm mt-1">Try selecting a different item</p>
+              </div>
+            </div>
+          }>
+            <DetailPanel onClose={handleCloseDetail} />
+          </ErrorBoundary>
         </div>
       </div>
 
