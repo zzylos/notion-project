@@ -40,39 +40,6 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
-  // Calculate which items are orphans (no parent and no children in the filtered set)
-  const { filteredItems, orphanCount } = useMemo(() => {
-    const itemIds = new Set(allFilteredItems.map(i => i.id));
-    const itemsWithChildren = new Set<string>();
-
-    // Find all items that have children
-    for (const item of allFilteredItems) {
-      if (item.parentId && itemIds.has(item.parentId)) {
-        itemsWithChildren.add(item.parentId);
-      }
-    }
-
-    // An orphan is an item with no parent (in set) AND no children
-    const orphans = allFilteredItems.filter(item => {
-      const hasParentInSet = item.parentId && itemIds.has(item.parentId);
-      const hasChildren = itemsWithChildren.has(item.id);
-      return !hasParentInSet && !hasChildren;
-    });
-
-    if (hideOrphanItems) {
-      const orphanIds = new Set(orphans.map(o => o.id));
-      return {
-        filteredItems: allFilteredItems.filter(item => !orphanIds.has(item.id)),
-        orphanCount: orphans.length,
-      };
-    }
-
-    return {
-      filteredItems: allFilteredItems,
-      orphanCount: orphans.length,
-    };
-  }, [allFilteredItems, hideOrphanItems]);
-
   const handleToggleOrphanItems = useCallback(() => {
     setHideOrphanItems(!hideOrphanItems);
   }, [hideOrphanItems, setHideOrphanItems]);
@@ -81,24 +48,40 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     setFocusMode(prev => !prev);
   }, []);
 
-  // Calculate connected items for the selected item (when focus mode is on)
+  // Calculate connected items for the selected item
+  // This collects ALL ancestors and ALL descendants recursively, not just immediate parent/children
+  // Calculated independently of focusMode so we can use it to include items outside filters
   const connectedItemIds = useMemo(() => {
-    if (!focusMode || !selectedItemId) return null;
+    if (!selectedItemId) return null;
 
     const selectedItem = items.get(selectedItemId);
     if (!selectedItem) return null;
 
     const connected = new Set<string>([selectedItemId]);
 
-    // Add parent
-    if (selectedItem.parentId) {
-      connected.add(selectedItem.parentId);
-    }
+    // Recursively add all ancestors (parent, grandparent, etc.)
+    const addAncestors = (itemId: string) => {
+      const item = items.get(itemId);
+      if (item?.parentId && !connected.has(item.parentId)) {
+        connected.add(item.parentId);
+        addAncestors(item.parentId);
+      }
+    };
+    addAncestors(selectedItemId);
 
-    // Add children
-    if (selectedItem.children) {
-      selectedItem.children.forEach(childId => connected.add(childId));
-    }
+    // Recursively add all descendants (children, grandchildren, etc.)
+    const addDescendants = (itemId: string) => {
+      const item = items.get(itemId);
+      if (item?.children) {
+        for (const childId of item.children) {
+          if (!connected.has(childId)) {
+            connected.add(childId);
+            addDescendants(childId);
+          }
+        }
+      }
+    };
+    addDescendants(selectedItemId);
 
     // Add blocked by items
     if (selectedItem.blockedBy) {
@@ -122,7 +105,64 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     }
 
     return connected;
-  }, [focusMode, selectedItemId, items]);
+  }, [selectedItemId, items]);
+
+  // Calculate which items are orphans and determine final filtered items
+  // When focus mode is ON, include connected items even if they're outside filters
+  const { filteredItems, orphanCount } = useMemo(() => {
+    // Start with filtered items
+    let baseItems = allFilteredItems;
+
+    // When focus mode is active, add connected items that are outside the filter
+    if (focusMode && connectedItemIds) {
+      const filteredIds = new Set(allFilteredItems.map(i => i.id));
+      const additionalItems: WorkItem[] = [];
+
+      for (const connectedId of connectedItemIds) {
+        if (!filteredIds.has(connectedId)) {
+          const item = items.get(connectedId);
+          if (item) {
+            additionalItems.push(item);
+          }
+        }
+      }
+
+      if (additionalItems.length > 0) {
+        baseItems = [...allFilteredItems, ...additionalItems];
+      }
+    }
+
+    const itemIds = new Set(baseItems.map(i => i.id));
+    const itemsWithChildren = new Set<string>();
+
+    // Find all items that have children
+    for (const item of baseItems) {
+      if (item.parentId && itemIds.has(item.parentId)) {
+        itemsWithChildren.add(item.parentId);
+      }
+    }
+
+    // An orphan is an item with no parent (in set) AND no children
+    const orphans = baseItems.filter(item => {
+      const hasParentInSet = item.parentId && itemIds.has(item.parentId);
+      const hasChildren = itemsWithChildren.has(item.id);
+      return !hasParentInSet && !hasChildren;
+    });
+
+    // Don't hide orphans when focus mode is active (connected items might appear as orphans)
+    if (hideOrphanItems && !focusMode) {
+      const orphanIds = new Set(orphans.map(o => o.id));
+      return {
+        filteredItems: baseItems.filter(item => !orphanIds.has(item.id)),
+        orphanCount: orphans.length,
+      };
+    }
+
+    return {
+      filteredItems: baseItems,
+      orphanCount: orphans.length,
+    };
+  }, [allFilteredItems, hideOrphanItems, focusMode, connectedItemIds, items]);
 
   // Handle fullscreen changes (including ESC key)
   useEffect(() => {
