@@ -26,13 +26,21 @@ export function parseDate(dateString: string | undefined | null): Date | null {
 /**
  * Check if a due date is overdue (past current date and not completed).
  * Uses safe date parsing to handle invalid date strings.
+ * Compares dates at start-of-day to avoid timezone issues where
+ * items due "today" incorrectly show as overdue.
  */
 export function isOverdue(dueDate: string | undefined, status: string): boolean {
   if (!dueDate) return false;
   if (getStatusCategory(status) === 'completed') return false;
   const parsedDate = parseDate(dueDate);
   if (!parsedDate) return false;
-  return parsedDate < new Date();
+
+  // Normalize both dates to start-of-day for accurate comparison
+  const dueDateStart = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  return dueDateStart < todayStart;
 }
 
 /**

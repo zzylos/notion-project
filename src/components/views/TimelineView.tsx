@@ -5,7 +5,7 @@ import { getStatusColors } from '../../utils/colors';
 import { parseDate, isOverdue, formatDate } from '../../utils/dateUtils';
 
 const TimelineView: React.FC = () => {
-  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
+  const { getFilteredItems, setSelectedItem, selectedItemId, isLoading } = useStore();
 
   // Memoize filtered and sorted items to avoid recreation on every render
   const sortedItems = useMemo(() => {
@@ -22,6 +22,16 @@ const TimelineView: React.FC = () => {
       return dateA.getTime() - dateB.getTime();
     });
   }, [getFilteredItems]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Calendar className="w-8 h-8 text-blue-500 animate-pulse" />
+        <span className="ml-3 text-gray-600">Loading timeline...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-auto p-4">

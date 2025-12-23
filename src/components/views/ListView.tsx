@@ -74,10 +74,19 @@ const ListView: React.FC = () => {
                 height: `${virtualRow.size}px`,
                 transform: `translateY(${virtualRow.start}px)`,
               }}
-              className={`grid grid-cols-[48px_1fr_100px_80px_120px_120px] px-4 items-center border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
+              className={`grid grid-cols-[48px_1fr_100px_80px_120px_120px] px-4 items-center border-b border-gray-100 hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
                 selectedItemId === item.id ? 'bg-blue-50' : ''
               }`}
               onClick={() => setSelectedItem(item.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedItem(item.id);
+                }
+              }}
+              role="row"
+              tabIndex={0}
+              aria-selected={selectedItemId === item.id}
             >
               <div>
                 <div className={`w-3 h-3 rounded-full ${getStatusColors(item.status).dot}`} />
