@@ -71,6 +71,7 @@ const defaultFilters: FilterState = {
   owners: [],
   searchQuery: '',
   showOnlyMyItems: false,
+  filterMode: 'show',
 };
 
 export const useStore = create<StoreState>()(
@@ -289,33 +290,39 @@ export const useStore = create<StoreState>()(
         const state = get();
         const { filters } = state;
         const allItems = Array.from(state.items.values());
+        const isHideMode = filters.filterMode === 'hide';
 
         return allItems.filter(item => {
-          // Type filter
-          if (filters.types.length > 0 && !filters.types.includes(item.type)) {
-            return false;
-          }
-
-          // Status filter
-          if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) {
-            return false;
-          }
-
-          // Priority filter
-          if (filters.priorities.length > 0) {
-            if (!item.priority || !filters.priorities.includes(item.priority)) {
+          // Check if item matches the filter criteria
+          const matchesFilters = (() => {
+            // Type filter
+            if (filters.types.length > 0 && !filters.types.includes(item.type)) {
               return false;
             }
-          }
 
-          // Owner filter
-          if (filters.owners.length > 0) {
-            if (!item.owner || !filters.owners.includes(item.owner.id)) {
+            // Status filter
+            if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) {
               return false;
             }
-          }
 
-          // Search query
+            // Priority filter
+            if (filters.priorities.length > 0) {
+              if (!item.priority || !filters.priorities.includes(item.priority)) {
+                return false;
+              }
+            }
+
+            // Owner filter
+            if (filters.owners.length > 0) {
+              if (!item.owner || !filters.owners.includes(item.owner.id)) {
+                return false;
+              }
+            }
+
+            return true;
+          })();
+
+          // Search query is always inclusive (not affected by hide mode)
           if (filters.searchQuery) {
             const query = filters.searchQuery.toLowerCase();
             const titleMatch = item.title.toLowerCase().includes(query);
@@ -326,7 +333,19 @@ export const useStore = create<StoreState>()(
             }
           }
 
-          return true;
+          // In hide mode: return true if item does NOT match filters (hide matching items)
+          // In show mode: return true if item DOES match filters (show matching items)
+          // If no filters are set, show all items regardless of mode
+          const hasActiveFilters = filters.types.length > 0 ||
+                                   filters.statuses.length > 0 ||
+                                   filters.priorities.length > 0 ||
+                                   filters.owners.length > 0;
+
+          if (!hasActiveFilters) {
+            return true; // No filters = show all
+          }
+
+          return isHideMode ? !matchesFilters : matchesFilters;
         });
       },
 

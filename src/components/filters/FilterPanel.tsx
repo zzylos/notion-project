@@ -5,9 +5,11 @@ import {
   Filter,
   ChevronDown,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { ItemType, Priority } from '../../types';
+import type { ItemType, Priority, FilterMode } from '../../types';
 import { typeColors, priorityColors, typeLabels, priorityLabels, getStatusColors, getStatusCategory } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
 
@@ -208,12 +210,23 @@ const FilterPanel: React.FC = memo(() => {
     return selectedCount > 0 && selectedCount < groupStatuses.size;
   }, [filters.statuses, statusGroups]);
 
+  const toggleFilterMode = useCallback(() => {
+    const newMode: FilterMode = filters.filterMode === 'show' ? 'hide' : 'show';
+    setFilters({ filterMode: newMode });
+  }, [filters.filterMode, setFilters]);
+
   const hasActiveFilters =
     filters.types.length > 0 ||
     filters.statuses.length > 0 ||
     filters.priorities.length > 0 ||
     filters.owners.length > 0 ||
     filters.searchQuery.length > 0;
+
+  const hasSelectionFilters =
+    filters.types.length > 0 ||
+    filters.statuses.length > 0 ||
+    filters.priorities.length > 0 ||
+    filters.owners.length > 0;
 
   // Get representative status for color
   const getGroupColor = useCallback((groupName: string) => {
@@ -236,28 +249,60 @@ const FilterPanel: React.FC = memo(() => {
 
   return (
     <div className="bg-white border-b border-gray-200 p-4 space-y-4">
-      {/* Search bar */}
-      <div className="relative">
-        <label htmlFor="filter-search" className="sr-only">
-          Search items
-        </label>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
-        <input
-          id="filter-search"
-          type="search"
-          placeholder="Search items by title, description, or tags..."
-          value={filters.searchQuery}
-          onChange={(e) => setFilters({ searchQuery: e.target.value })}
-          className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-          aria-label="Search items by title, description, or tags"
-        />
-        {filters.searchQuery && (
+      {/* Search bar and filter mode toggle */}
+      <div className="flex gap-3 items-center">
+        <div className="relative flex-1">
+          <label htmlFor="filter-search" className="sr-only">
+            Search items
+          </label>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
+          <input
+            id="filter-search"
+            type="search"
+            placeholder="Search items by title, description, or tags..."
+            value={filters.searchQuery}
+            onChange={(e) => setFilters({ searchQuery: e.target.value })}
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+            aria-label="Search items by title, description, or tags"
+          />
+          {filters.searchQuery && (
+            <button
+              onClick={() => setFilters({ searchQuery: '' })}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+              aria-label="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter mode toggle - only show when there are selection filters */}
+        {hasSelectionFilters && (
           <button
-            onClick={() => setFilters({ searchQuery: '' })}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
-            aria-label="Clear search"
+            onClick={toggleFilterMode}
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+              ${filters.filterMode === 'hide'
+                ? 'bg-red-100 text-red-700 border border-red-300 focus:ring-red-500'
+                : 'bg-green-100 text-green-700 border border-green-300 focus:ring-green-500'}
+            `}
+            title={filters.filterMode === 'hide'
+              ? 'Hide mode: Selected filters hide matching items'
+              : 'Show mode: Selected filters show only matching items'}
+            aria-pressed={filters.filterMode === 'hide'}
           >
-            <X className="w-4 h-4" />
+            {filters.filterMode === 'hide' ? (
+              <>
+                <EyeOff className="w-4 h-4" />
+                Hide
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4" />
+                Show
+              </>
+            )}
           </button>
         )}
       </div>
@@ -444,7 +489,11 @@ const FilterPanel: React.FC = memo(() => {
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Filter className="w-4 h-4" />
             <span>
-              Active filters:{' '}
+              {filters.filterMode === 'hide' && hasSelectionFilters ? (
+                <span className="text-red-600 font-medium">Hiding: </span>
+              ) : (
+                'Active filters: '
+              )}
               {[
                 filters.types.length > 0 && `${filters.types.length} types`,
                 filters.statuses.length > 0 && `${filters.statuses.length} statuses`,

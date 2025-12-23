@@ -14,11 +14,13 @@ interface CanvasNodeProps {
   data: {
     item: WorkItem;
     isSelected: boolean;
+    isConnected?: boolean;
+    isDimmed?: boolean;
   };
 }
 
 const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
-  const { item, isSelected } = data;
+  const { item, isSelected, isDimmed = false } = data;
   const TypeIcon = typeIcons[item.type];
   const statusStyle = getStatusColors(item.status);
   const typeStyle = typeColors[item.type];
@@ -27,13 +29,15 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
   return (
     <div
       className={`
-        bg-white rounded-lg shadow-md border-2 transition-all duration-200
-        hover:shadow-lg cursor-pointer
+        rounded-lg shadow-md border-2 transition-all duration-200
+        cursor-pointer
         ${isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}
+        ${isDimmed ? 'opacity-25 hover:opacity-50' : 'bg-white hover:shadow-lg'}
       `}
       style={{
         minWidth: 220,
         maxWidth: 280,
+        backgroundColor: isDimmed ? 'rgb(249 250 251)' : 'white',
       }}
     >
       {/* Top handle for incoming connections */}
