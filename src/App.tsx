@@ -55,7 +55,8 @@ function App() {
 
     setLoading(true);
     setError(null);
-    setLoadingProgress(null);
+    // Set initial progress immediately so progress bar shows up right away
+    setLoadingProgress({ loaded: 0, total: null });
     setFailedDatabases(null);
 
     try {

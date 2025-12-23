@@ -73,6 +73,18 @@ export interface FetchOptions {
 const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || DEFAULT_CORS_PROXY;
 const NOTION_API_BASE = NOTION.API_BASE;
 
+// LocalStorage cache key prefix
+const CACHE_KEY_PREFIX = 'notion-cache-';
+const CACHE_METADATA_KEY = 'notion-cache-metadata';
+
+// Persistent cache timeout (24 hours for localStorage, shorter for memory)
+const PERSISTENT_CACHE_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CacheMetadata {
+  keys: string[];
+  lastCleanup: number;
+}
+
 class NotionService {
   private config: NotionConfig | null = null;
   private cache: Map<string, { items: WorkItem[]; timestamp: number }> = new Map();
@@ -84,9 +96,92 @@ class NotionService {
   private debugMode = import.meta.env.DEV;
   private loggedDatabases = new Set<string>();
 
+  constructor() {
+    // Load persistent cache into memory on initialization
+    this.loadPersistentCache();
+  }
+
   initialize(config: NotionConfig) {
     this.config = config;
     this.loggedDatabases.clear();
+  }
+
+  /**
+   * Load cached data from localStorage into memory cache
+   */
+  private loadPersistentCache(): void {
+    try {
+      const metadataStr = localStorage.getItem(CACHE_METADATA_KEY);
+      if (!metadataStr) return;
+
+      const metadata: CacheMetadata = JSON.parse(metadataStr);
+      const now = Date.now();
+
+      for (const key of metadata.keys) {
+        const cachedStr = localStorage.getItem(CACHE_KEY_PREFIX + key);
+        if (!cachedStr) continue;
+
+        const cached = JSON.parse(cachedStr);
+        // Check if persistent cache is still valid
+        if (now - cached.timestamp < PERSISTENT_CACHE_TIMEOUT) {
+          this.cache.set(key, cached);
+          if (this.debugMode) {
+            console.info(`%c[Notion] Loaded ${cached.items.length} items from persistent cache`, 'color: #10b981');
+          }
+        } else {
+          // Clean up expired cache
+          localStorage.removeItem(CACHE_KEY_PREFIX + key);
+        }
+      }
+    } catch (error) {
+      console.warn('[Notion] Failed to load persistent cache:', error);
+    }
+  }
+
+  /**
+   * Save cache to localStorage for persistence across page refreshes
+   */
+  private savePersistentCache(cacheKey: string, items: WorkItem[], timestamp: number): void {
+    try {
+      const cacheData = { items, timestamp };
+      localStorage.setItem(CACHE_KEY_PREFIX + cacheKey, JSON.stringify(cacheData));
+
+      // Update metadata
+      const metadataStr = localStorage.getItem(CACHE_METADATA_KEY);
+      const metadata: CacheMetadata = metadataStr
+        ? JSON.parse(metadataStr)
+        : { keys: [], lastCleanup: Date.now() };
+
+      if (!metadata.keys.includes(cacheKey)) {
+        metadata.keys.push(cacheKey);
+      }
+      localStorage.setItem(CACHE_METADATA_KEY, JSON.stringify(metadata));
+
+      if (this.debugMode) {
+        console.info(`%c[Notion] Saved ${items.length} items to persistent cache`, 'color: #10b981');
+      }
+    } catch (error) {
+      // localStorage might be full or unavailable
+      console.warn('[Notion] Failed to save persistent cache:', error);
+    }
+  }
+
+  /**
+   * Clear persistent cache from localStorage
+   */
+  private clearPersistentCache(): void {
+    try {
+      const metadataStr = localStorage.getItem(CACHE_METADATA_KEY);
+      if (metadataStr) {
+        const metadata: CacheMetadata = JSON.parse(metadataStr);
+        for (const key of metadata.keys) {
+          localStorage.removeItem(CACHE_KEY_PREFIX + key);
+        }
+      }
+      localStorage.removeItem(CACHE_METADATA_KEY);
+    } catch (error) {
+      console.warn('[Notion] Failed to clear persistent cache:', error);
+    }
   }
 
   isInitialized(): boolean {
@@ -96,6 +191,7 @@ class NotionService {
   clearCache() {
     this.cache.clear();
     this.pendingRequests.clear();
+    this.clearPersistentCache();
   }
 
   /**
@@ -584,32 +680,24 @@ class NotionService {
     const allItems: WorkItem[] = [];
     const failedDatabases: Array<{ type: string; error: string }> = [];
 
-    // Fetch from each database
-    for (let i = 0; i < dbConfigs.length; i++) {
-      // Check if aborted before each database
-      if (signal?.aborted) {
-        throw new DOMException('Fetch aborted', 'AbortError');
-      }
+    // Check if aborted before starting
+    if (signal?.aborted) {
+      throw new DOMException('Fetch aborted', 'AbortError');
+    }
 
-      const dbConfig = dbConfigs[i];
+    if (this.debugMode) {
+      console.info(`%c[Notion] Fetching ${dbConfigs.length} databases in parallel...`, 'color: #10b981');
+    }
 
+    // Fetch all databases in parallel for faster loading
+    const fetchPromises = dbConfigs.map(async (dbConfig) => {
       if (this.debugMode) {
-        console.info(`%c[Notion] Fetching ${dbConfig.type} database...`, 'color: #10b981');
+        console.info(`%c[Notion] Starting fetch for ${dbConfig.type} database...`, 'color: #10b981');
       }
 
       try {
         const items = await this.fetchAllFromDatabase(dbConfig, signal);
-        allItems.push(...items);
-
-        // Report progress
-        onProgress?.({
-          loaded: allItems.length,
-          total: null,
-          items: [...allItems],
-          done: i === dbConfigs.length - 1,
-          currentDatabase: dbConfig.type,
-          failedDatabases: failedDatabases.length > 0 ? [...failedDatabases] : undefined,
-        });
+        return { success: true as const, items, type: dbConfig.type };
       } catch (error) {
         // Re-throw abort errors
         if (error instanceof DOMException && error.name === 'AbortError') {
@@ -617,9 +705,34 @@ class NotionService {
         }
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error(`Failed to fetch ${dbConfig.type} database:`, error);
-        failedDatabases.push({ type: dbConfig.type, error: errorMessage });
-        // Continue with other databases
+        return { success: false as const, error: errorMessage, type: dbConfig.type };
       }
+    });
+
+    // Process results as they come in for progressive updates
+    let completedCount = 0;
+    for (const promise of fetchPromises) {
+      const result = await promise;
+      completedCount++;
+
+      if (result.success) {
+        allItems.push(...result.items);
+        if (this.debugMode) {
+          console.info(`%c[Notion] Fetched ${result.items.length} items from ${result.type}`, 'color: #10b981');
+        }
+      } else {
+        failedDatabases.push({ type: result.type, error: result.error });
+      }
+
+      // Report progress after each database completes
+      onProgress?.({
+        loaded: allItems.length,
+        total: null,
+        items: [...allItems],
+        done: completedCount === dbConfigs.length,
+        currentDatabase: result.type,
+        failedDatabases: failedDatabases.length > 0 ? [...failedDatabases] : undefined,
+      });
     }
 
     // Build relationships across all items
@@ -627,7 +740,10 @@ class NotionService {
 
     // Cache the results (only if we got some items)
     if (allItems.length > 0) {
-      this.cache.set(cacheKey, { items: allItems, timestamp: Date.now() });
+      const timestamp = Date.now();
+      this.cache.set(cacheKey, { items: allItems, timestamp });
+      // Also persist to localStorage for faster startup next time
+      this.savePersistentCache(cacheKey, allItems, timestamp);
     }
 
     // Final progress callback with failed databases info

@@ -22,6 +22,7 @@ interface StoreState {
   focusedItemId: string | null;
   expandedIds: Set<string>;
   viewMode: ViewMode;
+  hideOrphanItems: boolean;
 
   // Filters
   filters: FilterState;
@@ -47,6 +48,7 @@ interface StoreState {
   expandToItem: (id: string) => void;
 
   setViewMode: (mode: ViewMode) => void;
+  setHideOrphanItems: (hide: boolean) => void;
   setFilters: (filters: Partial<FilterState>) => void;
   resetFilters: () => void;
 
@@ -80,6 +82,7 @@ export const useStore = create<StoreState>()(
       focusedItemId: null,
       expandedIds: new Set(),
       viewMode: 'tree',
+      hideOrphanItems: false,
       filters: defaultFilters,
       isLoading: false,
       error: null,
@@ -153,6 +156,9 @@ export const useStore = create<StoreState>()(
 
       // View mode
       setViewMode: (mode: ViewMode) => set({ viewMode: mode }),
+
+      // Orphan filter (for canvas view)
+      setHideOrphanItems: (hide: boolean) => set({ hideOrphanItems: hide }),
 
       // Filter actions
       setFilters: (filters: Partial<FilterState>) => {
@@ -419,6 +425,7 @@ export const useStore = create<StoreState>()(
       partialize: (state) => ({
         expandedIds: Array.from(state.expandedIds),
         viewMode: state.viewMode,
+        hideOrphanItems: state.hideOrphanItems,
         filters: state.filters,
         notionConfig: state.notionConfig,
       }),
