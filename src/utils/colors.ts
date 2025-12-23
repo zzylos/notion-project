@@ -50,14 +50,41 @@ const statusColorCache = new Map<string, StatusColorSet>();
 // Cache for status category lookups (performance optimization)
 const statusCategoryCache = new Map<string, StatusCategory>();
 
-// Helper to add to cache with size limit
+/**
+ * LRU cache helper: Add or update an entry, evicting least recently used if full.
+ * Uses Map's insertion order - entries are ordered by insertion time,
+ * so deleting and re-inserting moves the entry to the end (most recently used).
+ */
 function addToCache<K, V>(cache: Map<K, V>, key: K, value: V): void {
-  // If cache is at max size, remove oldest entries (first 10%)
+  // Delete first to update position (for LRU behavior)
+  cache.delete(key);
+
+  // Evict oldest entries if cache is full
   if (cache.size >= MAX_CACHE_SIZE) {
-    const keysToDelete = Array.from(cache.keys()).slice(0, Math.floor(MAX_CACHE_SIZE * 0.1));
-    keysToDelete.forEach(k => cache.delete(k));
+    // Delete oldest 10% (entries at the beginning of the Map)
+    const evictCount = Math.floor(MAX_CACHE_SIZE * 0.1);
+    let count = 0;
+    for (const k of cache.keys()) {
+      if (count >= evictCount) break;
+      cache.delete(k);
+      count++;
+    }
   }
+
   cache.set(key, value);
+}
+
+/**
+ * LRU cache helper: Get an entry and mark it as recently used.
+ */
+function getFromCache<K, V>(cache: Map<K, V>, key: K): V | undefined {
+  const value = cache.get(key);
+  if (value !== undefined) {
+    // Move to end (most recently used) by delete + re-insert
+    cache.delete(key);
+    cache.set(key, value);
+  }
+  return value;
 }
 
 /**
@@ -115,8 +142,8 @@ const STATUS_CATEGORY_KEYWORDS: Record<StatusCategory, string[]> = {
  * getStatusCategory("Custom Status")   // returns 'not-started' (default)
  */
 export function getStatusCategory(status: string): StatusCategory {
-  // Check cache first
-  const cached = statusCategoryCache.get(status);
+  // Check cache first (using LRU get to update access time)
+  const cached = getFromCache(statusCategoryCache, status);
   if (cached) {
     return cached;
   }
@@ -141,8 +168,8 @@ export function getStatusCategory(status: string): StatusCategory {
 
 // Get colors for any status (dynamic)
 export function getStatusColors(status: string): StatusColorSet {
-  // Check cache first
-  const cached = statusColorCache.get(status);
+  // Check cache first (using LRU get to update access time)
+  const cached = getFromCache(statusColorCache, status);
   if (cached) {
     return cached;
   }
@@ -269,3 +296,30 @@ export const typeHexColors: Record<ItemType, string> = {
   'design': '#d946ef',
   'project': '#0891b2',
 };
+
+/**
+ * Extracts unique status values from items, preserving order of first occurrence.
+ *
+ * This is a common pattern used across views (Kanban, Stats, Filters) to get
+ * a consistent list of status columns/categories from the data.
+ *
+ * @param items - Iterable of objects with a `status` property
+ * @returns Array of unique status strings in order of first occurrence
+ *
+ * @example
+ * const items = [{ status: 'In Progress' }, { status: 'Done' }, { status: 'In Progress' }];
+ * getUniqueStatuses(items); // ['In Progress', 'Done']
+ */
+export function getUniqueStatuses<T extends { status: string }>(items: Iterable<T>): string[] {
+  const statusSet = new Set<string>();
+  const statusOrder: string[] = [];
+
+  for (const item of items) {
+    if (!statusSet.has(item.status)) {
+      statusSet.add(item.status);
+      statusOrder.push(item.status);
+    }
+  }
+
+  return statusOrder;
+}

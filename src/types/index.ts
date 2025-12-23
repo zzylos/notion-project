@@ -93,11 +93,16 @@ export interface WorkItem {
   tags?: string[];
   /**
    * IDs of work items this depends on.
-   * Reserved for future dependency tracking feature.
-   * Not currently populated or used.
+   * @deprecated Reserved for future dependency tracking feature.
+   * Not currently populated or used in the UI.
    */
   dependencies?: string[];
-  /** IDs of work items blocking this one */
+  /**
+   * IDs of work items blocking this one.
+   * @deprecated Reserved for future blocker visualization feature.
+   * Not currently populated from Notion or used in the UI.
+   * Consider removing if not planned for implementation.
+   */
   blockedBy?: string[];
 }
 

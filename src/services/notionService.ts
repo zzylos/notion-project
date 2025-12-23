@@ -50,6 +50,8 @@ export type FetchProgressCallback = (progress: {
   done: boolean;
   currentDatabase?: string;
   failedDatabases?: Array<{ type: string; error: string }>;
+  /** Number of items with parent IDs pointing to non-existent items */
+  orphanedItemsCount?: number;
 }) => void;
 
 // Options for fetch operations
@@ -102,6 +104,31 @@ class NotionService {
   }
 
   initialize(config: NotionConfig) {
+    // Validate API key
+    if (!config.apiKey || typeof config.apiKey !== 'string') {
+      throw new Error('Invalid config: apiKey is required and must be a string');
+    }
+
+    // Validate that we have at least one database configured
+    const hasNewFormat = config.databases && config.databases.length > 0;
+    const hasLegacyFormat = Boolean(config.databaseId);
+
+    if (!hasNewFormat && !hasLegacyFormat) {
+      throw new Error('Invalid config: at least one database must be configured');
+    }
+
+    // Validate database configs have required fields
+    if (hasNewFormat) {
+      for (const db of config.databases) {
+        if (!db.databaseId || typeof db.databaseId !== 'string') {
+          throw new Error('Invalid config: each database must have a valid databaseId');
+        }
+        if (!db.type) {
+          throw new Error(`Invalid config: database ${db.databaseId} is missing a type`);
+        }
+      }
+    }
+
     this.config = config;
     this.loggedDatabases.clear();
   }
@@ -580,7 +607,8 @@ class NotionService {
   }
 
   // Build parent-child relationships across all items
-  private buildRelationships(items: WorkItem[]): void {
+  // Returns the count of orphaned items (items with parentId pointing to non-existent parents)
+  private buildRelationships(items: WorkItem[]): number {
     const itemMap = new Map(items.map(item => [item.id, item]));
     const orphanedItems: Array<{ id: string; title: string; parentId: string }> = [];
 
@@ -597,14 +625,18 @@ class NotionService {
       }
     }
 
-    // Log orphaned items in debug mode
-    if (this.debugMode && orphanedItems.length > 0) {
+    // Always log orphaned items warning if any are found
+    if (orphanedItems.length > 0) {
       console.warn(
-        `%c[Notion] ${orphanedItems.length} orphaned items (parent not found):`,
-        'color: #f59e0b; font-weight: bold'
+        `[Notion] ${orphanedItems.length} orphaned items (parent not found). ` +
+        `This may indicate missing databases or cross-database relations that couldn't be resolved.`
       );
-      console.table(orphanedItems);
+      if (this.debugMode) {
+        console.table(orphanedItems);
+      }
     }
+
+    return orphanedItems.length;
   }
 
   // Get database configs, handling both new and legacy formats
@@ -736,7 +768,7 @@ class NotionService {
     }
 
     // Build relationships across all items
-    this.buildRelationships(allItems);
+    const orphanedCount = this.buildRelationships(allItems);
 
     // Cache the results (only if we got some items)
     if (allItems.length > 0) {
@@ -746,13 +778,14 @@ class NotionService {
       this.savePersistentCache(cacheKey, allItems, timestamp);
     }
 
-    // Final progress callback with failed databases info
+    // Final progress callback with failed databases and orphan info
     onProgress?.({
       loaded: allItems.length,
       total: allItems.length,
       items: allItems,
       done: true,
       failedDatabases: failedDatabases.length > 0 ? failedDatabases : undefined,
+      orphanedItemsCount: orphanedCount > 0 ? orphanedCount : undefined,
     });
 
     return allItems;

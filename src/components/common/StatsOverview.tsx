@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { ItemType } from '../../types';
-import { typeLabels, getStatusColors, getStatusCategory, typeColors } from '../../utils/colors';
+import { typeLabels, getStatusColors, getStatusCategory, typeColors, getUniqueStatuses } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
 
 const StatsOverview: React.FC = () => {
@@ -16,17 +16,7 @@ const StatsOverview: React.FC = () => {
   const stats = getStats();
 
   // Get unique statuses from items in order of first occurrence
-  const statusOrder = useMemo(() => {
-    const statusList: string[] = [];
-    const statusSet = new Set<string>();
-    Array.from(items.values()).forEach((item) => {
-      if (!statusSet.has(item.status)) {
-        statusSet.add(item.status);
-        statusList.push(item.status);
-      }
-    });
-    return statusList;
-  }, [items]);
+  const statusOrder = useMemo(() => getUniqueStatuses(items.values()), [items]);
 
   // Calculate in-progress and completed counts dynamically in a single pass
   const { inProgressCount, completedCount } = useMemo(() => {
