@@ -10,6 +10,7 @@ import { getStatusColors, getStatusCategory, typeColors, priorityColors, getProg
 import { typeIcons } from '../../utils/icons';
 import { useStore } from '../../store/useStore';
 import { TREE } from '../../constants';
+import { isOverdue, formatDate } from '../../utils/dateUtils';
 
 interface TreeNodeProps {
   node: TreeNodeType;
@@ -167,11 +168,11 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
           <div
             className={`
               flex items-center gap-1 text-xs
-              ${new Date(item.dueDate) < new Date() && !isCompleted
+              ${isOverdue(item.dueDate, item.status)
                 ? 'text-red-500'
                 : 'text-gray-400'}
             `}
-            title={`Due: ${new Date(item.dueDate).toLocaleDateString()}`}
+            title={`Due: ${formatDate(item.dueDate, 'medium')}`}
           >
             <Clock className="w-3 h-3" />
           </div>

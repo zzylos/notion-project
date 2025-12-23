@@ -1,12 +1,38 @@
 import { getStatusCategory } from './colors';
 
 /**
+ * Safely parse a date string into a Date object.
+ * Returns null if the date string is invalid or cannot be parsed.
+ *
+ * @param dateString - The date string to parse
+ * @returns A valid Date object or null if parsing fails
+ *
+ * @example
+ * parseDate('2024-01-15')  // Returns Date object
+ * parseDate('invalid')     // Returns null
+ * parseDate('')            // Returns null
+ */
+export function parseDate(dateString: string | undefined | null): Date | null {
+  if (!dateString) return null;
+  try {
+    const date = new Date(dateString);
+    // Check if the date is valid (getTime() returns NaN for invalid dates)
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Check if a due date is overdue (past current date and not completed).
+ * Uses safe date parsing to handle invalid date strings.
  */
 export function isOverdue(dueDate: string | undefined, status: string): boolean {
   if (!dueDate) return false;
   if (getStatusCategory(status) === 'completed') return false;
-  return new Date(dueDate) < new Date();
+  const parsedDate = parseDate(dueDate);
+  if (!parsedDate) return false;
+  return parsedDate < new Date();
 }
 
 /**

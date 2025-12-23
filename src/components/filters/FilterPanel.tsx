@@ -12,20 +12,7 @@ import { useStore } from '../../store/useStore';
 import type { ItemType, Priority, FilterMode } from '../../types';
 import { typeColors, priorityColors, typeLabels, priorityLabels, getStatusColors, getStatusCategory } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
-
-/**
- * Status groups for combining similar statuses in the filter UI.
- * The display label maps to an array of status strings that should be grouped together.
- * When a group is selected, all underlying statuses are added to the filter.
- */
-const STATUS_GROUPS: Record<string, string[]> = {
-  'Not Started': ['Not started', 'Not Started', '1-Not started', 'Backlog', 'To Do', 'New'],
-  'In Progress': ['In progress', 'In Progress', '6-Project in progress', 'Active', 'Doing', 'WIP'],
-  'Planning': ['Planning', '2-Analysis/Research', '3-Solutioning', '4-Prioritization', '5-Scheduling', 'Analysis', 'Research', 'Solutioning'],
-  'Blocked': ['Blocked', 'blocked', 'On Hold', 'Waiting', 'Paused'],
-  'Done': ['Done', '8-Closed', '7-Post mortem', 'Completed', 'Complete', 'Closed', 'Resolved', 'Shipped'],
-  'Canceled': ['Canceled', 'Cancelled', 'Duplicate', 'Won\'t Do', 'Wontfix'],
-};
+import { STATUS_GROUPS } from '../../constants';
 
 // Reverse lookup: status string -> group name
 const STATUS_TO_GROUP = new Map<string, string>();

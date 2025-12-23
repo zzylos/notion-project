@@ -1,10 +1,11 @@
 import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { List, Search } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { getStatusColors } from '../../utils/colors';
 
 const ListView: React.FC = () => {
-  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
+  const { getFilteredItems, setSelectedItem, selectedItemId, isLoading } = useStore();
   const items = getFilteredItems();
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -15,6 +16,27 @@ const ListView: React.FC = () => {
     estimateSize: () => 48, // Estimated row height
     overscan: 10, // Render extra items above/below viewport
   });
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <List className="w-8 h-8 text-blue-500 animate-pulse" />
+        <span className="ml-3 text-gray-600">Loading items...</span>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+        <Search className="w-12 h-12 mb-4 text-gray-300" />
+        <p className="text-lg font-medium">No items found</p>
+        <p className="text-sm">Try adjusting your filters or search query</p>
+      </div>
+    );
+  }
 
   return (
     <div ref={parentRef} className="h-full overflow-auto">
