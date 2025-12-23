@@ -26,7 +26,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
   // Calculate status category once to avoid duplicate calls
   const statusCategory = getStatusCategory(item.status);
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
     if (hasChildren) {
       toggleExpanded(item.id);
@@ -38,13 +38,36 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
     onNodeClick(item.id);
   };
 
+  // Keyboard navigation for accessibility
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        handleClick();
+        break;
+      case 'ArrowRight':
+        if (hasChildren && !isExpanded) {
+          e.preventDefault();
+          handleToggle(e);
+        }
+        break;
+      case 'ArrowLeft':
+        if (hasChildren && isExpanded) {
+          e.preventDefault();
+          handleToggle(e);
+        }
+        break;
+    }
+  };
+
   const statusStyle = getStatusColors(item.status);
   const typeStyle = typeColors[item.type];
   const isInProgress = statusCategory === 'in-progress';
   const isCompleted = statusCategory === 'completed';
 
   return (
-    <div className="select-none">
+    <div className="select-none" role="treeitem" aria-selected={isSelected} aria-level={level + 1}>
       {/* Node row */}
       <div
         className={`
@@ -52,9 +75,14 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
           transition-all duration-150 ease-out
           ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}
           ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
+          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
         `}
         style={{ marginLeft: `${indentPx}px` }}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-expanded={hasChildren ? isExpanded : undefined}
       >
         {/* Expand/collapse button */}
         <button

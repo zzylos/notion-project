@@ -95,8 +95,22 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       } else {
         await document.exitFullscreen();
       }
-    } catch {
-      // Fullscreen may not be available in some browsers/contexts
+    } catch (error: unknown) {
+      // Handle specific fullscreen errors
+      if (error instanceof Error) {
+        // SecurityError or NotAllowedError - fullscreen not permitted
+        if (error.name === 'SecurityError' || error.name === 'NotAllowedError') {
+          console.warn('[Canvas] Fullscreen not allowed:', error.message);
+          return;
+        }
+        // TypeError - fullscreen API not supported
+        if (error.name === 'TypeError') {
+          console.warn('[Canvas] Fullscreen API not supported');
+          return;
+        }
+        // Log unexpected errors for debugging
+        console.error('[Canvas] Unexpected fullscreen error:', error);
+      }
     }
   }, []);
 
