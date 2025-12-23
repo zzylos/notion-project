@@ -14,12 +14,14 @@ import {
 import type { Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStore } from '../../store/useStore';
+import { useItemLimit } from '../../hooks/useItemLimit';
 import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import { calculateLayout } from '../../utils/layoutCalculator';
 import CanvasNode from './CanvasNode';
 import CanvasLegend from './CanvasLegend';
 import CanvasControls from './CanvasControls';
+import ItemLimitBanner from '../ui/ItemLimitBanner';
 
 // Custom node types
 const nodeTypes = {
@@ -109,7 +111,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
 
   // Calculate which items are orphans and determine final filtered items
   // When focus mode is ON, include connected items even if they're outside filters
-  const { filteredItems, orphanCount } = useMemo(() => {
+  const { itemsAfterOrphanFilter, orphanCount } = useMemo(() => {
     // Start with filtered items
     let baseItems = allFilteredItems;
 
@@ -153,16 +155,19 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     if (hideOrphanItems && !focusMode) {
       const orphanIds = new Set(orphans.map(o => o.id));
       return {
-        filteredItems: baseItems.filter(item => !orphanIds.has(item.id)),
+        itemsAfterOrphanFilter: baseItems.filter(item => !orphanIds.has(item.id)),
         orphanCount: orphans.length,
       };
     }
 
     return {
-      filteredItems: baseItems,
+      itemsAfterOrphanFilter: baseItems,
       orphanCount: orphans.length,
     };
   }, [allFilteredItems, hideOrphanItems, focusMode, connectedItemIds, items]);
+
+  // Apply item limit for performance
+  const { limitedItems: filteredItems, totalCount, isLimited } = useItemLimit(itemsAfterOrphanFilter);
 
   // Handle fullscreen changes (including ESC key)
   useEffect(() => {
@@ -297,7 +302,13 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   }, []);
 
   return (
-    <div ref={containerRef} className="h-full w-full bg-gray-50">
+    <div ref={containerRef} className="h-full w-full bg-gray-50 flex flex-col">
+      {/* Item limit warning banner */}
+      {isLimited && (
+        <ItemLimitBanner totalItems={totalCount} displayedItems={filteredItems.length} />
+      )}
+
+      <div className="flex-1 relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -348,6 +359,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
           Drag nodes to reorganize • Scroll to zoom • Click nodes to select
         </Panel>
       </ReactFlow>
+      </div>
     </div>
   );
 };

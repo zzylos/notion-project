@@ -23,6 +23,7 @@ interface StoreState {
   expandedIds: Set<string>;
   viewMode: ViewMode;
   hideOrphanItems: boolean;
+  disableItemLimit: boolean;
 
   // Filters
   filters: FilterState;
@@ -49,6 +50,7 @@ interface StoreState {
 
   setViewMode: (mode: ViewMode) => void;
   setHideOrphanItems: (hide: boolean) => void;
+  setDisableItemLimit: (disable: boolean) => void;
   setFilters: (filters: Partial<FilterState>) => void;
   resetFilters: () => void;
 
@@ -84,6 +86,7 @@ export const useStore = create<StoreState>()(
       expandedIds: new Set(),
       viewMode: 'tree',
       hideOrphanItems: false,
+      disableItemLimit: false,
       filters: defaultFilters,
       isLoading: false,
       error: null,
@@ -160,6 +163,9 @@ export const useStore = create<StoreState>()(
 
       // Orphan filter (for canvas view)
       setHideOrphanItems: (hide: boolean) => set({ hideOrphanItems: hide }),
+
+      // Item limit toggle (for performance with large datasets)
+      setDisableItemLimit: (disable: boolean) => set({ disableItemLimit: disable }),
 
       // Filter actions
       setFilters: (filters: Partial<FilterState>) => {
@@ -445,6 +451,7 @@ export const useStore = create<StoreState>()(
         expandedIds: Array.from(state.expandedIds),
         viewMode: state.viewMode,
         hideOrphanItems: state.hideOrphanItems,
+        disableItemLimit: state.disableItemLimit,
         filters: state.filters,
         notionConfig: state.notionConfig,
       }),

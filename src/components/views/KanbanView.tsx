@@ -1,13 +1,18 @@
 import { useMemo, useState, useCallback, memo } from 'react';
 import { EyeOff, Eye } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useItemLimit } from '../../hooks/useItemLimit';
 import { getStatusColors, getUniqueStatuses } from '../../utils/colors';
 import EmptyState from '../ui/EmptyState';
 import LoadingState from '../ui/LoadingState';
+import ItemLimitBanner from '../ui/ItemLimitBanner';
 
 const KanbanView: React.FC = memo(() => {
   const { getFilteredItems, setSelectedItem, selectedItemId, items: allItems, isLoading } = useStore();
-  const filteredItems = getFilteredItems();
+  const allFilteredItems = getFilteredItems();
+
+  // Apply item limit for performance
+  const { limitedItems: filteredItems, totalCount, isLimited } = useItemLimit(allFilteredItems);
   const [hideEmptyColumns, setHideEmptyColumns] = useState(false);
 
   // Get unique statuses from all items, preserving order of first occurrence
@@ -53,7 +58,13 @@ const KanbanView: React.FC = memo(() => {
   }
 
   return (
-    <div className="h-full overflow-auto p-4" role="region" aria-label="Kanban board">
+    <div className="h-full flex flex-col" role="region" aria-label="Kanban board">
+      {/* Item limit warning banner */}
+      {isLimited && (
+        <ItemLimitBanner totalItems={totalCount} displayedItems={filteredItems.length} />
+      )}
+
+      <div className="flex-1 overflow-auto p-4">
       {/* Controls */}
       {emptyColumnCount > 0 && (
         <div className="mb-4 flex items-center gap-2">
@@ -151,6 +162,7 @@ const KanbanView: React.FC = memo(() => {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
