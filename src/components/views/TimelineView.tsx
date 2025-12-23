@@ -57,6 +57,15 @@ const TimelineView: React.FC = () => {
                   key={item.id}
                   className="flex items-start gap-4 pl-1 cursor-pointer"
                   onClick={() => setSelectedItem(item.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedItem(item.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${item.title}, due ${item.dueDate && formatDate(item.dueDate, 'medium')}${itemIsOverdue ? ', overdue' : ''}`}
                 >
                   <div className={`w-3 h-3 rounded-full mt-1.5 ${getStatusColors(item.status).dot} ring-4 ring-white z-10`} />
                   <div className={`flex-1 bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow ${

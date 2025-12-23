@@ -86,26 +86,23 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
         aria-expanded={hasChildren ? isExpanded : undefined}
       >
         {/* Expand/collapse button */}
-        <button
-          onClick={handleToggle}
-          aria-label={hasChildren ? (isExpanded ? 'Collapse' : 'Expand') : undefined}
-          aria-expanded={hasChildren ? isExpanded : undefined}
-          className={`
-            flex items-center justify-center w-5 h-5 rounded
-            transition-colors duration-150
-            ${hasChildren ? 'hover:bg-gray-200 text-gray-500' : 'text-transparent cursor-default'}
-          `}
-        >
-          {hasChildren ? (
-            isExpanded ? (
+        {hasChildren ? (
+          <button
+            onClick={handleToggle}
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+            aria-expanded={isExpanded}
+            className="flex items-center justify-center w-5 h-5 rounded transition-colors duration-150 hover:bg-gray-200 text-gray-500"
+          >
+            {isExpanded ? (
               <ChevronDown className="w-4 h-4" />
             ) : (
               <ChevronRight className="w-4 h-4" />
-            )
-          ) : (
-            <span className="w-4 h-4" />
-          )}
-        </button>
+            )}
+          </button>
+        ) : (
+          // Spacer for leaf nodes - hidden from screen readers
+          <span className="w-5 h-5" aria-hidden="true" />
+        )}
 
         {/* Status indicator dot */}
         <div

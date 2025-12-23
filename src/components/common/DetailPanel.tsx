@@ -309,8 +309,13 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
               className="flex items-center gap-2 w-full p-2 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
             >
               {(() => {
-                const ParentIcon = typeIcons[parent.type as ItemType];
-                const parentStyle = typeColors[parent.type as ItemType];
+                // Validate parent.type is a valid ItemType before using
+                const validTypes: ItemType[] = ['mission', 'problem', 'solution', 'design', 'project'];
+                const isValidType = validTypes.includes(parent.type as ItemType);
+                if (!isValidType) return null;
+
+                const ParentIcon = typeIcons[parent.type];
+                const parentStyle = typeColors[parent.type];
                 return ParentIcon ? (
                   <ParentIcon className={`w-4 h-4 ${parentStyle?.icon || ''}`} />
                 ) : null;
