@@ -65,4 +65,6 @@ const StatusBadge: React.FC<StatusBadgeProps> = memo(({
   );
 });
 
+StatusBadge.displayName = 'StatusBadge';
+
 export default StatusBadge;

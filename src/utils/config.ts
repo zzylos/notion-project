@@ -1,4 +1,5 @@
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../types';
+import { DEFAULT_PROPERTY_MAPPINGS } from '../constants';
 
 /**
  * Configuration loader that supports:
@@ -105,4 +106,67 @@ export function getMergedConfig(storedConfig: NotionConfig | null): NotionConfig
   }
 
   return storedConfig;
+}
+
+/**
+ * Migrated config format for UI display.
+ * Converts between the internal NotionConfig format and UI-friendly format.
+ */
+export interface MigratedConfig {
+  apiKey: string;
+  databases: Record<ItemType, string>;
+  mappings: PropertyMappings;
+}
+
+/**
+ * Convert legacy or current NotionConfig to a UI-friendly format.
+ * Handles both old single-database format and new multi-database format.
+ *
+ * @param config - The NotionConfig to migrate (or null for defaults)
+ * @returns A UI-friendly format with separate fields for each database type
+ */
+export function migrateConfig(config: NotionConfig | null): MigratedConfig {
+  const databases: Record<ItemType, string> = {
+    mission: '',
+    problem: '',
+    solution: '',
+    project: '',
+    design: '',
+  };
+
+  if (!config) {
+    return { apiKey: '', databases, mappings: { ...DEFAULT_PROPERTY_MAPPINGS } };
+  }
+
+  // If we have the new format
+  if (config.databases && config.databases.length > 0) {
+    config.databases.forEach(db => {
+      databases[db.type] = db.databaseId;
+    });
+    return {
+      apiKey: config.apiKey,
+      databases,
+      mappings: config.defaultMappings || { ...DEFAULT_PROPERTY_MAPPINGS },
+    };
+  }
+
+  // Legacy format - put the single database ID in project
+  if (config.databaseId) {
+    databases.project = config.databaseId;
+  }
+
+  return {
+    apiKey: config.apiKey,
+    databases,
+    mappings: config.mappings ? {
+      title: config.mappings.title,
+      status: config.mappings.status,
+      priority: config.mappings.priority,
+      owner: config.mappings.owner,
+      parent: config.mappings.parent,
+      progress: config.mappings.progress,
+      dueDate: config.mappings.dueDate,
+      tags: config.mappings.tags,
+    } : { ...DEFAULT_PROPERTY_MAPPINGS },
+  };
 }

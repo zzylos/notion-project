@@ -1,14 +1,16 @@
-import { useMemo, useCallback } from 'react';
-import { Maximize2, Minimize2, RefreshCw, Search } from 'lucide-react';
+import { useMemo, useCallback, memo } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import TreeNode from './TreeNode';
 import { useStore } from '../../store/useStore';
 import type { TreeNode as TreeNodeType } from '../../types';
+import EmptyState from '../ui/EmptyState';
+import LoadingState from '../ui/LoadingState';
 
 interface TreeViewProps {
   onNodeSelect?: (id: string) => void;
 }
 
-const TreeView: React.FC<TreeViewProps> = ({ onNodeSelect }) => {
+const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   const {
     getTreeNodes,
     expandAll,
@@ -50,21 +52,17 @@ const TreeView: React.FC<TreeViewProps> = ({ onNodeSelect }) => {
   const isAllExpanded = expandableIds.length > 0 && expandableIds.every(id => expandedIds.has(id));
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-        <span className="ml-3 text-gray-600">Loading opportunity tree...</span>
-      </div>
-    );
+    return <LoadingState message="Loading opportunity tree..." size="lg" className="h-64" />;
   }
 
   if (treeNodes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-        <Search className="w-12 h-12 mb-4 text-gray-300" />
-        <p className="text-lg font-medium">No items found</p>
-        <p className="text-sm">Try adjusting your filters or search query</p>
-      </div>
+      <EmptyState
+        variant="filter"
+        title="No items found"
+        description="Try adjusting your filters or search query"
+        className="h-64"
+      />
     );
   }
 
@@ -107,6 +105,8 @@ const TreeView: React.FC<TreeViewProps> = ({ onNodeSelect }) => {
       </div>
     </div>
   );
-};
+});
+
+TreeView.displayName = 'TreeView';
 
 export default TreeView;

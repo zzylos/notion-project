@@ -1,21 +1,24 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { useStore } from './store/useStore';
 import Header from './components/common/Header';
 import FilterPanel from './components/filters/FilterPanel';
 import StatsOverview from './components/common/StatsOverview';
 import TreeView from './components/tree/TreeView';
-import CanvasView from './components/canvas/CanvasView';
-import KanbanView from './components/views/KanbanView';
-import ListView from './components/views/ListView';
-import TimelineView from './components/views/TimelineView';
 import DetailPanel from './components/common/DetailPanel';
 import NotionConfigModal from './components/common/NotionConfigModal';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import LoadingState from './components/ui/LoadingState';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
 import { getMergedConfig, hasEnvConfig } from './utils/config';
 import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp, AlertTriangle, X, FileCode } from 'lucide-react';
 import type { NotionConfig } from './types';
+
+// Lazy load heavy view components for better initial load performance
+const CanvasView = lazy(() => import('./components/canvas/CanvasView'));
+const KanbanView = lazy(() => import('./components/views/KanbanView'));
+const ListView = lazy(() => import('./components/views/ListView'));
+const TimelineView = lazy(() => import('./components/views/TimelineView'));
 
 function App() {
   const {
@@ -162,18 +165,38 @@ function App() {
   };
 
   // Render the appropriate view based on viewMode
+  // Lazy loaded views are wrapped in Suspense with a loading fallback
   const renderMainView = () => {
+    const lazyFallback = <LoadingState message="Loading view..." size="lg" className="h-64" />;
+
     switch (viewMode) {
       case 'canvas':
-        return <CanvasView onNodeSelect={() => setShowDetailPanel(true)} />;
+        return (
+          <Suspense fallback={lazyFallback}>
+            <CanvasView onNodeSelect={() => setShowDetailPanel(true)} />
+          </Suspense>
+        );
       case 'kanban':
-        return <KanbanView />;
+        return (
+          <Suspense fallback={lazyFallback}>
+            <KanbanView />
+          </Suspense>
+        );
       case 'list':
-        return <ListView />;
+        return (
+          <Suspense fallback={lazyFallback}>
+            <ListView />
+          </Suspense>
+        );
       case 'timeline':
-        return <TimelineView />;
+        return (
+          <Suspense fallback={lazyFallback}>
+            <TimelineView />
+          </Suspense>
+        );
       case 'tree':
       default:
+        // TreeView is not lazy loaded as it's the default view
         return <TreeView onNodeSelect={() => setShowDetailPanel(true)} />;
     }
   };

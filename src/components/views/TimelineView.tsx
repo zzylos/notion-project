@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { Calendar } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { getStatusColors } from '../../utils/colors';
 import { parseDate, isOverdue, formatDate } from '../../utils/dateUtils';
+import EmptyState from '../ui/EmptyState';
+import LoadingState from '../ui/LoadingState';
 
-const TimelineView: React.FC = () => {
+const TimelineView: React.FC = memo(() => {
   const { getFilteredItems, setSelectedItem, selectedItemId, isLoading } = useStore();
 
   // Memoize filtered and sorted items to avoid recreation on every render
@@ -25,12 +27,7 @@ const TimelineView: React.FC = () => {
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Calendar className="w-8 h-8 text-blue-500 animate-pulse" />
-        <span className="ml-3 text-gray-600">Loading timeline...</span>
-      </div>
-    );
+    return <LoadingState message="Loading timeline..." size="lg" className="h-64" />;
   }
 
   return (
@@ -40,10 +37,12 @@ const TimelineView: React.FC = () => {
         <span className="text-sm">Timeline View - Items with due dates</span>
       </div>
       {sortedItems.length === 0 ? (
-        <div className="text-center text-gray-500 py-12">
-          <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-          <p>No items with due dates found</p>
-        </div>
+        <EmptyState
+          title="No items with due dates"
+          description="Items need a due date to appear in the timeline"
+          icon={<Calendar className="w-12 h-12" />}
+          className="py-8"
+        />
       ) : (
         <div className="relative">
           {/* Timeline line */}
@@ -91,6 +90,8 @@ const TimelineView: React.FC = () => {
       )}
     </div>
   );
-};
+});
+
+TimelineView.displayName = 'TimelineView';
 
 export default TimelineView;

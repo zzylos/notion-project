@@ -1,9 +1,11 @@
-import { useMemo, useState, useCallback } from 'react';
-import { Search, EyeOff, Eye, Columns } from 'lucide-react';
+import { useMemo, useState, useCallback, memo } from 'react';
+import { EyeOff, Eye } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { getStatusColors, getUniqueStatuses } from '../../utils/colors';
+import EmptyState from '../ui/EmptyState';
+import LoadingState from '../ui/LoadingState';
 
-const KanbanView: React.FC = () => {
+const KanbanView: React.FC = memo(() => {
   const { getFilteredItems, setSelectedItem, selectedItemId, items: allItems, isLoading } = useStore();
   const filteredItems = getFilteredItems();
   const [hideEmptyColumns, setHideEmptyColumns] = useState(false);
@@ -35,22 +37,18 @@ const KanbanView: React.FC = () => {
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Columns className="w-8 h-8 text-blue-500 animate-pulse" />
-        <span className="ml-3 text-gray-600">Loading board...</span>
-      </div>
-    );
+    return <LoadingState message="Loading board..." size="lg" className="h-64" />;
   }
 
   // Empty state
   if (filteredItems.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-        <Search className="w-12 h-12 mb-4 text-gray-300" />
-        <p className="text-lg font-medium">No items found</p>
-        <p className="text-sm">Try adjusting your filters or search query</p>
-      </div>
+      <EmptyState
+        variant="filter"
+        title="No items found"
+        description="Try adjusting your filters or search query"
+        className="h-64"
+      />
     );
   }
 
@@ -156,6 +154,8 @@ const KanbanView: React.FC = () => {
       </div>
     </div>
   );
-};
+});
+
+KanbanView.displayName = 'KanbanView';
 
 export default KanbanView;
