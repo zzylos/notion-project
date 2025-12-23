@@ -12,6 +12,16 @@ import { useStore } from '../../store/useStore';
 import { TREE } from '../../constants';
 import { isOverdue, formatDate } from '../../utils/dateUtils';
 
+// Validate that a URL is a valid Notion URL
+const isValidNotionUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'notion.so' || parsed.hostname.endsWith('.notion.so');
+  } catch {
+    return false;
+  }
+};
+
 interface TreeNodeProps {
   node: TreeNodeType;
   onNodeClick: (id: string) => void;
@@ -175,8 +185,8 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
           </div>
         )}
 
-        {/* External link to Notion */}
-        {item.notionUrl && (
+        {/* External link to Notion - only show for valid Notion URLs */}
+        {item.notionUrl && isValidNotionUrl(item.notionUrl) && (
           <a
             href={item.notionUrl}
             target="_blank"

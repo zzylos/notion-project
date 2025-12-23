@@ -38,6 +38,8 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const [failedDatabases, setFailedDatabases] = useState<Array<{ type: string; error: string }> | null>(null);
+  // Counter to force modal remount when opening (resets form state)
+  const [modalKey, setModalKey] = useState(0);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -207,7 +209,10 @@ function App() {
       <div className="sticky top-0 z-20 bg-gray-50">
         {/* Header */}
         <Header
-          onOpenSettings={() => setShowSettings(true)}
+          onOpenSettings={() => {
+            setModalKey(k => k + 1); // Force modal remount to reset form state
+            setShowSettings(true);
+          }}
           onRefresh={handleRefresh}
           isRefreshing={isRefreshing || isLoading}
         />
@@ -346,8 +351,9 @@ function App() {
         </div>
       </div>
 
-      {/* Notion Config Modal */}
+      {/* Notion Config Modal - key forces remount to reset form state when opening */}
       <NotionConfigModal
+        key={modalKey}
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         onConnect={handleConnect}

@@ -124,7 +124,11 @@ const KanbanView: React.FC = memo(() => {
                 aria-labelledby={columnId}
               >
                 {statusItems.length === 0 ? (
-                  <div className="text-center text-gray-400 text-sm py-4">
+                  <div
+                    className="text-center text-gray-400 text-sm py-4"
+                    role="status"
+                    aria-label={`${status} column is empty`}
+                  >
                     No items
                   </div>
                 ) : (
