@@ -93,15 +93,14 @@ export interface WorkItem {
   tags?: string[];
   /**
    * IDs of work items this depends on.
-   * @deprecated Reserved for future dependency tracking feature.
-   * Not currently populated or used in the UI.
+   * Reserved for future dependency tracking feature.
+   * Not currently populated from Notion.
    */
   dependencies?: string[];
   /**
    * IDs of work items blocking this one.
-   * @deprecated Reserved for future blocker visualization feature.
-   * Not currently populated from Notion or used in the UI.
-   * Consider removing if not planned for implementation.
+   * Used by Canvas view's focus mode to show connected blockers.
+   * Not currently populated from Notion - reserved for future blocker relations.
    */
   blockedBy?: string[];
 }

@@ -2,66 +2,17 @@ import React, { useState } from 'react';
 import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../../types';
-import { DEFAULT_PROPERTY_MAPPINGS } from '../../constants';
 import ApiKeySection from './modal/ApiKeySection';
 import DatabaseConfigSection from './modal/DatabaseConfigSection';
 import PropertyMappingsSection from './modal/PropertyMappingsSection';
 import { isValidDatabaseId } from '../../utils/validation';
+import { migrateConfig } from '../../utils/config';
+import { DEFAULT_PROPERTY_MAPPINGS } from '../../constants';
 
 interface NotionConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConnect: () => void;
-}
-
-// Use centralized default property mappings
-const defaultMappings: PropertyMappings = { ...DEFAULT_PROPERTY_MAPPINGS };
-
-// Helper to convert legacy config to new format
-function migrateConfig(config: NotionConfig | null): { apiKey: string; databases: Record<ItemType, string>; mappings: PropertyMappings } {
-  const databases: Record<ItemType, string> = {
-    mission: '',
-    problem: '',
-    solution: '',
-    project: '',
-    design: '',
-  };
-
-  if (!config) {
-    return { apiKey: '', databases, mappings: defaultMappings };
-  }
-
-  // If we have the new format
-  if (config.databases && config.databases.length > 0) {
-    config.databases.forEach(db => {
-      databases[db.type] = db.databaseId;
-    });
-    return {
-      apiKey: config.apiKey,
-      databases,
-      mappings: config.defaultMappings || defaultMappings,
-    };
-  }
-
-  // Legacy format - put the single database ID in project
-  if (config.databaseId) {
-    databases.project = config.databaseId;
-  }
-
-  return {
-    apiKey: config.apiKey,
-    databases,
-    mappings: config.mappings ? {
-      title: config.mappings.title,
-      status: config.mappings.status,
-      priority: config.mappings.priority,
-      owner: config.mappings.owner,
-      parent: config.mappings.parent,
-      progress: config.mappings.progress,
-      dueDate: config.mappings.dueDate,
-      tags: config.mappings.tags,
-    } : defaultMappings,
-  };
 }
 
 const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, onConnect }) => {
@@ -152,7 +103,7 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
       project: '',
       design: '',
     });
-    setMappings(defaultMappings);
+    setMappings({ ...DEFAULT_PROPERTY_MAPPINGS });
     onConnect();
     onClose();
   };

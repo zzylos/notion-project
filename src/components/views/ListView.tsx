@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useRef, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { List, Search } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { getStatusColors } from '../../utils/colors';
+import EmptyState from '../ui/EmptyState';
+import LoadingState from '../ui/LoadingState';
 
-const ListView: React.FC = () => {
+const ListView: React.FC = memo(() => {
   const { getFilteredItems, setSelectedItem, selectedItemId, isLoading } = useStore();
   const items = getFilteredItems();
   const parentRef = useRef<HTMLDivElement>(null);
@@ -19,22 +20,18 @@ const ListView: React.FC = () => {
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <List className="w-8 h-8 text-blue-500 animate-pulse" />
-        <span className="ml-3 text-gray-600">Loading items...</span>
-      </div>
-    );
+    return <LoadingState message="Loading items..." size="lg" className="h-64" />;
   }
 
   // Empty state
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-        <Search className="w-12 h-12 mb-4 text-gray-300" />
-        <p className="text-lg font-medium">No items found</p>
-        <p className="text-sm">Try adjusting your filters or search query</p>
-      </div>
+      <EmptyState
+        variant="filter"
+        title="No items found"
+        description="Try adjusting your filters or search query"
+        className="h-64"
+      />
     );
   }
 
@@ -123,6 +120,8 @@ const ListView: React.FC = () => {
       )}
     </div>
   );
-};
+});
+
+ListView.displayName = 'ListView';
 
 export default ListView;
