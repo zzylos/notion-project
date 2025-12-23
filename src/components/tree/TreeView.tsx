@@ -2,9 +2,11 @@ import { useMemo, useCallback, memo } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import TreeNode from './TreeNode';
 import { useStore } from '../../store/useStore';
+import { VIEW_LIMITS } from '../../constants';
 import type { TreeNode as TreeNodeType } from '../../types';
 import EmptyState from '../ui/EmptyState';
 import LoadingState from '../ui/LoadingState';
+import ItemLimitBanner from '../ui/ItemLimitBanner';
 
 interface TreeViewProps {
   onNodeSelect?: (id: string) => void;
@@ -13,13 +15,61 @@ interface TreeViewProps {
 const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   const {
     getTreeNodes,
+    getFilteredItems,
     expandAll,
     collapseAll,
     expandedIds,
     isLoading,
+    disableItemLimit,
   } = useStore();
 
-  const treeNodes = useMemo(() => getTreeNodes(), [getTreeNodes]);
+  // Get full tree for display
+  const allTreeNodes = useMemo(() => getTreeNodes(), [getTreeNodes]);
+
+  // Get total item count for limit check
+  const totalFilteredCount = useMemo(() => getFilteredItems().length, [getFilteredItems]);
+
+  // Determine if we should limit and how many root nodes to show
+  const { treeNodes, isLimited, displayedCount } = useMemo(() => {
+    const shouldLimit = !disableItemLimit && totalFilteredCount > VIEW_LIMITS.ITEM_LIMIT;
+
+    if (!shouldLimit) {
+      return {
+        treeNodes: allTreeNodes,
+        isLimited: false,
+        displayedCount: totalFilteredCount,
+      };
+    }
+
+    // Limit by counting nodes and stopping when we reach the limit
+    let count = 0;
+    const limitedNodes: TreeNodeType[] = [];
+
+    const countNodesInTree = (node: TreeNodeType): number => {
+      return 1 + node.children.reduce((acc, child) => acc + countNodesInTree(child), 0);
+    };
+
+    for (const node of allTreeNodes) {
+      const nodeCount = countNodesInTree(node);
+      if (count + nodeCount <= VIEW_LIMITS.ITEM_LIMIT) {
+        limitedNodes.push(node);
+        count += nodeCount;
+      } else if (count < VIEW_LIMITS.ITEM_LIMIT) {
+        // Add partial tree (just this node without children to stay under limit)
+        limitedNodes.push({ ...node, children: [] });
+        count += 1;
+        break;
+      } else {
+        break;
+      }
+    }
+
+    return {
+      treeNodes: limitedNodes,
+      isLimited: true,
+      displayedCount: count,
+    };
+  }, [allTreeNodes, totalFilteredCount, disableItemLimit]);
 
   // Memoize handleNodeClick to prevent TreeNode re-renders
   const handleNodeClick = useCallback((id: string) => {
@@ -32,6 +82,9 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
     };
     return countNodes(treeNodes);
   }, [treeNodes]);
+
+  // For display, use displayedCount when limited, otherwise totalNodes
+  const displayCount = isLimited ? displayedCount : totalNodes;
 
   // Collect IDs of expandable items (items with children) in the current tree view
   const expandableIds = useMemo(() => {
@@ -68,10 +121,15 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Item limit warning banner */}
+      {isLimited && (
+        <ItemLimitBanner totalItems={totalFilteredCount} displayedItems={displayCount} />
+      )}
+
       {/* Tree header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="font-medium">{totalNodes}</span>
+          <span className="font-medium">{displayCount}</span>
           <span>items in tree</span>
         </div>
         <div className="flex items-center gap-2">

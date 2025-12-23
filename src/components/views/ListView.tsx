@@ -1,13 +1,18 @@
 import { useRef, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useStore } from '../../store/useStore';
+import { useItemLimit } from '../../hooks/useItemLimit';
 import { getStatusColors } from '../../utils/colors';
 import EmptyState from '../ui/EmptyState';
 import LoadingState from '../ui/LoadingState';
+import ItemLimitBanner from '../ui/ItemLimitBanner';
 
 const ListView: React.FC = memo(() => {
   const { getFilteredItems, setSelectedItem, selectedItemId, isLoading } = useStore();
-  const items = getFilteredItems();
+  const allItems = getFilteredItems();
+
+  // Apply item limit for performance (even though virtualization helps, limit still reduces memory)
+  const { limitedItems: items, totalCount, isLimited } = useItemLimit(allItems);
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Virtualize rows for large datasets
@@ -36,7 +41,13 @@ const ListView: React.FC = memo(() => {
   }
 
   return (
-    <div ref={parentRef} className="h-full overflow-auto">
+    <div className="h-full flex flex-col">
+      {/* Item limit warning banner */}
+      {isLimited && (
+        <ItemLimitBanner totalItems={totalCount} displayedItems={items.length} />
+      )}
+
+      <div ref={parentRef} className="flex-1 overflow-auto">
       {/* Fixed header */}
       <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
         <div className="grid grid-cols-[48px_1fr_100px_80px_120px_120px] px-4 py-3">
@@ -118,6 +129,7 @@ const ListView: React.FC = memo(() => {
           Showing {items.length} items (virtualized for performance)
         </div>
       )}
+      </div>
     </div>
   );
 });

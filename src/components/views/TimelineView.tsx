@@ -1,16 +1,18 @@
 import { useMemo, memo } from 'react';
 import { Calendar } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useItemLimit } from '../../hooks/useItemLimit';
 import { getStatusColors } from '../../utils/colors';
 import { parseDate, isOverdue, formatDate } from '../../utils/dateUtils';
 import EmptyState from '../ui/EmptyState';
 import LoadingState from '../ui/LoadingState';
+import ItemLimitBanner from '../ui/ItemLimitBanner';
 
 const TimelineView: React.FC = memo(() => {
   const { getFilteredItems, setSelectedItem, selectedItemId, isLoading } = useStore();
 
   // Memoize filtered and sorted items to avoid recreation on every render
-  const sortedItems = useMemo(() => {
+  const allSortedItems = useMemo(() => {
     const items = getFilteredItems().filter((item) => {
       if (!item.dueDate) return false;
       // Validate date format
@@ -25,13 +27,22 @@ const TimelineView: React.FC = memo(() => {
     });
   }, [getFilteredItems]);
 
+  // Apply item limit for performance
+  const { limitedItems: sortedItems, totalCount, isLimited } = useItemLimit(allSortedItems);
+
   // Loading state
   if (isLoading) {
     return <LoadingState message="Loading timeline..." size="lg" className="h-64" />;
   }
 
   return (
-    <div className="h-full overflow-auto p-4">
+    <div className="h-full flex flex-col">
+      {/* Item limit warning banner */}
+      {isLimited && (
+        <ItemLimitBanner totalItems={totalCount} displayedItems={sortedItems.length} />
+      )}
+
+      <div className="flex-1 overflow-auto p-4">
       <div className="flex items-center gap-2 mb-4 text-gray-500">
         <Calendar className="w-5 h-5" />
         <span className="text-sm">Timeline View - Items with due dates</span>
@@ -88,6 +99,7 @@ const TimelineView: React.FC = memo(() => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 });

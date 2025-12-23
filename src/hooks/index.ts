@@ -8,3 +8,4 @@
 export { useTimeout } from './useTimeout';
 export { useFetch } from './useFetch';
 export { useLocalStorage } from './useLocalStorage';
+export { useItemLimit } from './useItemLimit';

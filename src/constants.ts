@@ -25,6 +25,14 @@ export const TREE = {
 } as const;
 
 /**
+ * View rendering limits for performance
+ */
+export const VIEW_LIMITS = {
+  /** Maximum items to render before showing a warning and limiting */
+  ITEM_LIMIT: 500,
+} as const;
+
+/**
  * Notion API constants
  */
 export const NOTION = {
