@@ -31,18 +31,23 @@ const TreeView: React.FC<TreeViewProps> = ({ onNodeSelect }) => {
     return countNodes(treeNodes);
   }, [treeNodes]);
 
-  // Count items that have children (expandable items) in the current tree view
-  const expandableCount = useMemo(() => {
-    const countExpandable = (nodes: TreeNodeType[]): number => {
-      return nodes.reduce((acc, node) => {
-        const hasChildren = node.children.length > 0;
-        return acc + (hasChildren ? 1 : 0) + countExpandable(node.children);
-      }, 0);
+  // Collect IDs of expandable items (items with children) in the current tree view
+  const expandableIds = useMemo(() => {
+    const ids: string[] = [];
+    const collectExpandable = (nodes: TreeNodeType[]): void => {
+      nodes.forEach(node => {
+        if (node.children.length > 0) {
+          ids.push(node.item.id);
+          collectExpandable(node.children);
+        }
+      });
     };
-    return countExpandable(treeNodes);
+    collectExpandable(treeNodes);
+    return ids;
   }, [treeNodes]);
 
-  const isAllExpanded = expandableCount > 0 && expandedIds.size >= expandableCount;
+  // Check if all expandable items are actually expanded
+  const isAllExpanded = expandableIds.length > 0 && expandableIds.every(id => expandedIds.has(id));
 
   if (isLoading) {
     return (
