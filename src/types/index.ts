@@ -121,6 +121,11 @@ export interface TreeNode {
 }
 
 /**
+ * Filter mode - whether filters show or hide matching items
+ */
+export type FilterMode = 'show' | 'hide';
+
+/**
  * Filter state for filtering work items.
  * Multiple filters are combined with AND logic.
  */
@@ -137,6 +142,8 @@ export interface FilterState {
   searchQuery: string;
   /** Show only items owned by the current user */
   showOnlyMyItems: boolean;
+  /** Filter mode: 'show' keeps matching items, 'hide' removes matching items */
+  filterMode: FilterMode;
   /** Optional date range filter */
   dateRange?: {
     start: string;

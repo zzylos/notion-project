@@ -1,5 +1,5 @@
 import { Panel } from '@xyflow/react';
-import { RotateCcw, Maximize, Minimize, Eye, EyeOff } from 'lucide-react';
+import { RotateCcw, Maximize, Minimize, Eye, EyeOff, Focus } from 'lucide-react';
 
 interface CanvasControlsProps {
   /** Called when the user clicks the reset layout button */
@@ -14,11 +14,17 @@ interface CanvasControlsProps {
   onToggleOrphanItems: () => void;
   /** Count of orphan items being hidden */
   orphanCount: number;
+  /** Whether focus mode is enabled (show only connected items) */
+  focusMode: boolean;
+  /** Called when the user toggles focus mode */
+  onToggleFocusMode: () => void;
+  /** Whether an item is currently selected */
+  hasSelection: boolean;
 }
 
 /**
  * CanvasControls provides action buttons for the canvas view,
- * including layout reset, fullscreen toggle, and orphan item filtering.
+ * including layout reset, fullscreen toggle, orphan filtering, and focus mode.
  */
 const CanvasControls: React.FC<CanvasControlsProps> = ({
   onResetLayout,
@@ -27,9 +33,36 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
   hideOrphanItems,
   onToggleOrphanItems,
   orphanCount,
+  focusMode,
+  onToggleFocusMode,
+  hasSelection,
 }) => {
   return (
     <Panel position="top-right" className="flex gap-2">
+      {/* Focus mode toggle - highlight connected items */}
+      <button
+        onClick={onToggleFocusMode}
+        disabled={!hasSelection}
+        className={`
+          flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-sm transition-colors
+          ${!hasSelection
+            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+            : focusMode
+              ? 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200'
+              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}
+        `}
+        title={!hasSelection
+          ? 'Select an item to enable focus mode'
+          : focusMode
+            ? 'Disable focus mode'
+            : 'Focus mode: Highlight connected items (parent, children, siblings)'}
+        aria-label={focusMode ? 'Disable focus mode' : 'Enable focus mode'}
+        aria-pressed={focusMode}
+      >
+        <Focus size={16} />
+        {focusMode ? 'Focus On' : 'Focus'}
+      </button>
+
       {/* Orphan items toggle */}
       <button
         onClick={onToggleOrphanItems}

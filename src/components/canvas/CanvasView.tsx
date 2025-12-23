@@ -32,12 +32,13 @@ interface CanvasViewProps {
 
 // Inner component that uses React Flow hooks
 const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
-  const { getFilteredItems, setSelectedItem, selectedItemId, hideOrphanItems, setHideOrphanItems } = useStore();
+  const { getFilteredItems, setSelectedItem, selectedItemId, hideOrphanItems, setHideOrphanItems, items } = useStore();
   const allFilteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const fitViewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   // Calculate which items are orphans (no parent and no children in the filtered set)
   const { filteredItems, orphanCount } = useMemo(() => {
@@ -75,6 +76,53 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const handleToggleOrphanItems = useCallback(() => {
     setHideOrphanItems(!hideOrphanItems);
   }, [hideOrphanItems, setHideOrphanItems]);
+
+  const handleToggleFocusMode = useCallback(() => {
+    setFocusMode(prev => !prev);
+  }, []);
+
+  // Calculate connected items for the selected item (when focus mode is on)
+  const connectedItemIds = useMemo(() => {
+    if (!focusMode || !selectedItemId) return null;
+
+    const selectedItem = items.get(selectedItemId);
+    if (!selectedItem) return null;
+
+    const connected = new Set<string>([selectedItemId]);
+
+    // Add parent
+    if (selectedItem.parentId) {
+      connected.add(selectedItem.parentId);
+    }
+
+    // Add children
+    if (selectedItem.children) {
+      selectedItem.children.forEach(childId => connected.add(childId));
+    }
+
+    // Add blocked by items
+    if (selectedItem.blockedBy) {
+      selectedItem.blockedBy.forEach(blockerId => connected.add(blockerId));
+    }
+
+    // Find items that this item blocks (reverse lookup)
+    for (const item of items.values()) {
+      if (item.blockedBy?.includes(selectedItemId)) {
+        connected.add(item.id);
+      }
+    }
+
+    // Find siblings (items with same parent)
+    if (selectedItem.parentId) {
+      for (const item of items.values()) {
+        if (item.parentId === selectedItem.parentId) {
+          connected.add(item.id);
+        }
+      }
+    }
+
+    return connected;
+  }, [focusMode, selectedItemId, items]);
 
   // Handle fullscreen changes (including ESC key)
   useEffect(() => {
@@ -150,20 +198,26 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, filteredItems, selectedItemId]);
 
-  // Update node selection state without resetting positions
+  // Update node selection and connection state without resetting positions
   // Note: setNodes is stable from React Flow hooks, so not included in deps
   useEffect(() => {
     setNodes(currentNodes =>
-      currentNodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          isSelected: node.id === selectedItemId,
-        },
-      }))
+      currentNodes.map(node => {
+        const isConnected = connectedItemIds ? connectedItemIds.has(node.id) : true;
+        const isDimmed = focusMode && selectedItemId && !isConnected;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isSelected: node.id === selectedItemId,
+            isConnected,
+            isDimmed,
+          },
+        };
+      })
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItemId]);
+  }, [selectedItemId, connectedItemIds, focusMode]);
 
   // Reset layout to original positions
   // Note: setNodes/setEdges are stable from React Flow hooks
@@ -244,6 +298,9 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
           hideOrphanItems={hideOrphanItems}
           onToggleOrphanItems={handleToggleOrphanItems}
           orphanCount={orphanCount}
+          focusMode={focusMode}
+          onToggleFocusMode={handleToggleFocusMode}
+          hasSelection={!!selectedItemId}
         />
 
         {/* Instructions */}
