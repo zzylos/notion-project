@@ -1,5 +1,5 @@
 import { Panel } from '@xyflow/react';
-import { RotateCcw, Maximize, Minimize } from 'lucide-react';
+import { RotateCcw, Maximize, Minimize, Eye, EyeOff } from 'lucide-react';
 
 interface CanvasControlsProps {
   /** Called when the user clicks the reset layout button */
@@ -8,19 +8,45 @@ interface CanvasControlsProps {
   onToggleFullscreen: () => void;
   /** Whether the canvas is currently in fullscreen mode */
   isFullscreen: boolean;
+  /** Whether orphan items (no parent, no children) are hidden */
+  hideOrphanItems: boolean;
+  /** Called when the user toggles orphan visibility */
+  onToggleOrphanItems: () => void;
+  /** Count of orphan items being hidden */
+  orphanCount: number;
 }
 
 /**
  * CanvasControls provides action buttons for the canvas view,
- * including layout reset and fullscreen toggle functionality.
+ * including layout reset, fullscreen toggle, and orphan item filtering.
  */
 const CanvasControls: React.FC<CanvasControlsProps> = ({
   onResetLayout,
   onToggleFullscreen,
   isFullscreen,
+  hideOrphanItems,
+  onToggleOrphanItems,
+  orphanCount,
 }) => {
   return (
     <Panel position="top-right" className="flex gap-2">
+      {/* Orphan items toggle */}
+      <button
+        onClick={onToggleOrphanItems}
+        className={`
+          flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-sm transition-colors
+          ${hideOrphanItems
+            ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}
+        `}
+        title={hideOrphanItems ? 'Show orphan items' : 'Hide orphan items (items with no connections)'}
+        aria-label={hideOrphanItems ? 'Show orphan items' : 'Hide orphan items'}
+        aria-pressed={hideOrphanItems}
+      >
+        {hideOrphanItems ? <EyeOff size={16} /> : <Eye size={16} />}
+        {hideOrphanItems ? `Hidden: ${orphanCount}` : 'Hide Orphans'}
+      </button>
+
       <button
         onClick={onResetLayout}
         className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

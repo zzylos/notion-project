@@ -32,12 +32,49 @@ interface CanvasViewProps {
 
 // Inner component that uses React Flow hooks
 const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
-  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
-  const filteredItems = getFilteredItems();
+  const { getFilteredItems, setSelectedItem, selectedItemId, hideOrphanItems, setHideOrphanItems } = useStore();
+  const allFilteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const fitViewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Calculate which items are orphans (no parent and no children in the filtered set)
+  const { filteredItems, orphanCount } = useMemo(() => {
+    const itemIds = new Set(allFilteredItems.map(i => i.id));
+    const itemsWithChildren = new Set<string>();
+
+    // Find all items that have children
+    for (const item of allFilteredItems) {
+      if (item.parentId && itemIds.has(item.parentId)) {
+        itemsWithChildren.add(item.parentId);
+      }
+    }
+
+    // An orphan is an item with no parent (in set) AND no children
+    const orphans = allFilteredItems.filter(item => {
+      const hasParentInSet = item.parentId && itemIds.has(item.parentId);
+      const hasChildren = itemsWithChildren.has(item.id);
+      return !hasParentInSet && !hasChildren;
+    });
+
+    if (hideOrphanItems) {
+      const orphanIds = new Set(orphans.map(o => o.id));
+      return {
+        filteredItems: allFilteredItems.filter(item => !orphanIds.has(item.id)),
+        orphanCount: orphans.length,
+      };
+    }
+
+    return {
+      filteredItems: allFilteredItems,
+      orphanCount: orphans.length,
+    };
+  }, [allFilteredItems, hideOrphanItems]);
+
+  const handleToggleOrphanItems = useCallback(() => {
+    setHideOrphanItems(!hideOrphanItems);
+  }, [hideOrphanItems, setHideOrphanItems]);
 
   // Handle fullscreen changes (including ESC key)
   useEffect(() => {
@@ -190,6 +227,9 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
           onResetLayout={handleResetLayout}
           onToggleFullscreen={handleToggleFullscreen}
           isFullscreen={isFullscreen}
+          hideOrphanItems={hideOrphanItems}
+          onToggleOrphanItems={handleToggleOrphanItems}
+          orphanCount={orphanCount}
         />
 
         {/* Instructions */}
