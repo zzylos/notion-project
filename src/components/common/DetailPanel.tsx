@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   X,
   ExternalLink,
@@ -21,6 +21,7 @@ import {
   getProgressColor,
 } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
+import { isOverdue, formatDate } from '../../utils/dateUtils';
 
 // Validate that a URL is a valid Notion URL
 const isValidNotionUrl = (url: string): boolean => {
@@ -38,6 +39,11 @@ interface DetailPanelProps {
 
 const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
   const { selectedItemId, items, getItemPath, expandToItem } = useStore();
+
+  // Memoize navigation handler - must be before early returns for consistent hook order
+  const handleNavigate = useCallback((id: string) => {
+    expandToItem(id);
+  }, [expandToItem]);
 
   if (!selectedItemId) {
     return (
@@ -69,10 +75,6 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
   const blockedBy = item.blockedBy
     ?.map((id) => items.get(id))
     .filter((i): i is WorkItem => i !== undefined) || [];
-
-  const handleNavigate = (id: string) => {
-    expandToItem(id);
-  };
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -228,19 +230,14 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
             <div
               className={`
                 flex items-center gap-2 text-sm
-                ${new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed'
+                ${isOverdue(item.dueDate, item.status)
                   ? 'text-red-600'
                   : 'text-gray-700'}
               `}
             >
               <Clock className="w-4 h-4" />
-              {new Date(item.dueDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-              {new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed' && (
+              {formatDate(item.dueDate, 'long')}
+              {isOverdue(item.dueDate, item.status) && (
                 <span className="text-red-500 text-xs font-medium">OVERDUE</span>
               )}
             </div>

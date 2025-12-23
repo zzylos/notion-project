@@ -1,17 +1,8 @@
 import { useMemo } from 'react';
 import { Calendar } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { getStatusColors, getStatusCategory } from '../../utils/colors';
-
-// Safe date parsing utility
-const parseDate = (dateString: string): Date | null => {
-  try {
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? null : date;
-  } catch {
-    return null;
-  }
-};
+import { getStatusColors } from '../../utils/colors';
+import { parseDate, isOverdue, formatDate } from '../../utils/dateUtils';
 
 const TimelineView: React.FC = () => {
   const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
@@ -50,7 +41,7 @@ const TimelineView: React.FC = () => {
 
           <div className="space-y-4">
             {sortedItems.map((item) => {
-              const isOverdue = item.dueDate && new Date(item.dueDate) < new Date() && getStatusCategory(item.status) !== 'completed';
+              const itemIsOverdue = isOverdue(item.dueDate, item.status);
               return (
                 <div
                   key={item.id}
@@ -63,9 +54,9 @@ const TimelineView: React.FC = () => {
                   }`}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-gray-800">{item.title}</span>
-                      <span className={`text-xs ${isOverdue ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
-                        {item.dueDate && new Date(item.dueDate).toLocaleDateString()}
-                        {isOverdue && ' (OVERDUE)'}
+                      <span className={`text-xs ${itemIsOverdue ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
+                        {item.dueDate && formatDate(item.dueDate, 'medium')}
+                        {itemIsOverdue && ' (OVERDUE)'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
