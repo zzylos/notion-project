@@ -41,11 +41,24 @@ const statusCategoryColors: Record<StatusCategory, StatusColorSet> = {
   },
 };
 
+// Maximum cache size to prevent memory leaks in long-running sessions
+const MAX_CACHE_SIZE = 1000;
+
 // Cache for consistent color assignment
 const statusColorCache = new Map<string, StatusColorSet>();
 
 // Cache for status category lookups (performance optimization)
 const statusCategoryCache = new Map<string, StatusCategory>();
+
+// Helper to add to cache with size limit
+function addToCache<K, V>(cache: Map<K, V>, key: K, value: V): void {
+  // If cache is at max size, remove oldest entries (first 10%)
+  if (cache.size >= MAX_CACHE_SIZE) {
+    const keysToDelete = Array.from(cache.keys()).slice(0, Math.floor(MAX_CACHE_SIZE * 0.1));
+    keysToDelete.forEach(k => cache.delete(k));
+  }
+  cache.set(key, value);
+}
 
 /**
  * Keyword mapping for status categorization.
@@ -116,13 +129,13 @@ export function getStatusCategory(status: string): StatusCategory {
   for (const category of categories) {
     const keywords = STATUS_CATEGORY_KEYWORDS[category];
     if (keywords.some(keyword => normalized.includes(keyword))) {
-      statusCategoryCache.set(status, category);
+      addToCache(statusCategoryCache, status, category);
       return category;
     }
   }
 
   // Default to not-started
-  statusCategoryCache.set(status, 'not-started');
+  addToCache(statusCategoryCache, status, 'not-started');
   return 'not-started';
 }
 
@@ -138,8 +151,8 @@ export function getStatusColors(status: string): StatusColorSet {
   const category = getStatusCategory(status);
   const colors = statusCategoryColors[category];
 
-  // Cache and return
-  statusColorCache.set(status, colors);
+  // Cache and return (with size limit)
+  addToCache(statusColorCache, status, colors);
   return colors;
 }
 

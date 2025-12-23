@@ -449,12 +449,21 @@ export const useStore = create<StoreState>()(
         notionConfig: state.notionConfig,
       }),
       merge: (persisted, current) => {
-        const persistedState = persisted as Partial<StoreState> & { expandedIds?: string[] };
-        return {
-          ...current,
-          ...persistedState,
-          expandedIds: new Set(persistedState.expandedIds || []),
-        };
+        try {
+          const persistedState = persisted as Partial<StoreState> & { expandedIds?: string[] };
+          // Validate expandedIds is an array before converting to Set
+          const expandedIdsArray = Array.isArray(persistedState.expandedIds)
+            ? persistedState.expandedIds.filter(id => typeof id === 'string')
+            : [];
+          return {
+            ...current,
+            ...persistedState,
+            expandedIds: new Set(expandedIdsArray),
+          };
+        } catch (error) {
+          console.warn('[Store] Failed to merge persisted state, using defaults:', error);
+          return current;
+        }
       },
     }
   )

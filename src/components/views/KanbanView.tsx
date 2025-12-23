@@ -98,10 +98,12 @@ const KanbanView: React.FC = () => {
       )}
 
       <div className="flex gap-4 min-w-max" role="list" aria-label="Status columns">
-        {statuses.map((status) => {
+        {statuses.map((status, statusIndex) => {
           const statusItems = statusItemsMap.get(status) || [];
           const colors = getStatusColors(status);
           const isEmpty = statusItems.length === 0;
+          // Use index to ensure unique IDs even if status names normalize to same value
+          const columnId = `column-${statusIndex}-${status.replace(/\s+/g, '-').toLowerCase()}`;
 
           // Skip empty columns if hidden
           if (hideEmptyColumns && isEmpty) {
@@ -116,14 +118,14 @@ const KanbanView: React.FC = () => {
               aria-label={`${status} column with ${statusItems.length} items`}
             >
               <div className={`rounded-lg border ${colors.bg} ${colors.border} p-3 mb-3`}>
-                <h3 className={`font-semibold ${colors.text}`} id={`column-${status.replace(/\s+/g, '-')}`}>
+                <h3 className={`font-semibold ${colors.text}`} id={columnId}>
                   {status} ({statusItems.length})
                 </h3>
               </div>
               <div
                 className="space-y-2"
                 role="list"
-                aria-labelledby={`column-${status.replace(/\s+/g, '-')}`}
+                aria-labelledby={columnId}
               >
                 {statusItems.length === 0 ? (
                   <div className="text-center text-gray-400 text-sm py-4">
