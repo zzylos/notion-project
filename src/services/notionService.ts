@@ -583,6 +583,9 @@ class NotionService {
     );
   }
 
+  // Callback for page-level progress during database fetching
+  private onPageProgress?: (itemsLoaded: number, databaseType: string) => void;
+
   // Fetch all pages from a single database
   private async fetchAllFromDatabase(dbConfig: DatabaseConfig, signal?: AbortSignal): Promise<WorkItem[]> {
     const allPages: NotionPage[] = [];
@@ -599,6 +602,11 @@ class NotionService {
       allPages.push(...response.results);
       hasMore = response.has_more;
       currentCursor = response.next_cursor ?? undefined;
+
+      // Report progress after each page to show incremental loading
+      if (this.onPageProgress) {
+        this.onPageProgress(allPages.length, dbConfig.type);
+      }
     }
 
     return allPages
@@ -712,8 +720,40 @@ class NotionService {
     const allItems: WorkItem[] = [];
     const failedDatabases: Array<{ type: string; error: string }> = [];
 
+    // Track items loaded per database for page-level progress
+    const itemsPerDatabase = new Map<string, number>();
+    let lastProgressUpdate = 0;
+    const PROGRESS_THROTTLE_MS = 100; // Throttle updates to avoid excessive re-renders
+
+    // Set up page-level progress callback for incremental updates during pagination
+    this.onPageProgress = (itemsLoaded: number, databaseType: string) => {
+      if (signal?.aborted) return;
+
+      itemsPerDatabase.set(databaseType, itemsLoaded);
+
+      // Calculate total items loaded across all databases
+      let totalLoaded = 0;
+      for (const count of itemsPerDatabase.values()) {
+        totalLoaded += count;
+      }
+
+      // Throttle progress updates to avoid excessive re-renders
+      const now = Date.now();
+      if (now - lastProgressUpdate >= PROGRESS_THROTTLE_MS) {
+        lastProgressUpdate = now;
+        onProgress?.({
+          loaded: totalLoaded,
+          total: null,
+          items: [], // Don't send items during page-level progress (not yet processed)
+          done: false,
+          currentDatabase: databaseType,
+        });
+      }
+    };
+
     // Check if aborted before starting
     if (signal?.aborted) {
+      this.onPageProgress = undefined;
       throw new DOMException('Fetch aborted', 'AbortError');
     }
 
@@ -756,7 +796,7 @@ class NotionService {
         failedDatabases.push({ type: result.type, error: result.error });
       }
 
-      // Report progress after each database completes
+      // Report progress after each database completes (with actual items)
       onProgress?.({
         loaded: allItems.length,
         total: null,
@@ -766,6 +806,9 @@ class NotionService {
         failedDatabases: failedDatabases.length > 0 ? [...failedDatabases] : undefined,
       });
     }
+
+    // Clean up page progress callback
+    this.onPageProgress = undefined;
 
     // Build relationships across all items
     const orphanedCount = this.buildRelationships(allItems);
