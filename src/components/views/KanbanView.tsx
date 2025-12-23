@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { Search, EyeOff, Eye, Columns } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { getStatusColors } from '../../utils/colors';
+import { getStatusColors, getUniqueStatuses } from '../../utils/colors';
 
 const KanbanView: React.FC = () => {
   const { getFilteredItems, setSelectedItem, selectedItemId, items: allItems, isLoading } = useStore();
@@ -9,20 +9,7 @@ const KanbanView: React.FC = () => {
   const [hideEmptyColumns, setHideEmptyColumns] = useState(false);
 
   // Get unique statuses from all items, preserving order of first occurrence
-  const statuses = useMemo(() => {
-    const statusSet = new Set<string>();
-    const statusOrder: string[] = [];
-
-    // Get statuses from all items to maintain consistent columns
-    Array.from(allItems.values()).forEach((item) => {
-      if (!statusSet.has(item.status)) {
-        statusSet.add(item.status);
-        statusOrder.push(item.status);
-      }
-    });
-
-    return statusOrder;
-  }, [allItems]);
+  const statuses = useMemo(() => getUniqueStatuses(allItems.values()), [allItems]);
 
   // Pre-compute status items to avoid repeated filtering
   const statusItemsMap = useMemo(() => {

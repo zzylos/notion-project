@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { getStatusColors, getStatusCategory } from '../../utils/colors';
 
 interface StatusBadgeProps {
@@ -14,15 +14,22 @@ interface StatusBadgeProps {
 /**
  * Reusable status badge component with consistent styling.
  * Displays a colored dot and optional label based on status.
+ * Memoized to prevent unnecessary re-renders.
  */
-const StatusBadge: React.FC<StatusBadgeProps> = ({
+const StatusBadge: React.FC<StatusBadgeProps> = memo(({
   status,
   showLabel = true,
   size = 'md',
   className = '',
 }) => {
-  const statusStyle = getStatusColors(status);
-  const isInProgress = getStatusCategory(status) === 'in-progress';
+  // Compute category once and derive colors from it
+  const { statusStyle, isInProgress } = useMemo(() => {
+    const category = getStatusCategory(status);
+    return {
+      statusStyle: getStatusColors(status),
+      isInProgress: category === 'in-progress',
+    };
+  }, [status]);
 
   const dotSizeClass = size === 'sm' ? 'w-1.5 h-1.5' : 'w-2 h-2';
   const textSizeClass = size === 'sm' ? 'text-[10px]' : 'text-xs';
@@ -56,6 +63,6 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
       {status}
     </span>
   );
-};
+});
 
 export default StatusBadge;

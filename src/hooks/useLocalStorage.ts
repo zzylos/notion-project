@@ -55,8 +55,9 @@ export function useLocalStorage<T>(
       try {
         setStoredValue((prevValue) => {
           // Allow value to be a function for functional updates
+          // Use typeof check instead of instanceof for more reliable function detection
           const valueToStore =
-            value instanceof Function ? value(prevValue) : value;
+            typeof value === 'function' ? (value as (prev: T) => T)(prevValue) : value;
           window.localStorage.setItem(key, JSON.stringify(valueToStore));
           return valueToStore;
         });

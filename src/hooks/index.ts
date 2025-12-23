@@ -7,5 +7,4 @@
 
 export { useTimeout } from './useTimeout';
 export { useFetch } from './useFetch';
-export { useDataChanged } from './useDataChanged';
 export { useLocalStorage } from './useLocalStorage';
