@@ -76,7 +76,8 @@ export const sampleData: WorkItem[] = [
     owner: { id: 'owner-2', name: 'TanWei', email: 'tanwei@housesigma.com' },
     parentId: 'problem-1',
     children: ['design-1', 'project-1', 'project-2'],
-    description: 'Use machine learning to provide accurate price comparisons based on multiple factors',
+    description:
+      'Use machine learning to provide accurate price comparisons based on multiple factors',
     createdAt: '2024-03-15',
     updatedAt: '2024-12-14',
     tags: ['AI', 'pricing', 'MVP'],

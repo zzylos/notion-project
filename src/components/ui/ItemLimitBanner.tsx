@@ -13,10 +13,7 @@ interface ItemLimitBannerProps {
  * Banner that shows when items are being limited for performance.
  * Displays a warning with the option to show all items.
  */
-export const ItemLimitBanner: React.FC<ItemLimitBannerProps> = ({
-  totalItems,
-  displayedItems,
-}) => {
+export const ItemLimitBanner: React.FC<ItemLimitBannerProps> = ({ totalItems, displayedItems }) => {
   const { disableItemLimit, setDisableItemLimit } = useStore();
 
   // Don't show if limit is disabled or we're showing all items
@@ -32,10 +29,9 @@ export const ItemLimitBanner: React.FC<ItemLimitBannerProps> = ({
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
           <span className="text-sm text-amber-800">
-            Showing {displayedItems.toLocaleString()} of {totalItems.toLocaleString()} items for performance.
-            <span className="text-amber-600 ml-1">
-              ({hiddenCount.toLocaleString()} hidden)
-            </span>
+            Showing {displayedItems.toLocaleString()} of {totalItems.toLocaleString()} items for
+            performance.
+            <span className="text-amber-600 ml-1">({hiddenCount.toLocaleString()} hidden)</span>
           </span>
         </div>
         <button

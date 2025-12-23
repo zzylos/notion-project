@@ -81,15 +81,9 @@ const EmptyState: React.FC<EmptyStateProps> = ({
       role="status"
       aria-label={title || defaults.title}
     >
-      <div className="w-12 h-12 mb-4 text-gray-300">
-        {icon || <Icon className="w-12 h-12" />}
-      </div>
-      <h3 className="text-lg font-medium text-gray-900 mb-1">
-        {title || defaults.title}
-      </h3>
-      <p className="text-sm text-gray-500 max-w-sm">
-        {description || defaults.description}
-      </p>
+      <div className="w-12 h-12 mb-4 text-gray-300">{icon || <Icon className="w-12 h-12" />}</div>
+      <h3 className="text-lg font-medium text-gray-900 mb-1">{title || defaults.title}</h3>
+      <p className="text-sm text-gray-500 max-w-sm">{description || defaults.description}</p>
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

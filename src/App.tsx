@@ -11,7 +11,16 @@ import LoadingState from './components/ui/LoadingState';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
 import { getMergedConfig, hasEnvConfig } from './utils/config';
-import { PanelRightClose, PanelRight, Loader2, ChevronDown, ChevronUp, AlertTriangle, X, FileCode } from 'lucide-react';
+import {
+  PanelRightClose,
+  PanelRight,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  X,
+  FileCode,
+} from 'lucide-react';
 import type { NotionConfig } from './types';
 
 // Lazy load heavy view components for better initial load performance
@@ -36,8 +45,14 @@ function App() {
   const [showDetailPanel, setShowDetailPanel] = useState(true);
   const [showStats, setShowStats] = useState(false); // Collapsed by default
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number | null } | null>(null);
-  const [failedDatabases, setFailedDatabases] = useState<Array<{ type: string; error: string }> | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState<{
+    loaded: number;
+    total: number | null;
+  } | null>(null);
+  const [failedDatabases, setFailedDatabases] = useState<Array<{
+    type: string;
+    error: string;
+  }> | null>(null);
   // Counter to force modal remount when opening (resets form state)
   const [modalKey, setModalKey] = useState(0);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,92 +63,95 @@ function App() {
   const usingEnvConfig = hasEnvConfig();
 
   // Load data function with progressive updates
-  const loadData = useCallback(async (config: NotionConfig | null, forceRefresh = false) => {
-    // Cancel any previous in-flight request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+  const loadData = useCallback(
+    async (config: NotionConfig | null, forceRefresh = false) => {
+      // Cancel any previous in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
 
-    // Create new AbortController for this request
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+      // Create new AbortController for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
-    setLoading(true);
-    setError(null);
-    // Set initial progress immediately so progress bar shows up right away
-    setLoadingProgress({ loaded: 0, total: null });
-    setFailedDatabases(null);
+      setLoading(true);
+      setError(null);
+      // Set initial progress immediately so progress bar shows up right away
+      setLoadingProgress({ loaded: 0, total: null });
+      setFailedDatabases(null);
 
-    try {
-      // Check for valid config - support both legacy databaseId and new databases array
-      const hasValidConfig = config && config.apiKey && (
-        config.databaseId ||
-        (config.databases && config.databases.length > 0)
-      );
+      try {
+        // Check for valid config - support both legacy databaseId and new databases array
+        const hasValidConfig =
+          config &&
+          config.apiKey &&
+          (config.databaseId || (config.databases && config.databases.length > 0));
 
-      if (hasValidConfig) {
-        // Clear cache if force refresh
-        if (forceRefresh) {
-          notionService.clearCache();
+        if (hasValidConfig) {
+          // Clear cache if force refresh
+          if (forceRefresh) {
+            notionService.clearCache();
+          }
+
+          // Initialize Notion service and fetch data with progress
+          notionService.initialize(config);
+
+          const items = await notionService.fetchAllItems({
+            signal: abortController.signal,
+            onProgress: progress => {
+              // Don't update state if aborted
+              if (abortController.signal.aborted) return;
+
+              try {
+                setLoadingProgress({ loaded: progress.loaded, total: progress.total });
+
+                // Track failed databases
+                if (progress.failedDatabases && progress.failedDatabases.length > 0) {
+                  setFailedDatabases(progress.failedDatabases);
+                }
+
+                // Update items progressively for faster perceived performance
+                if (progress.items.length > 0 && !progress.done) {
+                  setItems(progress.items);
+                }
+              } catch (e) {
+                console.error('Error in progress callback:', e);
+              }
+            },
+          });
+
+          // Don't update state if aborted
+          if (abortController.signal.aborted) return;
+
+          setItems(items);
+        } else {
+          // Use sample data
+          setItems(sampleData);
+          // Expand all nodes for demo (clear any existing timeout first)
+          if (expandTimeoutRef.current) {
+            clearTimeout(expandTimeoutRef.current);
+          }
+          expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
         }
-
-        // Initialize Notion service and fetch data with progress
-        notionService.initialize(config);
-
-        const items = await notionService.fetchAllItems({
-          signal: abortController.signal,
-          onProgress: (progress) => {
-            // Don't update state if aborted
-            if (abortController.signal.aborted) return;
-
-            try {
-              setLoadingProgress({ loaded: progress.loaded, total: progress.total });
-
-              // Track failed databases
-              if (progress.failedDatabases && progress.failedDatabases.length > 0) {
-                setFailedDatabases(progress.failedDatabases);
-              }
-
-              // Update items progressively for faster perceived performance
-              if (progress.items.length > 0 && !progress.done) {
-                setItems(progress.items);
-              }
-            } catch (e) {
-              console.error('Error in progress callback:', e);
-            }
-          },
-        });
-
-        // Don't update state if aborted
-        if (abortController.signal.aborted) return;
-
-        setItems(items);
-      } else {
-        // Use sample data
+      } catch (error) {
+        // Ignore abort errors - they're expected when canceling
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Failed to load data from Notion:', error);
+        setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
         setItems(sampleData);
-        // Expand all nodes for demo (clear any existing timeout first)
-        if (expandTimeoutRef.current) {
-          clearTimeout(expandTimeoutRef.current);
+      } finally {
+        // Only update loading state if this is still the current request
+        if (abortControllerRef.current === abortController) {
+          setLoading(false);
+          setLoadingProgress(null);
         }
-        expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
       }
-    } catch (error) {
-      // Ignore abort errors - they're expected when canceling
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return;
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to load data from Notion:', error);
-      setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
-      setItems(sampleData);
-    } finally {
-      // Only update loading state if this is still the current request
-      if (abortControllerRef.current === abortController) {
-        setLoading(false);
-        setLoadingProgress(null);
-      }
-    }
-  }, [setItems, setLoading, setError, expandAll]);
+    },
+    [setItems, setLoading, setError, expandAll]
+  );
 
   // Load data on mount and when config changes
   useEffect(() => {
@@ -222,61 +240,64 @@ function App() {
           <div className="bg-green-50 border-b border-green-200 px-4 py-1.5">
             <div className="flex items-center gap-2 text-xs text-green-700">
               <FileCode className="w-3.5 h-3.5" />
-              <span>Using configuration from <code className="px-1 py-0.5 bg-green-100 rounded">.env</code> file</span>
+              <span>
+                Using configuration from{' '}
+                <code className="px-1 py-0.5 bg-green-100 rounded">.env</code> file
+              </span>
             </div>
           </div>
         )}
 
-      {/* Loading Progress Bar */}
-      {isLoading && loadingProgress && (
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
-          <div className="flex items-center gap-3">
-            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-            <span className="text-sm text-blue-700">
-              Loading items from Notion... {loadingProgress.loaded} items loaded
-              {loadingProgress.total && ` of ~${loadingProgress.total}`}
-            </span>
-          </div>
-          <div className="mt-1 w-full h-1 bg-blue-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-600 rounded-full transition-all duration-300"
-              style={{
-                width: loadingProgress.total
-                  ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
-                  : '100%',
-                animation: loadingProgress.total ? 'none' : 'pulse 1.5s ease-in-out infinite',
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Failed Databases Warning */}
-      {failedDatabases && failedDatabases.length > 0 && !isLoading && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <span className="text-sm font-medium text-amber-800">
-                Some databases failed to load
+        {/* Loading Progress Bar */}
+        {isLoading && loadingProgress && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+              <span className="text-sm text-blue-700">
+                Loading items from Notion... {loadingProgress.loaded} items loaded
+                {loadingProgress.total && ` of ~${loadingProgress.total}`}
               </span>
-              <ul className="mt-1 text-xs text-amber-700">
-                {failedDatabases.map((db, i) => (
-                  <li key={i}>
-                    <span className="font-medium capitalize">{db.type}</span>: {db.error}
-                  </li>
-                ))}
-              </ul>
             </div>
-            <button
-              onClick={() => setFailedDatabases(null)}
-              className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="mt-1 w-full h-1 bg-blue-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                style={{
+                  width: loadingProgress.total
+                    ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
+                    : '100%',
+                  animation: loadingProgress.total ? 'none' : 'pulse 1.5s ease-in-out infinite',
+                }}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Failed Databases Warning */}
+        {failedDatabases && failedDatabases.length > 0 && !isLoading && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-amber-800">
+                  Some databases failed to load
+                </span>
+                <ul className="mt-1 text-xs text-amber-700">
+                  {failedDatabases.map((db, i) => (
+                    <li key={i}>
+                      <span className="font-medium capitalize">{db.type}</span>: {db.error}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => setFailedDatabases(null)}
+                className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Stats Overview - Collapsible */}
         <div className="border-b border-gray-200 bg-white">
@@ -302,9 +323,7 @@ function App() {
       <div className="flex-1 flex min-h-[500px]">
         {/* Main view - with minimum height for canvas usability */}
         <div className="flex-1 overflow-auto min-h-[500px]">
-          <ErrorBoundary>
-            {renderMainView()}
-          </ErrorBoundary>
+          <ErrorBoundary>{renderMainView()}</ErrorBoundary>
         </div>
 
         {/* Detail panel toggle button (mobile) */}
@@ -338,14 +357,16 @@ function App() {
               <PanelRightClose className="w-5 h-5" />
             </button>
           </div>
-          <ErrorBoundary fallback={
-            <div className="h-full flex items-center justify-center p-8 text-center">
-              <div className="text-gray-500">
-                <p className="font-medium">Failed to load item details</p>
-                <p className="text-sm mt-1">Try selecting a different item</p>
+          <ErrorBoundary
+            fallback={
+              <div className="h-full flex items-center justify-center p-8 text-center">
+                <div className="text-gray-500">
+                  <p className="font-medium">Failed to load item details</p>
+                  <p className="text-sm mt-1">Try selecting a different item</p>
+                </div>
               </div>
-            </div>
-          }>
+            }
+          >
             <DetailPanel onClose={handleCloseDetail} />
           </ErrorBoundary>
         </div>

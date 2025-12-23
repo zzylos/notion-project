@@ -40,9 +40,7 @@ const PropertyMappingsSection: React.FC<PropertyMappingsSectionProps> = ({
       >
         <Settings className="w-4 h-4" />
         Property Mappings
-        <span className="text-xs text-gray-500">
-          ({showAdvanced ? 'hide' : 'show'})
-        </span>
+        <span className="text-xs text-gray-500">({showAdvanced ? 'hide' : 'show'})</span>
       </button>
 
       {showAdvanced && (
@@ -59,15 +57,13 @@ const PropertyMappingsSection: React.FC<PropertyMappingsSectionProps> = ({
                 >
                   {key}
                 </label>
-                <span className="text-[10px] text-gray-400">
-                  {mappingDescriptions[key]}
-                </span>
+                <span className="text-[10px] text-gray-400">{mappingDescriptions[key]}</span>
               </div>
               <input
                 id={`mapping-${key}`}
                 type="text"
                 value={value}
-                onChange={(e) => onMappingChange(key, e.target.value)}
+                onChange={e => onMappingChange(key, e.target.value)}
                 placeholder={key === 'title' ? '(auto-detected)' : '(optional)'}
                 className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />

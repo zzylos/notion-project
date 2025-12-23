@@ -45,17 +45,21 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
         disabled={!hasSelection}
         className={`
           flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-sm transition-colors
-          ${!hasSelection
-            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-            : focusMode
-              ? 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200'
-              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}
+          ${
+            !hasSelection
+              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+              : focusMode
+                ? 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+          }
         `}
-        title={!hasSelection
-          ? 'Select an item to enable focus mode'
-          : focusMode
-            ? 'Disable focus mode'
-            : 'Focus mode: Highlight connected items (parent, children, siblings)'}
+        title={
+          !hasSelection
+            ? 'Select an item to enable focus mode'
+            : focusMode
+              ? 'Disable focus mode'
+              : 'Focus mode: Highlight connected items (parent, children, siblings)'
+        }
         aria-label={focusMode ? 'Disable focus mode' : 'Enable focus mode'}
         aria-pressed={focusMode}
       >
@@ -68,11 +72,15 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
         onClick={onToggleOrphanItems}
         className={`
           flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-sm transition-colors
-          ${hideOrphanItems
-            ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}
+          ${
+            hideOrphanItems
+              ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+          }
         `}
-        title={hideOrphanItems ? 'Show orphan items' : 'Hide orphan items (items with no connections)'}
+        title={
+          hideOrphanItems ? 'Show orphan items' : 'Hide orphan items (items with no connections)'
+        }
         aria-label={hideOrphanItems ? 'Show orphan items' : 'Hide orphan items'}
         aria-pressed={hideOrphanItems}
       >

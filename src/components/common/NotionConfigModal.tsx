@@ -59,7 +59,9 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
     setValidationErrors(newValidationErrors);
 
     if (hasValidationErrors) {
-      setError('Please fix the invalid database IDs. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+      setError(
+        'Please fix the invalid database IDs. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+      );
       setIsConnecting(false);
       return;
     }
@@ -129,7 +131,10 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
   if (!isOpen) return null;
 
   const hasAnyDatabase = Object.values(databases).some(id => id.trim());
-  const isConnected = notionConfig && notionConfig.apiKey && (notionConfig.databases?.length > 0 || notionConfig.databaseId);
+  const isConnected =
+    notionConfig &&
+    notionConfig.apiKey &&
+    (notionConfig.databases?.length > 0 || notionConfig.databaseId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -213,7 +218,8 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-700">Limit items for performance</div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  When enabled, views will show at most {VIEW_LIMITS.ITEM_LIMIT} items to prevent lag
+                  When enabled, views will show at most {VIEW_LIMITS.ITEM_LIMIT} items to prevent
+                  lag
                 </div>
               </div>
               <button
@@ -246,8 +252,8 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
           {/* Info box */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-xs text-blue-800">
-              <strong>Note:</strong> Each database type will be fetched separately and combined into a unified view.
-              Parent relations can link items across different databases.
+              <strong>Note:</strong> Each database type will be fetched separately and combined into
+              a unified view. Parent relations can link items across different databases.
             </p>
           </div>
 

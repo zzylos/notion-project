@@ -63,9 +63,7 @@ const OwnerAvatar: React.FC<OwnerAvatarProps> = ({
       {avatarElement}
       <div>
         <p className="text-sm font-medium text-gray-900">{owner.name}</p>
-        {showEmail && owner.email && (
-          <p className="text-xs text-gray-500">{owner.email}</p>
-        )}
+        {showEmail && owner.email && <p className="text-xs text-gray-500">{owner.email}</p>}
       </div>
     </div>
   );

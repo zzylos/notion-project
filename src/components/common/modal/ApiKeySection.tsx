@@ -27,7 +27,7 @@ const ApiKeySection: React.FC<ApiKeySectionProps> = ({ apiKey, onChange }) => {
       <input
         type="password"
         value={apiKey}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
         placeholder="secret_..."
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
         aria-label="Notion API key"
@@ -41,8 +41,8 @@ const ApiKeySection: React.FC<ApiKeySectionProps> = ({ apiKey, onChange }) => {
           className="text-blue-500 hover:underline"
         >
           notion.so/my-integrations
-        </a>
-        {' '}and share all databases with it.
+        </a>{' '}
+        and share all databases with it.
       </p>
     </div>
   );

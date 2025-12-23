@@ -1,14 +1,14 @@
 import React, { useMemo } from 'react';
-import {
-  Target,
-  TrendingUp,
-  AlertTriangle,
-  Clock,
-  CheckCircle2,
-} from 'lucide-react';
+import { Target, TrendingUp, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { ItemType } from '../../types';
-import { typeLabels, getStatusColors, getStatusCategory, typeColors, getUniqueStatuses } from '../../utils/colors';
+import {
+  typeLabels,
+  getStatusColors,
+  getStatusCategory,
+  typeColors,
+  getUniqueStatuses,
+} from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
 
 const StatsOverview: React.FC = () => {
@@ -101,7 +101,7 @@ const StatsOverview: React.FC = () => {
               By Status
             </h4>
             <div className="flex items-center gap-1 h-3 bg-gray-100 rounded-full overflow-hidden">
-              {statusOrder.map((status) => {
+              {statusOrder.map(status => {
                 const count = stats.byStatus[status] || 0;
                 const percent = stats.totalItems > 0 ? (count / stats.totalItems) * 100 : 0;
                 if (percent === 0) return null;
@@ -116,7 +116,7 @@ const StatsOverview: React.FC = () => {
               })}
             </div>
             <div className="flex flex-wrap gap-3 mt-2">
-              {statusOrder.map((status) => {
+              {statusOrder.map(status => {
                 const count = stats.byStatus[status] || 0;
                 if (count === 0) return null;
                 return (
@@ -136,7 +136,7 @@ const StatsOverview: React.FC = () => {
               By Type
             </h4>
             <div className="flex flex-wrap gap-2">
-              {typeOrder.map((type) => {
+              {typeOrder.map(type => {
                 const count = stats.byType[type];
                 const Icon = typeIcons[type];
                 return (

@@ -1,10 +1,4 @@
-import {
-  Target,
-  AlertCircle,
-  Lightbulb,
-  Palette,
-  FolderKanban,
-} from 'lucide-react';
+import { Target, AlertCircle, Lightbulb, Palette, FolderKanban } from 'lucide-react';
 import type { ItemType } from '../types';
 
 /**

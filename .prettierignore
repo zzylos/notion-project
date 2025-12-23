@@ -1,0 +1,24 @@
+# Build outputs
+dist
+dist-ssr
+build
+
+# Dependencies
+node_modules
+
+# Generated files
+*.min.js
+*.min.css
+
+# Cache
+.cache
+.tmp
+
+# Environment files (may contain secrets)
+.env
+.env.*
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
