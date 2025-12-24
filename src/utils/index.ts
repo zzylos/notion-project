@@ -28,16 +28,19 @@ export {
 export type { MigratedConfig } from './config';
 
 // Date utilities
-export { formatRelativeDate, formatDate, isOverdue } from './dateUtils';
+export { parseDate, formatDate, isOverdue, getRelativeTime } from './dateUtils';
 
 // Error handling
 export {
+  AppError,
   ApiError,
   NetworkError,
   ValidationError,
-  NotFoundError,
-  withRetry,
+  getHttpErrorMessage,
+  parseApiError,
   shouldRetry,
+  withRetry,
+  formatErrorForDisplay,
 } from './errors';
 
 // Icons
@@ -55,13 +58,19 @@ export { sampleData } from './sampleData';
 // Type guards
 export {
   isAbortError,
+  isError,
+  isObject,
   isNonEmptyString,
-  isNonNullObject,
+  isValidNumber,
+  isNonEmptyArray,
+  hasProperty,
+  isNullish,
+  assertDefined,
   getErrorMessage,
 } from './typeGuards';
 
 // Validation
-export { isValidApiKey, isValidDatabaseId, sanitizeInput } from './validation';
+export { isValidApiKey, isValidDatabaseId, isValidEmail, isValidNotionUrl } from './validation';
 
 // Array utilities
-export { groupBy } from './arrayUtils';
+export { toggleArrayItem, includesItem, unique } from './arrayUtils';
