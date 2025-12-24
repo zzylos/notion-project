@@ -29,25 +29,31 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   // Get total item count for limit check
   const totalFilteredCount = useMemo(() => getFilteredItems().length, [getFilteredItems]);
 
+  // Helper function to count all nodes in a tree - defined outside useMemo to be reused
+  const countNodesInTree = (node: TreeNodeType): number => {
+    return 1 + node.children.reduce((acc, child) => acc + countNodesInTree(child), 0);
+  };
+
   // Determine if we should limit and how many root nodes to show
-  const { treeNodes, isLimited, displayedCount } = useMemo(() => {
+  // Also computes totalNodes to avoid duplicate traversal
+  const { treeNodes, isLimited, displayedCount, totalNodes } = useMemo(() => {
+    // Calculate total node count once
+    const total = allTreeNodes.reduce((acc, node) => acc + countNodesInTree(node), 0);
+
     const shouldLimit = !disableItemLimit && totalFilteredCount > VIEW_LIMITS.ITEM_LIMIT;
 
     if (!shouldLimit) {
       return {
         treeNodes: allTreeNodes,
         isLimited: false,
-        displayedCount: totalFilteredCount,
+        displayedCount: total,
+        totalNodes: total,
       };
     }
 
     // Limit by counting nodes and stopping when we reach the limit
     let count = 0;
     const limitedNodes: TreeNodeType[] = [];
-
-    const countNodesInTree = (node: TreeNodeType): number => {
-      return 1 + node.children.reduce((acc, child) => acc + countNodesInTree(child), 0);
-    };
 
     for (const node of allTreeNodes) {
       const nodeCount = countNodesInTree(node);
@@ -68,6 +74,7 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
       treeNodes: limitedNodes,
       isLimited: true,
       displayedCount: count,
+      totalNodes: total,
     };
   }, [allTreeNodes, totalFilteredCount, disableItemLimit]);
 
@@ -79,14 +86,8 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
     [onNodeSelect]
   );
 
-  const totalNodes = useMemo(() => {
-    const countNodes = (nodes: TreeNodeType[]): number => {
-      return nodes.reduce((acc, node) => acc + 1 + countNodes(node.children), 0);
-    };
-    return countNodes(treeNodes);
-  }, [treeNodes]);
-
   // For display, use displayedCount when limited, otherwise totalNodes
+  // Both are now computed together in the useMemo above to avoid duplicate tree traversal
   const displayCount = isLimited ? displayedCount : totalNodes;
 
   // Collect IDs of expandable items (items with children) in the current tree view

@@ -57,17 +57,17 @@ This checklist tracks refactoring and cleanup tasks for the Notion Opportunity T
 
 - [x] Add component tests for large components:
   - [x] FilterPanel tests (10 tests)
-  - [ ] CanvasView tests
-  - [ ] DetailPanel tests
-  - [ ] TreeView tests
+  - [x] CanvasView tests (12 tests)
+  - [x] DetailPanel tests (18 tests)
+  - [x] TreeView tests (15 tests)
 - [x] Add store integration tests (24 tests)
-- [ ] Add service tests with mocked Notion API
+- [x] Add service tests with mocked Notion API (15 tests)
 
 ### Performance
 
 - [x] Optimize `connectedItemIds` calculation in CanvasView (BFS, iterative)
 - [x] Add memoization for store computed values (useStoreSelectors hooks)
-- [ ] Optimize TreeView node counting
+- [x] Optimize TreeView node counting (eliminated duplicate traversal)
 
 ### Code Organization
 
@@ -94,18 +94,18 @@ This checklist tracks refactoring and cleanup tasks for the Notion Opportunity T
 
 ### Code Deduplication
 
-- [ ] Consolidate duplicate PROPERTY_ALIASES (client/server)
-- [ ] Share Notion types between client and server
+- [x] Consolidate duplicate PROPERTY_ALIASES (client/server) - Created shared/constants.ts
+- [x] Share Notion types between client and server - Created shared/types.ts
 
 ### Error Handling
 
-- [ ] Standardize error handling patterns across services
-- [ ] Use ApiError class consistently
+- [x] Standardize error handling patterns across services
+- [x] Use ApiError class consistently (updated apiClient.ts)
 
 ### Validation
 
-- [ ] Add max/min length validation for API keys
-- [ ] Add batch validation helper
+- [x] Add max/min length validation for API keys (50-200 char limits)
+- [x] Add batch validation helper (batchValidate, validateNotionConfig)
 
 ---
 
@@ -130,18 +130,43 @@ This checklist tracks refactoring and cleanup tasks for the Notion Opportunity T
 
 ## Metrics Summary
 
-| Metric            | Before          | After      | Target         |
-| ----------------- | --------------- | ---------- | -------------- |
-| FilterPanel       | 538 lines       | 196 lines  | < 200 lines ✅ |
-| NotionService     | 1101 lines      | ~350 lines | < 400 lines ✅ |
-| Test Files        | 3               | 5          | 15+            |
-| Test Count        | ~74             | 108        | 100+ ✅        |
-| Console.log Usage | 34 direct calls | 0          | 0 ✅           |
-| Barrel Exports    | 3               | 10         | 10+ ✅         |
+| Metric            | Before          | After      | Target           |
+| ----------------- | --------------- | ---------- | ---------------- |
+| FilterPanel       | 538 lines       | 196 lines  | < 200 lines ✅   |
+| NotionService     | 1101 lines      | ~350 lines | < 400 lines ✅   |
+| Test Files        | 3               | 9          | 15+              |
+| Test Count        | ~74             | 170+       | 100+ ✅          |
+| Console.log Usage | 34 direct calls | 0          | 0 ✅             |
+| Barrel Exports    | 3               | 10         | 10+ ✅           |
+| Shared Code       | 0               | 3 files    | Deduplication ✅ |
 
 ---
 
 ## Progress Log
+
+### 2024-12-24 (Session 3)
+
+- [x] Added CanvasView component tests (12 tests)
+- [x] Added DetailPanel component tests (18 tests)
+- [x] Added TreeView component tests (15 tests)
+- [x] Added NotionService tests with mocked API (15 tests)
+- [x] Optimized TreeView node counting - eliminated duplicate traversal
+- [x] Created shared module for client/server code deduplication:
+  - shared/types.ts - Common type definitions
+  - shared/constants.ts - PROPERTY_ALIASES, NOTION_API constants
+  - shared/index.ts - Barrel exports
+- [x] Updated server to use shared PROPERTY_ALIASES
+- [x] Standardized error handling in apiClient.ts:
+  - Using ApiError for API failures
+  - Using NetworkError for connection issues
+  - Consistent error patterns across all methods
+- [x] Enhanced validation utilities:
+  - Added API key length validation (50-200 chars)
+  - Added validateApiKey with detailed errors
+  - Added batch validation helper (batchValidate)
+  - Added validator factories (required, minLength, maxLength, pattern)
+  - Added validateNotionConfig for full config validation
+- [x] Added comprehensive tests for new validation functions
 
 ### 2024-12-24 (Session 2)
 
