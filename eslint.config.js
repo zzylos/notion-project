@@ -7,7 +7,7 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'coverage']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -31,12 +31,19 @@ export default defineConfig([
         'warn',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
+      '@typescript-eslint/no-explicit-any': 'warn',
 
       // Code quality rules - allow info and table for debug mode
       'no-console': ['warn', { allow: ['warn', 'error', 'info', 'table'] }],
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'prefer-const': 'error',
       'no-var': 'error',
+
+      // Complexity rules to improve code maintainability
+      complexity: ['warn', { max: 15 }],
+      'max-depth': ['warn', { max: 4 }],
+      'max-nested-callbacks': ['warn', { max: 3 }],
+      'max-params': ['warn', { max: 5 }],
 
       // React specific
       'react-hooks/exhaustive-deps': 'warn',
@@ -51,6 +58,14 @@ export default defineConfig([
     },
     rules: {
       'no-console': 'off', // Allow console in scripts
+    },
+  },
+  {
+    // Relaxed rules for test files
+    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'src/test/**/*'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'max-nested-callbacks': 'off',
     },
   },
 ]);

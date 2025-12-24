@@ -55,6 +55,50 @@ export const REFRESH = {
 } as const;
 
 /**
+ * Cache-related constants
+ */
+export const CACHE = {
+  /** Persistent cache timeout in milliseconds (24 hours) */
+  PERSISTENT_TIMEOUT_MS: 24 * 60 * 60 * 1000,
+  /** LocalStorage key prefix for cache entries */
+  KEY_PREFIX: 'notion-cache-',
+  /** LocalStorage key for cache metadata */
+  METADATA_KEY: 'notion-cache-metadata',
+  /** Maximum wait time for force refresh in milliseconds (30 seconds) */
+  FORCE_REFRESH_MAX_WAIT_MS: 30000,
+  /** Polling interval for waiting on refresh in milliseconds */
+  REFRESH_POLL_INTERVAL_MS: 100,
+  /** Throttle duration for page progress callbacks in milliseconds */
+  PAGE_PROGRESS_THROTTLE_MS: 100,
+} as const;
+
+/**
+ * Edge styling constants for canvas view
+ */
+export const EDGE_STYLES = {
+  /** Stroke width for edges */
+  STROKE_WIDTH: 2,
+  /** Stroke dasharray for blocked edges */
+  BLOCKED_DASH_ARRAY: '5,5',
+  /** Color for blocked-by edges */
+  BLOCKED_COLOR: '#ef4444',
+  /** Font size for edge labels */
+  LABEL_FONT_SIZE: 10,
+} as const;
+
+/**
+ * Animation and timing constants
+ */
+export const TIMING = {
+  /** Debounce delay for search input in milliseconds */
+  SEARCH_DEBOUNCE_MS: 300,
+  /** Transition duration for UI animations in milliseconds */
+  TRANSITION_MS: 200,
+  /** Auto-save delay in milliseconds */
+  AUTO_SAVE_DELAY_MS: 1000,
+} as const;
+
+/**
  * Default CORS proxy for browser-based Notion API calls
  */
 export const DEFAULT_CORS_PROXY = 'https://corsproxy.io/?';
