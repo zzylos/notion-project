@@ -187,12 +187,12 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     return { itemsAfterOrphanFilter: filtered, orphanCount };
   }, [allFilteredItems, hideOrphanItems, focusMode, connectedItemIds, items]);
 
-  // Apply item limit for performance
-  const {
-    limitedItems: filteredItems,
-    totalCount,
-    isLimited,
-  } = useItemLimit(itemsAfterOrphanFilter);
+  // Apply item limit for performance (bypass when in focus mode to ensure all connected items are visible)
+  const { limitedItems, totalCount, isLimited } = useItemLimit(itemsAfterOrphanFilter);
+
+  // When focus mode is active, use all items (no limit) to ensure connected items are visible
+  const filteredItems = focusMode && selectedItemId ? itemsAfterOrphanFilter : limitedItems;
+  const showLimitBanner = focusMode && selectedItemId ? false : isLimited;
 
   // Handle fullscreen changes (including ESC key)
   useEffect(() => {
@@ -329,8 +329,8 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
 
   return (
     <div ref={containerRef} className="h-full w-full bg-gray-50 flex flex-col">
-      {/* Item limit warning banner */}
-      {isLimited && (
+      {/* Item limit warning banner (hidden in focus mode) */}
+      {showLimitBanner && (
         <ItemLimitBanner totalItems={totalCount} displayedItems={filteredItems.length} />
       )}
 
