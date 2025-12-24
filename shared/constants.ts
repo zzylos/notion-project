@@ -65,3 +65,13 @@ export const NOTION_API = {
   /** Items per page when fetching from Notion */
   PAGE_SIZE: 100,
 } as const;
+
+/**
+ * Cache-related constants used by both client and server.
+ */
+export const CACHE = {
+  /** Maximum wait time for force refresh in milliseconds (30 seconds) */
+  FORCE_REFRESH_MAX_WAIT_MS: 30000,
+  /** Polling interval for waiting on refresh in milliseconds */
+  REFRESH_POLL_INTERVAL_MS: 100,
+} as const;

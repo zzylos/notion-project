@@ -1,4 +1,6 @@
 import type { CacheStats, WorkItem } from '../types/index.js';
+import { CACHE } from '../../../shared/constants.js';
+import { logger } from '../utils/logger.js';
 
 interface CacheEntry {
   items: WorkItem[];
@@ -105,20 +107,20 @@ class CacheService {
 
     const callback = this.refreshCallbacks.get(key);
     if (!callback) {
-      console.warn(`[Cache] No refresh callback registered for key: ${key}`);
+      logger.cache.warn(`No refresh callback registered for key: ${key}`);
       return;
     }
 
     this.refreshInProgress.add(key);
     this.backgroundRefreshes++;
-    console.info(`[Cache] Background refresh started for: ${key}`);
+    logger.cache.info(`Background refresh started for: ${key}`);
 
     try {
       const freshItems = await callback();
       this.set(key, freshItems);
-      console.info(`[Cache] Background refresh completed: ${freshItems.length} items`);
+      logger.cache.info(`Background refresh completed: ${freshItems.length} items`);
     } catch (error) {
-      console.error('[Cache] Background refresh failed:', error);
+      logger.cache.error('Background refresh failed:', error);
       // Keep stale data on failure - don't clear the cache
     } finally {
       this.refreshInProgress.delete(key);
@@ -134,9 +136,7 @@ class CacheService {
       timestamp: Date.now(),
     });
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.info(`[Cache] SET: ${key} (${items.length} items)`);
-    }
+    logger.cache.debug(`SET: ${key} (${items.length} items)`);
   }
 
   /**
@@ -170,7 +170,7 @@ class CacheService {
   clear(): void {
     this.cache.clear();
     this.refreshInProgress.clear();
-    console.info('[Cache] Cleared all entries');
+    logger.cache.info('Cleared all entries');
   }
 
   /**
@@ -180,8 +180,8 @@ class CacheService {
     const existed = this.cache.has(key);
     this.cache.delete(key);
     this.refreshInProgress.delete(key);
-    if (existed && process.env.NODE_ENV !== 'production') {
-      console.info(`[Cache] DEL: ${key}`);
+    if (existed) {
+      logger.cache.debug(`DEL: ${key}`);
     }
     return existed;
   }
@@ -192,40 +192,39 @@ class CacheService {
   async forceRefresh(key: string): Promise<WorkItem[] | null> {
     const callback = this.refreshCallbacks.get(key);
     if (!callback) {
-      console.warn(`[Cache] No refresh callback registered for key: ${key}`);
+      logger.cache.warn(`No refresh callback registered for key: ${key}`);
       return null;
     }
 
     // Wait if already refreshing (with timeout to prevent infinite wait)
     if (this.refreshInProgress.has(key)) {
-      console.info(`[Cache] Waiting for existing refresh: ${key}`);
-      const maxWaitMs = 30000; // 30 second timeout
+      logger.cache.info(`Waiting for existing refresh: ${key}`);
       const startTime = Date.now();
 
-      // Wait for refresh to complete (poll every 100ms, with timeout)
+      // Wait for refresh to complete (poll with timeout)
       while (this.refreshInProgress.has(key)) {
-        if (Date.now() - startTime > maxWaitMs) {
-          console.warn(`[Cache] Timeout waiting for refresh: ${key}`);
+        if (Date.now() - startTime > CACHE.FORCE_REFRESH_MAX_WAIT_MS) {
+          logger.cache.warn(`Timeout waiting for refresh: ${key}`);
           // Return existing stale data if available
           const entry = this.cache.get(key);
           return entry?.items ?? null;
         }
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, CACHE.REFRESH_POLL_INTERVAL_MS));
       }
       const entry = this.cache.get(key);
       return entry?.items ?? null;
     }
 
     this.refreshInProgress.add(key);
-    console.info(`[Cache] Force refresh started for: ${key}`);
+    logger.cache.info(`Force refresh started for: ${key}`);
 
     try {
       const freshItems = await callback();
       this.set(key, freshItems);
-      console.info(`[Cache] Force refresh completed: ${freshItems.length} items`);
+      logger.cache.info(`Force refresh completed: ${freshItems.length} items`);
       return freshItems;
     } catch (error) {
-      console.error('[Cache] Force refresh failed:', error);
+      logger.cache.error('Force refresh failed:', error);
       throw error;
     } finally {
       this.refreshInProgress.delete(key);
