@@ -5,30 +5,71 @@ import type { ApiResponse, FetchItemsResponse } from '../types/index.js';
 
 const router = Router();
 
+// Flag to track if refresh callback is registered
+let refreshCallbackRegistered = false;
+
+/**
+ * Register the refresh callback for the cache.
+ * This enables stale-while-revalidate behavior.
+ */
+function ensureRefreshCallbackRegistered(): string {
+  const cache = getCache();
+  const notion = getNotion();
+
+  // Generate cache key from configured database IDs
+  const dbIds = notion['config'].databases.map((db: { databaseId: string }) => db.databaseId);
+  const cacheKey = cache.generateKey(dbIds);
+
+  if (!refreshCallbackRegistered) {
+    // Register the refresh callback for background updates
+    cache.registerRefreshCallback(cacheKey, async () => {
+      console.info('[API] Executing refresh callback...');
+      const result = await notion.fetchAllItems();
+      return result.items;
+    });
+    refreshCallbackRegistered = true;
+    console.info('[API] Refresh callback registered for stale-while-revalidate');
+  }
+
+  return cacheKey;
+}
+
 /**
  * GET /api/items
- * Fetch all items from Notion (with caching)
+ * Fetch all items from Notion (with stale-while-revalidate caching)
+ *
+ * Caching behavior:
+ * - Fresh cache: Returns cached data immediately
+ * - Stale cache: Returns cached data immediately, triggers background refresh
+ * - No cache: Fetches from Notion and caches the result
  */
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const cache = getCache();
     const notion = getNotion();
+    const cacheKey = ensureRefreshCallbackRegistered();
 
-    // Generate cache key from configured database IDs
-    const dbIds = notion['config'].databases.map((db: { databaseId: string }) => db.databaseId);
-    const cacheKey = cache.generateKey(dbIds);
-
-    // Check cache first
+    // Check cache first (includes stale-while-revalidate logic)
     const cached = cache.get(cacheKey);
+
     if (cached) {
       const cacheAge = Date.now() - cached.timestamp;
-      console.info(`[API] Cache HIT for items (age: ${Math.round(cacheAge / 1000)}s)`);
+      const status = cached.isStale ? 'STALE' : 'HIT';
+      const refreshing = cache.isRefreshing(cacheKey);
+
+      console.info(
+        `[API] Cache ${status} for items (age: ${Math.round(cacheAge / 1000)}s)` +
+          (refreshing ? ' [refreshing in background]' : '')
+      );
 
       const response: ApiResponse<FetchItemsResponse> = {
         success: true,
         data: { items: cached.items },
         cached: true,
         cacheAge,
+        // @ts-expect-error - Extended response fields
+        isStale: cached.isStale,
+        refreshing,
       };
       res.json(response);
       return;
@@ -55,6 +96,44 @@ router.get('/', async (_req: Request, res: Response) => {
     res.json(response);
   } catch (error) {
     console.error('[API] Error fetching items:', error);
+    const response: ApiResponse<never> = {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+    res.status(500).json(response);
+  }
+});
+
+/**
+ * POST /api/items/refresh
+ * Force refresh the cache (waits for completion)
+ */
+router.post('/refresh', async (_req: Request, res: Response) => {
+  try {
+    const cache = getCache();
+    const cacheKey = ensureRefreshCallbackRegistered();
+
+    console.info('[API] Force refresh requested');
+
+    const items = await cache.forceRefresh(cacheKey);
+
+    if (!items) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Failed to refresh cache',
+      };
+      res.status(500).json(response);
+      return;
+    }
+
+    const response: ApiResponse<FetchItemsResponse> = {
+      success: true,
+      data: { items },
+      cached: false,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error('[API] Error refreshing items:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

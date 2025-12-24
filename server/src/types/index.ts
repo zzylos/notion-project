@@ -82,6 +82,9 @@ export interface CacheStats {
   hitRate: number;
   hits: number;
   misses: number;
+  staleHits?: number;
+  backgroundRefreshes?: number;
+  refreshingKeys?: string[];
 }
 
 // Notion API types

@@ -105,10 +105,20 @@ Status labels are automatically imported from your Notion database. The app inte
 
 ### Performance Optimizations
 
-- **5-minute caching** - Reduces redundant API calls to Notion
+- **Dual-layer caching** - 5-minute memory cache + 24-hour localStorage cache
+- **Stale-while-revalidate** - Returns cached data instantly while refreshing in background
 - **Progressive loading** - See items as they load with progress bar
 - **Virtualized lists** - Smooth scrolling for thousands of items
 - **Force refresh** - Clear cache and reload data when needed
+
+### Backend API Mode (Production)
+
+For production deployments, use the optional backend API server:
+
+- **Secure API key handling** - Keys stay on the server, not in the browser
+- **Server-side caching** - Shared cache across all users with stale-while-revalidate
+- **No CORS proxy needed** - Direct server-to-Notion communication
+- **Better rate limiting** - Control API calls at the server level
 
 ## User Scenarios
 
@@ -134,14 +144,23 @@ Assess organizational alignment and identify bottlenecks in the problem cluster 
 ### Installation
 
 ```bash
-# Install dependencies
+# Install dependencies (includes backend server)
 npm install
 
-# Start development server
+# Start frontend development server
 npm run dev
 
-# Build for production
+# Start backend API server
+npm run dev:server
+
+# Start both frontend and backend together
+npm run dev:full
+
+# Build frontend for production
 npm run build
+
+# Build both frontend and backend
+npm run build:all
 
 # Run linter
 npm run lint
@@ -231,6 +250,8 @@ Each Notion database should have these properties (configurable in settings):
 
 ## Tech Stack
 
+### Frontend
+
 - **React 19** - UI framework
 - **TypeScript** - Type safety
 - **Vite** - Build tool
@@ -240,6 +261,14 @@ Each Notion database should have these properties (configurable in settings):
 - **@tanstack/react-virtual** - List virtualization
 - **Lucide React** - Icons
 - **D3.js** - Data visualization utilities
+
+### Backend (Optional)
+
+- **Express** - Web framework
+- **TypeScript** - Type safety
+- **node-cache** - In-memory caching (used for stale-while-revalidate)
+- **cors** - Cross-origin resource sharing
+- **dotenv** - Environment variable loading
 
 ## Project Structure
 
@@ -251,7 +280,9 @@ src/
 │   ├── views/          # KanbanView, ListView, TimelineView
 │   ├── filters/        # Filter panel components
 │   └── common/         # Shared components (Header, DetailPanel, etc.)
-├── services/           # Notion API service with multi-database support
+├── services/
+│   ├── notionService.ts  # Notion API service with multi-database support
+│   └── apiClient.ts      # Backend API client (for backend mode)
 ├── store/              # Zustand state management
 ├── types/              # TypeScript type definitions
 ├── utils/
@@ -260,10 +291,24 @@ src/
 │   └── sampleData.ts   # Demo data for offline use
 └── App.tsx             # Main application with all view modes
 
+server/                 # Backend API server (optional)
+├── src/
+│   ├── index.ts        # Express server entry point
+│   ├── config.ts       # Server configuration loader
+│   ├── routes/
+│   │   ├── items.ts    # Items API endpoints
+│   │   └── cache.ts    # Cache management endpoints
+│   ├── services/
+│   │   ├── notion.ts   # Server-side Notion API service
+│   │   └── cache.ts    # Stale-while-revalidate cache
+│   └── types/          # TypeScript types
+├── package.json        # Server dependencies
+└── .env.example        # Server environment template
+
 scripts/
 └── test-notion-connection.js   # API credential validation script
 
-.env.example            # Template for environment configuration
+.env.example            # Template for frontend environment configuration
 ```
 
 ## Key Features for Employee Feedback
@@ -340,6 +385,98 @@ For databases with 500+ items:
 - Use filters to reduce the number of visible items
 - Drag nodes to reorganize as needed
 
+## Backend API Mode (Recommended for Production)
+
+For production deployments, use the backend API mode instead of direct browser-to-Notion calls. This keeps your API key secure on the server.
+
+### Architecture
+
+```
+┌─────────────┐     ┌─────────────────┐     ┌─────────────┐
+│   Browser   │────▶│  Backend API    │────▶│  Notion API │
+│  (Frontend) │     │   (Express)     │     │             │
+└─────────────┘     └────────┬────────┘     └─────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  Server Cache   │
+                    │ (Stale-While-   │
+                    │   Revalidate)   │
+                    └─────────────────┘
+```
+
+### Setting Up Backend Mode
+
+1. **Configure the backend server** (`server/.env`):
+
+```bash
+# Copy the example file
+cp server/.env.example server/.env
+
+# Edit with your Notion credentials
+NOTION_API_KEY=secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NOTION_DB_MISSION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+NOTION_DB_PROBLEM=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# ... add other database IDs
+
+# Cache settings
+CACHE_TTL_SECONDS=300  # 5 minutes (default)
+```
+
+2. **Configure the frontend** (`.env`):
+
+```bash
+# Enable backend API mode
+VITE_USE_BACKEND_API=true
+VITE_API_URL=http://localhost:3001  # or your production URL
+```
+
+3. **Start both servers**:
+
+```bash
+npm run dev:full
+```
+
+### Backend API Endpoints
+
+| Endpoint                  | Method | Description                                          |
+| ------------------------- | ------ | ---------------------------------------------------- |
+| `/api/items`              | GET    | Fetch all items (cached with stale-while-revalidate) |
+| `/api/items/refresh`      | POST   | Force refresh the cache                              |
+| `/api/items/:id`          | GET    | Fetch single item                                    |
+| `/api/items/:id/status`   | PATCH  | Update item status                                   |
+| `/api/items/:id/progress` | PATCH  | Update item progress                                 |
+| `/api/cache/invalidate`   | POST   | Clear server cache                                   |
+| `/api/cache/stats`        | GET    | Get cache statistics                                 |
+| `/api/health`             | GET    | Health check                                         |
+
+### Stale-While-Revalidate Caching
+
+The server implements a stale-while-revalidate caching strategy:
+
+1. **Fresh cache (< TTL)**: Returns cached data immediately
+2. **Stale cache (> TTL)**: Returns cached data immediately AND triggers background refresh
+3. **No cache**: Fetches from Notion and caches the result
+
+This ensures:
+
+- **Fast responses**: Users always get data instantly (even if slightly stale)
+- **Fresh data**: Background refreshes keep the cache up-to-date
+- **Resilience**: If Notion is temporarily unavailable, stale data is still served
+
+### Production Deployment
+
+For production, you can deploy the backend separately:
+
+```bash
+# Build the backend
+npm run build:server
+
+# Start production server
+npm run start:server
+```
+
+Update your frontend's `VITE_API_URL` to point to your production backend URL.
+
 ## Configuration Options
 
 The app supports two configuration methods:
@@ -348,16 +485,20 @@ The app supports two configuration methods:
 
 Create a `.env` file based on `.env.example`. Environment config takes precedence over UI settings.
 
-| Variable                  | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| `VITE_NOTION_API_KEY`     | Your Notion API key (required)              |
-| `VITE_NOTION_DB_MISSION`  | Objectives database ID                      |
-| `VITE_NOTION_DB_PROBLEM`  | Problems database ID                        |
-| `VITE_NOTION_DB_SOLUTION` | Solutions database ID                       |
-| `VITE_NOTION_DB_PROJECT`  | Projects database ID                        |
-| `VITE_NOTION_DB_DESIGN`   | Deliverables database ID                    |
-| `VITE_MAPPING_*`          | Property name mappings (see `.env.example`) |
-| `VITE_CORS_PROXY`         | Custom CORS proxy URL                       |
+| Variable                        | Description                                        |
+| ------------------------------- | -------------------------------------------------- |
+| `VITE_NOTION_API_KEY`           | Your Notion API key (required for direct mode)     |
+| `VITE_NOTION_DB_MISSION`        | Objectives database ID                             |
+| `VITE_NOTION_DB_PROBLEM`        | Problems database ID                               |
+| `VITE_NOTION_DB_SOLUTION`       | Solutions database ID                              |
+| `VITE_NOTION_DB_PROJECT`        | Projects database ID                               |
+| `VITE_NOTION_DB_DESIGN`         | Deliverables database ID                           |
+| `VITE_MAPPING_*`                | Property name mappings (see `.env.example`)        |
+| `VITE_CORS_PROXY`               | Custom CORS proxy URL (direct mode only)           |
+| `VITE_USE_BACKEND_API`          | Set to `true` to use backend API mode              |
+| `VITE_API_URL`                  | Backend API URL (default: `http://localhost:3001`) |
+| `VITE_DISABLE_CONFIG_UI`        | Set to `true` to disable UI configuration          |
+| `VITE_REFRESH_COOLDOWN_MINUTES` | Rate limit for refresh button (default: 2 minutes) |
 
 ### 2. UI Settings Modal
 
