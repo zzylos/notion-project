@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2, Unplug, Gauge } from 'lucide-react';
+import {
+  X,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Unplug,
+  Gauge,
+  Lock,
+  FileCode,
+} from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../../types';
 import ApiKeySection from './modal/ApiKeySection';
 import DatabaseConfigSection from './modal/DatabaseConfigSection';
 import PropertyMappingsSection from './modal/PropertyMappingsSection';
 import { isValidDatabaseId } from '../../utils/validation';
-import { migrateConfig } from '../../utils/config';
+import { migrateConfig, isConfigUIDisabled, hasEnvConfig } from '../../utils/config';
 import { DEFAULT_PROPERTY_MAPPINGS, VIEW_LIMITS } from '../../constants';
 
 interface NotionConfigModalProps {
@@ -19,6 +29,8 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
   const { setNotionConfig, notionConfig, disableItemLimit, setDisableItemLimit } = useStore();
 
   const migrated = migrateConfig(notionConfig);
+  const configUIDisabled = isConfigUIDisabled();
+  const usingEnvConfig = hasEnvConfig();
 
   const [apiKey, setApiKey] = useState(migrated.apiKey);
   const [databases, setDatabases] = useState<Record<ItemType, string>>(migrated.databases);
@@ -166,13 +178,16 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
                 <CheckCircle2 className="w-5 h-5" />
                 <span className="text-sm font-medium">Connected to Notion</span>
               </div>
-              <button
-                onClick={handleDisconnect}
-                className="flex items-center gap-1 px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-              >
-                <Unplug className="w-4 h-4" />
-                Disconnect
-              </button>
+              {/* Only show disconnect button when config UI is enabled */}
+              {!configUIDisabled && (
+                <button
+                  onClick={handleDisconnect}
+                  className="flex items-center gap-1 px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
+                >
+                  <Unplug className="w-4 h-4" />
+                  Disconnect
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -189,23 +204,53 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* API Key */}
-          <ApiKeySection apiKey={apiKey} onChange={setApiKey} />
+          {/* Config UI Disabled Banner */}
+          {configUIDisabled && (
+            <div className="flex items-start gap-3 p-4 bg-slate-100 border border-slate-200 rounded-lg">
+              <Lock className="w-5 h-5 text-slate-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-800">
+                  Configuration Managed by Server
+                </h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  Notion API settings are configured via environment variables and cannot be
+                  modified through this interface. Contact your administrator to change these
+                  settings.
+                </p>
+                {usingEnvConfig && (
+                  <div className="flex items-center gap-2 mt-3 text-xs text-green-700">
+                    <FileCode className="w-4 h-4" />
+                    <span>
+                      Configuration loaded from{' '}
+                      <code className="px-1 py-0.5 bg-green-100 rounded">.env</code> file
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-          {/* Multiple Databases */}
-          <DatabaseConfigSection
-            databases={databases}
-            validationErrors={validationErrors}
-            onDatabaseChange={updateDatabase}
-          />
+          {/* API Key - disabled when config UI is disabled */}
+          {!configUIDisabled && <ApiKeySection apiKey={apiKey} onChange={setApiKey} />}
 
-          {/* Property Mappings */}
-          <PropertyMappingsSection
-            mappings={mappings}
-            showAdvanced={showAdvanced}
-            onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
-            onMappingChange={(key, value) => setMappings(prev => ({ ...prev, [key]: value }))}
-          />
+          {/* Multiple Databases - disabled when config UI is disabled */}
+          {!configUIDisabled && (
+            <DatabaseConfigSection
+              databases={databases}
+              validationErrors={validationErrors}
+              onDatabaseChange={updateDatabase}
+            />
+          )}
+
+          {/* Property Mappings - disabled when config UI is disabled */}
+          {!configUIDisabled && (
+            <PropertyMappingsSection
+              mappings={mappings}
+              showAdvanced={showAdvanced}
+              onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
+              onMappingChange={(key, value) => setMappings(prev => ({ ...prev, [key]: value }))}
+            />
+          )}
 
           {/* Performance Settings */}
           <div className="space-y-3">
@@ -249,51 +294,70 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
             )}
           </div>
 
-          {/* Info box */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-800">
-              <strong>Note:</strong> Each database type will be fetched separately and combined into
-              a unified view. Parent relations can link items across different databases.
-            </p>
-          </div>
+          {/* Info box - only show when config UI is enabled */}
+          {!configUIDisabled && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-800">
+                <strong>Note:</strong> Each database type will be fetched separately and combined
+                into a unified view. Parent relations can link items across different databases.
+              </p>
+            </div>
+          )}
 
-          {/* Submit button */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={!apiKey || !hasAnyDatabase || isConnecting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isConnecting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  {isConnected ? 'Update Connection' : 'Connect to Notion'}
-                </>
-              )}
-            </button>
-          </div>
+          {/* Submit button - only show when config UI is enabled */}
+          {!configUIDisabled && (
+            <div className="flex gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={!apiKey || !hasAnyDatabase || isConnecting}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    {isConnected ? 'Update Connection' : 'Connect to Notion'}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Close button - only show when config UI is disabled */}
+          {configUIDisabled && (
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          )}
         </form>
 
-        {/* Demo data option */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <div className="text-center">
-            <p className="text-sm text-gray-600 mb-2">
-              Don't have Notion set up yet? Try with demo data:
-            </p>
-            <button
-              onClick={handleUseDemoData}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Use Demo Data Instead
-            </button>
+        {/* Demo data option - only show when config UI is enabled */}
+        {!configUIDisabled && (
+          <div className="p-4 border-t border-gray-200 bg-gray-50">
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-2">
+                Don't have Notion set up yet? Try with demo data:
+              </p>
+              <button
+                onClick={handleUseDemoData}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Use Demo Data Instead
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

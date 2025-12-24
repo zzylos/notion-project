@@ -45,6 +45,16 @@ export const NOTION = {
 } as const;
 
 /**
+ * Refresh rate limiting constants
+ */
+export const REFRESH = {
+  /** Default cooldown between refreshes in milliseconds (2 minutes) */
+  DEFAULT_COOLDOWN_MS: 2 * 60 * 1000,
+  /** LocalStorage key for storing last refresh timestamp */
+  LAST_REFRESH_KEY: 'notion-last-refresh',
+} as const;
+
+/**
  * Default CORS proxy for browser-based Notion API calls
  */
 export const DEFAULT_CORS_PROXY = 'https://corsproxy.io/?';

@@ -10,7 +10,12 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import LoadingState from './components/ui/LoadingState';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
-import { getMergedConfig, hasEnvConfig } from './utils/config';
+import {
+  getMergedConfig,
+  hasEnvConfig,
+  checkRefreshCooldown,
+  setLastRefreshTime,
+} from './utils/config';
 import {
   PanelRightClose,
   PanelRight,
@@ -53,14 +58,49 @@ function App() {
     type: string;
     error: string;
   }> | null>(null);
+  // Refresh cooldown state
+  const [refreshCooldownRemaining, setRefreshCooldownRemaining] = useState(0);
   // Counter to force modal remount when opening (resets form state)
   const [modalKey, setModalKey] = useState(0);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Merge environment config with stored config (env takes precedence)
   const effectiveConfig = useMemo(() => getMergedConfig(notionConfig), [notionConfig]);
   const usingEnvConfig = hasEnvConfig();
+
+  // Start or update the cooldown timer
+  const startCooldownTimer = useCallback(() => {
+    // Clear any existing interval
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+      cooldownIntervalRef.current = null;
+    }
+
+    // Check initial cooldown state
+    const { remainingMs } = checkRefreshCooldown();
+    setRefreshCooldownRemaining(remainingMs);
+
+    // If there's remaining cooldown, start an interval to update it
+    if (remainingMs > 0) {
+      cooldownIntervalRef.current = setInterval(() => {
+        const { remainingMs: remaining } = checkRefreshCooldown();
+        setRefreshCooldownRemaining(remaining);
+
+        // Clear interval when cooldown expires
+        if (remaining <= 0 && cooldownIntervalRef.current) {
+          clearInterval(cooldownIntervalRef.current);
+          cooldownIntervalRef.current = null;
+        }
+      }, 1000); // Update every second
+    }
+  }, []);
+
+  // Check cooldown on mount
+  useEffect(() => {
+    startCooldownTimer();
+  }, [startCooldownTimer]);
 
   // Load data function with progressive updates
   const loadData = useCallback(
@@ -158,7 +198,7 @@ function App() {
     loadData(effectiveConfig);
   }, [effectiveConfig, loadData]);
 
-  // Cleanup timeout and abort controller on unmount
+  // Cleanup timeout, abort controller, and cooldown interval on unmount
   useEffect(() => {
     return () => {
       if (expandTimeoutRef.current) {
@@ -167,13 +207,29 @@ function App() {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
     };
   }, []);
 
   const handleRefresh = async () => {
+    // Check if refresh is allowed based on cooldown
+    const { allowed, remainingMs } = checkRefreshCooldown();
+    if (!allowed) {
+      // Update the cooldown display
+      setRefreshCooldownRemaining(remainingMs);
+      startCooldownTimer();
+      return;
+    }
+
     setIsRefreshing(true);
     await loadData(effectiveConfig, true); // Force refresh, bypass cache
     setIsRefreshing(false);
+
+    // Record the refresh time and start cooldown timer
+    setLastRefreshTime(Date.now());
+    startCooldownTimer();
   };
 
   const handleCloseDetail = () => {
@@ -233,6 +289,7 @@ function App() {
           }}
           onRefresh={handleRefresh}
           isRefreshing={isRefreshing || isLoading}
+          refreshCooldownRemaining={refreshCooldownRemaining}
         />
 
         {/* Environment config indicator */}

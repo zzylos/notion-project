@@ -48,9 +48,35 @@ VITE_MAPPING_TAGS=Tags
 
 # Optional CORS proxy override
 VITE_CORS_PROXY=https://corsproxy.io/?
+
+# Production settings (optional)
+VITE_DISABLE_CONFIG_UI=true             # Disable UI configuration (use .env only)
+VITE_REFRESH_COOLDOWN_MINUTES=2         # Rate limit refresh button (default: 2 min)
 ```
 
 The config loader (`src/utils/config.ts`) merges env config with localStorage settings. When using env config, a green indicator appears below the header.
+
+### Production Settings
+
+For production deployments, the following settings are available:
+
+| Variable                        | Default | Description                                                                                                                                                                                |
+| ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `VITE_DISABLE_CONFIG_UI`        | `false` | When `true`, disables UI-based configuration. Users cannot modify API keys, database IDs, or property mappings through the settings modal. All configuration must be done via `.env` file. |
+| `VITE_REFRESH_COOLDOWN_MINUTES` | `2`     | Minimum time between data refreshes to prevent excessive API calls. Set to `0` to disable rate limiting.                                                                                   |
+
+When `VITE_DISABLE_CONFIG_UI=true`:
+
+- Settings modal shows a locked configuration banner
+- API key, database ID, and property mapping inputs are hidden
+- Disconnect and demo data options are hidden
+- Only performance settings remain editable
+
+When refresh cooldown is active:
+
+- Refresh button shows remaining countdown time
+- Button is disabled until cooldown expires
+- Cooldown persists across page reloads
 
 ## Architecture
 
@@ -73,7 +99,9 @@ The config loader (`src/utils/config.ts`) merges env config with localStorage se
 - Service at `src/services/notionService.ts`
 - **Multi-database support**: Fetches from up to 5 databases (Objectives, Problems, Solutions, Projects, Deliverables)
 - Uses CORS proxy (`corsproxy.io`) for browser-based API calls
-- 5-minute caching to reduce API calls
+- **Dual-layer caching**:
+  - Memory cache (5 minutes) - for quick navigation
+  - Persistent localStorage cache (24 hours) - survives page reloads for faster startup
 - Progressive loading with callback for large databases
 - Type is determined by which database an item comes from
 
