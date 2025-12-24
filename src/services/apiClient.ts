@@ -1,4 +1,5 @@
 import type { WorkItem, ItemStatus } from '../types';
+import { ApiError, NetworkError, isAbortError } from '../utils/errors';
 
 /**
  * API response wrapper type
@@ -61,20 +62,27 @@ class ApiClient {
       const data = (await response.json()) as ApiResponse<T>;
 
       if (!response.ok) {
-        throw new Error(data.error || `HTTP error ${response.status}`);
+        throw new ApiError(data.error || `HTTP error ${response.status}`, endpoint, {
+          statusCode: response.status,
+        });
       }
 
       return data;
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      // Re-throw abort errors
+      if (isAbortError(error)) {
+        throw error;
+      }
+
+      // Re-throw ApiError instances
+      if (error instanceof ApiError) {
         throw error;
       }
 
       // Handle network errors
       if (error instanceof TypeError) {
-        throw new Error(
-          `Network error: Unable to connect to backend at ${this.baseUrl}. ` +
-            'Make sure the server is running.'
+        throw new NetworkError(
+          `Unable to connect to backend at ${this.baseUrl}. Make sure the server is running.`
         );
       }
 
@@ -95,7 +103,7 @@ class ApiClient {
     const response = await this.request<FetchItemsResponse>('/api/items', {}, signal);
 
     if (!response.success || !response.data) {
-      throw new Error(response.error || 'Failed to fetch items');
+      throw new ApiError(response.error || 'Failed to fetch items', '/api/items');
     }
 
     return {
@@ -111,10 +119,11 @@ class ApiClient {
    * Fetch a single item by ID
    */
   async fetchItem(pageId: string): Promise<WorkItem> {
-    const response = await this.request<WorkItem>(`/api/items/${pageId}`);
+    const endpoint = `/api/items/${pageId}`;
+    const response = await this.request<WorkItem>(endpoint);
 
     if (!response.success || !response.data) {
-      throw new Error(response.error || 'Failed to fetch item');
+      throw new ApiError(response.error || 'Failed to fetch item', endpoint);
     }
 
     return response.data;
@@ -124,13 +133,14 @@ class ApiClient {
    * Update item status
    */
   async updateItemStatus(pageId: string, status: ItemStatus): Promise<void> {
-    const response = await this.request<{ updated: boolean }>(`/api/items/${pageId}/status`, {
+    const endpoint = `/api/items/${pageId}/status`;
+    const response = await this.request<{ updated: boolean }>(endpoint, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     });
 
     if (!response.success) {
-      throw new Error(response.error || 'Failed to update status');
+      throw new ApiError(response.error || 'Failed to update status', endpoint);
     }
   }
 
@@ -138,13 +148,14 @@ class ApiClient {
    * Update item progress
    */
   async updateItemProgress(pageId: string, progress: number): Promise<void> {
-    const response = await this.request<{ updated: boolean }>(`/api/items/${pageId}/progress`, {
+    const endpoint = `/api/items/${pageId}/progress`;
+    const response = await this.request<{ updated: boolean }>(endpoint, {
       method: 'PATCH',
       body: JSON.stringify({ progress }),
     });
 
     if (!response.success) {
-      throw new Error(response.error || 'Failed to update progress');
+      throw new ApiError(response.error || 'Failed to update progress', endpoint);
     }
   }
 
@@ -152,12 +163,13 @@ class ApiClient {
    * Invalidate the server cache
    */
   async invalidateCache(): Promise<void> {
-    const response = await this.request<{ cleared: boolean }>('/api/cache/invalidate', {
+    const endpoint = '/api/cache/invalidate';
+    const response = await this.request<{ cleared: boolean }>(endpoint, {
       method: 'POST',
     });
 
     if (!response.success) {
-      throw new Error(response.error || 'Failed to invalidate cache');
+      throw new ApiError(response.error || 'Failed to invalidate cache', endpoint);
     }
   }
 
@@ -165,10 +177,11 @@ class ApiClient {
    * Get cache statistics
    */
   async getCacheStats(): Promise<CacheStats> {
-    const response = await this.request<CacheStats>('/api/cache/stats');
+    const endpoint = '/api/cache/stats';
+    const response = await this.request<CacheStats>(endpoint);
 
     if (!response.success || !response.data) {
-      throw new Error(response.error || 'Failed to get cache stats');
+      throw new ApiError(response.error || 'Failed to get cache stats', endpoint);
     }
 
     return response.data;

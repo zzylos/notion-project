@@ -11,42 +11,9 @@ import type {
   NotionPropertyValue,
   NotionQueryResponse,
 } from '../types/index.js';
+import { PROPERTY_ALIASES, NOTION_API } from '../../../shared/index.js';
 
-/**
- * Common property name aliases for flexible matching
- */
-const PROPERTY_ALIASES: Record<string, string[]> = {
-  Status: ['Status', 'State', 'Stage', 'Phase'],
-  Priority: ['Priority', 'Importance', 'Urgency', 'Level', 'P'],
-  Parent: [
-    'Parent',
-    'Parent Item',
-    'Parent Task',
-    'Belongs To',
-    'Part Of',
-    'Epic',
-    'Initiative',
-    'Objective',
-    'Problem',
-    'Solution',
-    'Project',
-  ],
-  Owner: [
-    'Owner',
-    'Assignee',
-    'Assigned To',
-    'Responsible',
-    'Lead',
-    'Person',
-    'People',
-    'Assigned',
-  ],
-  Progress: ['Progress', 'Completion', 'Percent Complete', '% Complete', 'Done %'],
-  Deadline: ['Deadline', 'Due Date', 'Due', 'Target Date', 'End Date', 'Finish Date', 'Due By'],
-  Tags: ['Tags', 'Labels', 'Categories', 'Keywords'],
-};
-
-const NOTION_API_BASE = 'https://api.notion.com/v1';
+const NOTION_API_BASE = NOTION_API.BASE_URL;
 
 /**
  * Server-side Notion API service.
