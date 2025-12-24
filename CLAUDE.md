@@ -8,7 +8,10 @@ This is a Notion Opportunity Tree Visualizer for HouseSigma. It displays work it
 
 ```bash
 npm run dev          # Start development server (Vite)
+npm run dev:server   # Start backend API server
+npm run dev:full     # Start both frontend and backend concurrently
 npm run build        # TypeScript check + production build
+npm run build:all    # Build frontend and backend
 npm run lint         # Run ESLint
 npm run test:notion <API_KEY> <DATABASE_ID>  # Test Notion API connection
 ```
@@ -78,6 +81,60 @@ When refresh cooldown is active:
 - Button is disabled until cooldown expires
 - Cooldown persists across page reloads
 
+### Backend API Mode (Recommended for Production)
+
+For production deployments, use the backend API mode instead of direct browser-to-Notion calls:
+
+```bash
+# Frontend .env
+VITE_USE_BACKEND_API=true
+VITE_API_URL=http://localhost:3001  # Or your production backend URL
+
+# Backend server/.env
+NOTION_API_KEY=secret_xxx
+NOTION_DB_MISSION=xxx
+# ... other database IDs
+```
+
+**Benefits:**
+
+- API key stays on the server (more secure)
+- Server-side caching with stale-while-revalidate pattern
+- No CORS proxy needed
+- Better rate limiting control
+
+**Architecture:**
+
+```
+Browser → Backend API Server → Notion API
+              ↓
+         Server Cache
+    (Stale-While-Revalidate)
+```
+
+**Stale-While-Revalidate Caching:**
+
+When cache TTL expires:
+
+1. Returns stale data immediately to the client
+2. Triggers background refresh from Notion
+3. Updates cache when fresh data arrives
+
+This ensures fast responses while keeping data fresh.
+
+**Backend API Endpoints:**
+
+| Endpoint                  | Method | Description                                   |
+| ------------------------- | ------ | --------------------------------------------- |
+| `/api/items`              | GET    | Fetch all items (stale-while-revalidate)      |
+| `/api/items/refresh`      | POST   | Force refresh cache (waits for completion)    |
+| `/api/items/:id`          | GET    | Fetch single item                             |
+| `/api/items/:id/status`   | PATCH  | Update item status                            |
+| `/api/items/:id/progress` | PATCH  | Update item progress                          |
+| `/api/cache/invalidate`   | POST   | Clear server cache                            |
+| `/api/cache/stats`        | GET    | Get cache statistics (includes stale metrics) |
+| `/api/health`             | GET    | Health check                                  |
+
 ## Architecture
 
 ### State Management
@@ -97,11 +154,17 @@ When refresh cooldown is active:
 ### Notion Integration
 
 - Service at `src/services/notionService.ts`
+- API client at `src/services/apiClient.ts` (for backend mode)
 - **Multi-database support**: Fetches from up to 5 databases (Objectives, Problems, Solutions, Projects, Deliverables)
-- Uses CORS proxy (`corsproxy.io`) for browser-based API calls
-- **Dual-layer caching**:
+- **Two operation modes**:
+  - **Direct mode** (default): Uses CORS proxy (`corsproxy.io`) for browser-based API calls
+  - **Backend mode** (`VITE_USE_BACKEND_API=true`): Calls your own backend server
+- **Dual-layer caching** (both modes):
   - Memory cache (5 minutes) - for quick navigation
   - Persistent localStorage cache (24 hours) - survives page reloads for faster startup
+- **Server-side caching** (backend mode only):
+  - Configurable TTL (default: 5 minutes)
+  - Cache invalidation via API
 - Progressive loading with callback for large databases
 - Type is determined by which database an item comes from
 
@@ -112,6 +175,7 @@ When refresh cooldown is active:
 | `src/App.tsx`                                 | Main app, view switching, collapsible stats |
 | `src/store/useStore.ts`                       | Zustand state management                    |
 | `src/services/notionService.ts`               | Multi-database Notion API integration       |
+| `src/services/apiClient.ts`                   | Backend API client (for backend mode)       |
 | `src/components/common/NotionConfigModal.tsx` | Settings with multi-database inputs         |
 | `src/components/canvas/CanvasView.tsx`        | React Flow canvas with hierarchical layout  |
 | `src/components/canvas/CanvasNode.tsx`        | Custom node component for canvas            |
@@ -126,6 +190,11 @@ When refresh cooldown is active:
 | `src/types/index.ts`                          | TypeScript type definitions                 |
 | `src/utils/colors.ts`                         | Color utilities with dynamic status support |
 | `src/utils/sampleData.ts`                     | Demo data for offline use                   |
+| `server/src/index.ts`                         | Backend API server entry point              |
+| `server/src/services/notion.ts`               | Server-side Notion API service              |
+| `server/src/services/cache.ts`                | Server-side caching service                 |
+| `server/src/routes/items.ts`                  | Items API endpoints                         |
+| `server/src/routes/cache.ts`                  | Cache management endpoints                  |
 
 ## Important Patterns
 

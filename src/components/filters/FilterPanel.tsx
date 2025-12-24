@@ -487,7 +487,7 @@ const FilterPanel: React.FC = memo(() => {
                       className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center text-[10px] font-medium"
                       aria-hidden="true"
                     >
-                      {owner.name.charAt(0)}
+                      {owner.name?.charAt(0) || '?'}
                     </div>
                     {owner.name}
                   </button>

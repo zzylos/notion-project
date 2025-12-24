@@ -206,7 +206,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
           {item.owner ? (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-medium text-blue-700">
-                {item.owner.name.charAt(0)}
+                {item.owner.name?.charAt(0) || '?'}
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">{item.owner.name}</p>

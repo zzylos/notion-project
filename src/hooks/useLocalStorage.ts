@@ -69,7 +69,11 @@ export function useLocalStorage<T>(
   );
 
   // Use ref for initialValue to avoid recreation
+  // Keep ref in sync with prop changes so removeValue uses current initial value
   const initialValueRef = useRef(initialValue);
+  useEffect(() => {
+    initialValueRef.current = initialValue;
+  }, [initialValue]);
 
   // Remove value from localStorage and reset to initial
   const removeValue = useCallback(() => {
