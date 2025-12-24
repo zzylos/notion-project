@@ -196,11 +196,20 @@ class CacheService {
       return null;
     }
 
-    // Wait if already refreshing
+    // Wait if already refreshing (with timeout to prevent infinite wait)
     if (this.refreshInProgress.has(key)) {
       console.info(`[Cache] Waiting for existing refresh: ${key}`);
-      // Wait for refresh to complete (poll every 100ms)
+      const maxWaitMs = 30000; // 30 second timeout
+      const startTime = Date.now();
+
+      // Wait for refresh to complete (poll every 100ms, with timeout)
       while (this.refreshInProgress.has(key)) {
+        if (Date.now() - startTime > maxWaitMs) {
+          console.warn(`[Cache] Timeout waiting for refresh: ${key}`);
+          // Return existing stale data if available
+          const entry = this.cache.get(key);
+          return entry?.items ?? null;
+        }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       const entry = this.cache.get(key);
@@ -266,7 +275,7 @@ class CacheService {
 // Singleton instance - will be initialized with config in index.ts
 let cacheInstance: CacheService | null = null;
 
-export function initializeCache(ttlSeconds: number, _checkPeriodSeconds: number): CacheService {
+export function initializeCache(ttlSeconds: number): CacheService {
   cacheInstance = new CacheService(ttlSeconds);
   return cacheInstance;
 }

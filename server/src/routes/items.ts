@@ -1,7 +1,14 @@
 import { Router, type Request, type Response } from 'express';
 import { getCache } from '../services/cache.js';
 import { getNotion } from '../services/notion.js';
+import { mutationRateLimiter } from '../middleware/rateLimit.js';
 import type { ApiResponse, FetchItemsResponse } from '../types/index.js';
+
+// Extended response type for cached responses
+interface CachedApiResponse<T> extends ApiResponse<T> {
+  isStale?: boolean;
+  refreshing?: boolean;
+}
 
 const router = Router();
 
@@ -17,7 +24,7 @@ function ensureRefreshCallbackRegistered(): string {
   const notion = getNotion();
 
   // Generate cache key from configured database IDs
-  const dbIds = notion['config'].databases.map((db: { databaseId: string }) => db.databaseId);
+  const dbIds = notion.getDatabaseIds();
   const cacheKey = cache.generateKey(dbIds);
 
   if (!refreshCallbackRegistered) {
@@ -62,12 +69,11 @@ router.get('/', async (_req: Request, res: Response) => {
           (refreshing ? ' [refreshing in background]' : '')
       );
 
-      const response: ApiResponse<FetchItemsResponse> = {
+      const response: CachedApiResponse<FetchItemsResponse> = {
         success: true,
         data: { items: cached.items },
         cached: true,
         cacheAge,
-        // @ts-expect-error - Extended response fields
         isStale: cached.isStale,
         refreshing,
       };
@@ -170,9 +176,11 @@ router.get('/:id', async (req: Request, res: Response) => {
  * PATCH /api/items/:id/status
  * Update item status
  */
-router.patch('/:id/status', async (req: Request, res: Response) => {
+router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
+
+    // Validate status input
     if (!status || typeof status !== 'string') {
       const response: ApiResponse<never> = {
         success: false,
@@ -182,13 +190,25 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
       return;
     }
 
+    // Validate max length to prevent abuse
+    const trimmedStatus = status.trim();
+    if (trimmedStatus.length === 0 || trimmedStatus.length > 100) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Status must be between 1 and 100 characters',
+      };
+      res.status(400).json(response);
+      return;
+    }
+
     const notion = getNotion();
     const cache = getCache();
+    const cacheKey = ensureRefreshCallbackRegistered();
 
-    await notion.updateItemStatus(req.params.id, status);
+    await notion.updateItemStatus(req.params.id, trimmedStatus);
 
-    // Invalidate cache after update
-    cache.clear();
+    // Invalidate only the items cache (not all cache entries)
+    cache.delete(cacheKey);
 
     const response: ApiResponse<{ updated: boolean }> = {
       success: true,
@@ -209,7 +229,7 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
  * PATCH /api/items/:id/progress
  * Update item progress
  */
-router.patch('/:id/progress', async (req: Request, res: Response) => {
+router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Response) => {
   try {
     const { progress } = req.body;
     if (typeof progress !== 'number' || progress < 0 || progress > 100) {
@@ -223,11 +243,12 @@ router.patch('/:id/progress', async (req: Request, res: Response) => {
 
     const notion = getNotion();
     const cache = getCache();
+    const cacheKey = ensureRefreshCallbackRegistered();
 
     await notion.updateItemProgress(req.params.id, progress);
 
-    // Invalidate cache after update
-    cache.clear();
+    // Invalidate only the items cache (not all cache entries)
+    cache.delete(cacheKey);
 
     const response: ApiResponse<{ updated: boolean }> = {
       success: true,

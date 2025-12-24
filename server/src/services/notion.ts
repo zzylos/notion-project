@@ -56,10 +56,19 @@ class NotionService {
   private config: NotionConfig;
   private debugMode: boolean;
   private loggedDatabases = new Set<string>();
+  // Track property types for each database (needed for correct update format)
+  private propertyTypes: Map<string, Map<string, string>> = new Map();
 
   constructor(config: NotionConfig) {
     this.config = config;
     this.debugMode = process.env.NODE_ENV !== 'production';
+  }
+
+  /**
+   * Get database IDs for cache key generation
+   */
+  getDatabaseIds(): string[] {
+    return this.config.databases.map(db => db.databaseId);
   }
 
   /**
@@ -188,15 +197,24 @@ class NotionService {
   }
 
   /**
-   * Log property names for debugging
+   * Log property names for debugging and track property types
    */
   private logPropertyNames(
     databaseType: ItemType,
     props: Record<string, NotionPropertyValue>
   ): void {
-    if (!this.debugMode) return;
-
     const dbKey = databaseType;
+
+    // Always track property types for correct update format
+    if (!this.propertyTypes.has(dbKey)) {
+      const typeMap = new Map<string, string>();
+      for (const [name, value] of Object.entries(props)) {
+        typeMap.set(name.toLowerCase(), value.type);
+      }
+      this.propertyTypes.set(dbKey, typeMap);
+    }
+
+    if (!this.debugMode) return;
     if (this.loggedDatabases.has(dbKey)) return;
     this.loggedDatabases.add(dbKey);
 
@@ -206,6 +224,20 @@ class NotionService {
     }));
 
     console.info(`[Notion] ${databaseType.toUpperCase()} database properties:`, propertyInfo);
+  }
+
+  /**
+   * Get the detected property type for a given property name
+   */
+  private getPropertyType(propertyName: string): 'status' | 'select' | null {
+    const lowerName = propertyName.toLowerCase();
+    for (const typeMap of this.propertyTypes.values()) {
+      const type = typeMap.get(lowerName);
+      if (type === 'status' || type === 'select') {
+        return type;
+      }
+    }
+    return null;
   }
 
   // Property extraction methods
@@ -297,7 +329,7 @@ class NotionService {
     return prop.people.map(p => ({
       id: p.id,
       name: p.name || 'Unknown',
-      email: p.person?.email || '',
+      email: p.person?.email,
       avatar: p.avatar_url,
     }));
   }
@@ -507,25 +539,39 @@ class NotionService {
 
   /**
    * Fetch a single item by ID
+   * @param pageId The Notion page ID
+   * @param type Optional item type (defaults to 'project' if not specified)
    */
-  async fetchItem(pageId: string): Promise<WorkItem> {
+  async fetchItem(pageId: string, type: ItemType = 'project'): Promise<WorkItem> {
     const page = await this.notionFetch<NotionPage>(`/pages/${pageId}`);
-    return this.pageToWorkItem(page, 'project');
+    return this.pageToWorkItem(page, type);
   }
 
   /**
    * Update item status
+   * Automatically uses correct Notion API format (select vs status property type)
    */
   async updateItemStatus(pageId: string, status: ItemStatus): Promise<void> {
     const mappings = this.getMappings();
+    const statusPropertyName = mappings.status;
+
+    // Detect the property type (status vs select)
+    const propertyType = this.getPropertyType(statusPropertyName);
+
+    // Build the correct update format based on property type
+    let propertyValue: Record<string, unknown>;
+    if (propertyType === 'status') {
+      propertyValue = { status: { name: status } };
+    } else {
+      // Default to select format (works for most cases)
+      propertyValue = { select: { name: status } };
+    }
 
     await this.notionFetch(`/pages/${pageId}`, {
       method: 'PATCH',
       body: JSON.stringify({
         properties: {
-          [mappings.status]: {
-            select: { name: status },
-          },
+          [statusPropertyName]: propertyValue,
         },
       }),
     });
