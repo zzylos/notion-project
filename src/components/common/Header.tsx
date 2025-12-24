@@ -15,7 +15,19 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onRefresh: () => void;
   isRefreshing: boolean;
+  /** Remaining cooldown time in milliseconds before next refresh is allowed */
+  refreshCooldownRemaining?: number;
 }
+
+/**
+ * Format milliseconds to a human-readable time string (e.g., "1:30")
+ */
+const formatCooldownTime = (ms: number): string => {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
 const viewModeIcons: Record<ViewMode, React.ComponentType<{ className?: string }>> = {
   tree: TreeDeciduous,
@@ -33,8 +45,15 @@ const viewModeLabels: Record<ViewMode, string> = {
   timeline: 'Timeline',
 };
 
-const Header: React.FC<HeaderProps> = ({ onOpenSettings, onRefresh, isRefreshing }) => {
+const Header: React.FC<HeaderProps> = ({
+  onOpenSettings,
+  onRefresh,
+  isRefreshing,
+  refreshCooldownRemaining = 0,
+}) => {
   const { viewMode, setViewMode, notionConfig } = useStore();
+  const isOnCooldown = refreshCooldownRemaining > 0;
+  const isRefreshDisabled = isRefreshing || isOnCooldown;
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
@@ -97,11 +116,27 @@ const Header: React.FC<HeaderProps> = ({ onOpenSettings, onRefresh, isRefreshing
           {/* Refresh button */}
           <button
             onClick={onRefresh}
-            disabled={isRefreshing}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh data"
+            disabled={isRefreshDisabled}
+            className={`
+              flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors
+              ${
+                isRefreshDisabled
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+              }
+            `}
+            title={
+              isOnCooldown
+                ? `Refresh available in ${formatCooldownTime(refreshCooldownRemaining)}`
+                : 'Refresh data'
+            }
           >
             <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isOnCooldown && (
+              <span className="text-xs font-medium text-gray-400">
+                {formatCooldownTime(refreshCooldownRemaining)}
+              </span>
+            )}
           </button>
 
           {/* Settings button */}
