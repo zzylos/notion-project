@@ -2,12 +2,17 @@ import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } fro
 import { useStore } from './store/useStore';
 import Header from './components/common/Header';
 import FilterPanel from './components/filters/FilterPanel';
-import StatsOverview from './components/common/StatsOverview';
 import TreeView from './components/tree/TreeView';
 import DetailPanel from './components/common/DetailPanel';
 import NotionConfigModal from './components/common/NotionConfigModal';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LoadingState from './components/ui/LoadingState';
+import {
+  EnvConfigIndicator,
+  LoadingProgressBar,
+  FailedDatabasesWarning,
+  StatsToggle,
+} from './components/common/StatusIndicators';
 import { sampleData } from './utils/sampleData';
 import { notionService } from './services/notionService';
 import {
@@ -17,16 +22,7 @@ import {
   setLastRefreshTime,
 } from './utils/config';
 import { logger } from './utils/logger';
-import {
-  PanelRightClose,
-  PanelRight,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
-  X,
-  FileCode,
-} from 'lucide-react';
+import { PanelRightClose, PanelRight } from 'lucide-react';
 import type { NotionConfig } from './types';
 
 // Lazy load heavy view components for better initial load performance
@@ -142,14 +138,19 @@ function App() {
     [setItems]
   );
 
-  // Load sample data as fallback
-  const loadSampleData = useCallback(() => {
-    setItems(sampleData);
+  // Helper to expand all after a delay (clears existing timeout)
+  const scheduleExpandAll = useCallback(() => {
     if (expandTimeoutRef.current) {
       clearTimeout(expandTimeoutRef.current);
     }
     expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
-  }, [setItems, expandAll]);
+  }, [expandAll]);
+
+  // Load sample data as fallback
+  const loadSampleData = useCallback(() => {
+    setItems(sampleData);
+    scheduleExpandAll();
+  }, [setItems, scheduleExpandAll]);
 
   // Load data function with progressive updates
   const loadData = useCallback(
@@ -183,10 +184,7 @@ function App() {
           if (!abortController.signal.aborted) {
             setItems(items);
             // Expand all items after loading from Notion (same as sample data)
-            if (expandTimeoutRef.current) {
-              clearTimeout(expandTimeoutRef.current);
-            }
-            expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
+            scheduleExpandAll();
           }
         } else {
           loadSampleData();
@@ -205,7 +203,15 @@ function App() {
         }
       }
     },
-    [setItems, setLoading, setError, hasValidNotionConfig, handleFetchProgress, loadSampleData]
+    [
+      setItems,
+      setLoading,
+      setError,
+      hasValidNotionConfig,
+      handleFetchProgress,
+      loadSampleData,
+      scheduleExpandAll,
+    ]
   );
 
   // Load data on mount and when config changes
@@ -309,101 +315,21 @@ function App() {
         />
 
         {/* Environment config indicator */}
-        {usingEnvConfig && (
-          <div className="bg-green-50 border-b border-green-200 px-4 py-1.5">
-            <div className="flex items-center gap-2 text-xs text-green-700">
-              <FileCode className="w-3.5 h-3.5" />
-              <span>
-                Using configuration from{' '}
-                <code className="px-1 py-0.5 bg-green-100 rounded">.env</code> file
-              </span>
-            </div>
-          </div>
-        )}
+        {usingEnvConfig && <EnvConfigIndicator />}
 
         {/* Loading Progress Bar */}
-        {isLoading && (
-          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
-            <div className="flex items-center gap-3">
-              <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-              <span className="text-sm text-blue-700">
-                {loadingProgress && loadingProgress.loaded > 0 ? (
-                  <>
-                    Loading items from Notion... {loadingProgress.loaded} items loaded
-                    {loadingProgress.total && ` of ~${loadingProgress.total}`}
-                  </>
-                ) : (
-                  'Loading data from Notion...'
-                )}
-              </span>
-            </div>
-            <div className="mt-1 w-full h-1 bg-blue-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
-                style={{
-                  width:
-                    loadingProgress?.total && loadingProgress.loaded > 0
-                      ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
-                      : '100%',
-                  backgroundSize: '200% 100%',
-                  animation:
-                    loadingProgress?.total && loadingProgress.loaded > 0
-                      ? 'none'
-                      : 'shimmer 1.5s ease-in-out infinite',
-                }}
-              />
-            </div>
-            <style>{`
-              @keyframes shimmer {
-                0% { background-position: 200% 0; }
-                100% { background-position: -200% 0; }
-              }
-            `}</style>
-          </div>
-        )}
+        {isLoading && <LoadingProgressBar progress={loadingProgress} />}
 
         {/* Failed Databases Warning */}
         {failedDatabases && failedDatabases.length > 0 && !isLoading && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <span className="text-sm font-medium text-amber-800">
-                  Some databases failed to load
-                </span>
-                <ul className="mt-1 text-xs text-amber-700">
-                  {failedDatabases.map((db, i) => (
-                    <li key={i}>
-                      <span className="font-medium capitalize">{db.type}</span>: {db.error}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                onClick={() => setFailedDatabases(null)}
-                className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          <FailedDatabasesWarning
+            databases={failedDatabases}
+            onDismiss={() => setFailedDatabases(null)}
+          />
         )}
 
         {/* Stats Overview - Collapsible */}
-        <div className="border-b border-gray-200 bg-white">
-          <button
-            onClick={() => setShowStats(!showStats)}
-            className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
-          >
-            <span className="text-sm font-medium text-gray-700">Statistics Overview</span>
-            {showStats ? (
-              <ChevronUp className="w-4 h-4 text-gray-500" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-gray-500" />
-            )}
-          </button>
-          {showStats && <StatsOverview />}
-        </div>
+        <StatsToggle isOpen={showStats} onToggle={() => setShowStats(!showStats)} />
 
         {/* Filter Panel */}
         <FilterPanel />
