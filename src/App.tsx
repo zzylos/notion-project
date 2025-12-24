@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { useStore } from './store/useStore';
+import { useNotionData, useCooldownTimer } from './hooks';
 import Header from './components/common/Header';
 import FilterPanel from './components/filters/FilterPanel';
 import TreeView from './components/tree/TreeView';
@@ -13,17 +14,8 @@ import {
   FailedDatabasesWarning,
   StatsToggle,
 } from './components/common/StatusIndicators';
-import { sampleData } from './utils/sampleData';
-import { notionService } from './services/notionService';
-import {
-  getMergedConfig,
-  hasEnvConfig,
-  checkRefreshCooldown,
-  setLastRefreshTime,
-} from './utils/config';
-import { logger } from './utils/logger';
+import { getMergedConfig, hasEnvConfig } from './utils/config';
 import { PanelRightClose, PanelRight } from 'lucide-react';
-import type { NotionConfig } from './types';
 
 // Lazy load heavy view components for better initial load performance
 const CanvasView = lazy(() => import('./components/canvas/CanvasView'));
@@ -32,225 +24,34 @@ const ListView = lazy(() => import('./components/views/ListView'));
 const TimelineView = lazy(() => import('./components/views/TimelineView'));
 
 function App() {
-  const {
-    setItems,
-    setLoading,
-    setError,
-    setSelectedItem,
-    notionConfig,
-    isLoading,
-    expandAll,
-    viewMode,
-  } = useStore();
-
-  const [showSettings, setShowSettings] = useState(false);
-  const [showDetailPanel, setShowDetailPanel] = useState(true);
-  const [showStats, setShowStats] = useState(false); // Collapsed by default
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState<{
-    loaded: number;
-    total: number | null;
-  } | null>(null);
-  const [failedDatabases, setFailedDatabases] = useState<Array<{
-    type: string;
-    error: string;
-  }> | null>(null);
-  // Refresh cooldown state
-  const [refreshCooldownRemaining, setRefreshCooldownRemaining] = useState(0);
-  // Track whether we're using demo data (vs real Notion data)
-  const [isUsingDemoData, setIsUsingDemoData] = useState(true);
-  // Counter to force modal remount when opening (resets form state)
-  const [modalKey, setModalKey] = useState(0);
-  const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { setSelectedItem, notionConfig, isLoading, viewMode } = useStore();
 
   // Merge environment config with stored config (env takes precedence)
   const effectiveConfig = useMemo(() => getMergedConfig(notionConfig), [notionConfig]);
   const usingEnvConfig = hasEnvConfig();
 
-  // Start or update the cooldown timer
-  const startCooldownTimer = useCallback(() => {
-    // Clear any existing interval
-    if (cooldownIntervalRef.current) {
-      clearInterval(cooldownIntervalRef.current);
-      cooldownIntervalRef.current = null;
-    }
+  // Use custom hooks for data loading and cooldown management
+  const { isUsingDemoData, loadingProgress, failedDatabases, clearFailedDatabases, refreshData } =
+    useNotionData(effectiveConfig);
 
-    // Check initial cooldown state
-    const { remainingMs } = checkRefreshCooldown();
-    setRefreshCooldownRemaining(remainingMs);
+  const { remainingMs: refreshCooldownRemaining, checkAndStartCooldown } = useCooldownTimer();
 
-    // If there's remaining cooldown, start an interval to update it
-    if (remainingMs > 0) {
-      cooldownIntervalRef.current = setInterval(() => {
-        const { remainingMs: remaining } = checkRefreshCooldown();
-        setRefreshCooldownRemaining(remaining);
-
-        // Clear interval when cooldown expires
-        if (remaining <= 0 && cooldownIntervalRef.current) {
-          clearInterval(cooldownIntervalRef.current);
-          cooldownIntervalRef.current = null;
-        }
-      }, 1000); // Update every second
-    }
-  }, []);
-
-  // Check cooldown on mount
-  useEffect(() => {
-    startCooldownTimer();
-  }, [startCooldownTimer]);
-
-  // Check if config has valid Notion credentials
-  const hasValidNotionConfig = useCallback(
-    (config: NotionConfig | null): config is NotionConfig => {
-      return Boolean(
-        config?.apiKey && (config.databaseId || (config.databases && config.databases.length > 0))
-      );
-    },
-    []
-  );
-
-  // Handle progress updates during data fetch
-  const handleFetchProgress = useCallback(
-    (
-      abortController: AbortController,
-      progress: {
-        loaded: number;
-        total: number | null;
-        items: Array<unknown>;
-        done: boolean;
-        failedDatabases?: Array<{ type: string; error: string }>;
-      }
-    ) => {
-      if (abortController.signal.aborted) return;
-
-      setLoadingProgress({ loaded: progress.loaded, total: progress.total });
-
-      if (progress.failedDatabases?.length) {
-        setFailedDatabases(progress.failedDatabases);
-      }
-
-      if (progress.items.length > 0 && !progress.done) {
-        setItems(progress.items as Parameters<typeof setItems>[0]);
-      }
-    },
-    [setItems]
-  );
-
-  // Helper to expand all after a delay (clears existing timeout)
-  const scheduleExpandAll = useCallback(() => {
-    if (expandTimeoutRef.current) {
-      clearTimeout(expandTimeoutRef.current);
-    }
-    expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
-  }, [expandAll]);
-
-  // Load sample data as fallback
-  const loadSampleData = useCallback(() => {
-    setItems(sampleData);
-    scheduleExpandAll();
-  }, [setItems, scheduleExpandAll]);
-
-  // Load data function with progressive updates
-  const loadData = useCallback(
-    async (config: NotionConfig | null, forceRefresh = false) => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
-      setLoading(true);
-      setError(null);
-      setLoadingProgress({ loaded: 0, total: null });
-      setFailedDatabases(null);
-
-      // Update demo data indicator immediately based on config validity
-      const usingNotion = hasValidNotionConfig(config);
-      setIsUsingDemoData(!usingNotion);
-
-      try {
-        if (usingNotion) {
-          if (forceRefresh) notionService.clearCache();
-          notionService.initialize(config);
-
-          const items = await notionService.fetchAllItems({
-            signal: abortController.signal,
-            onProgress: progress => handleFetchProgress(abortController, progress),
-          });
-
-          if (!abortController.signal.aborted) {
-            setItems(items);
-            // Expand all items after loading from Notion (same as sample data)
-            scheduleExpandAll();
-          }
-        } else {
-          loadSampleData();
-        }
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        logger.error('App', 'Failed to load data from Notion:', error);
-        setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
-        setItems(sampleData);
-        setIsUsingDemoData(true); // Failed to load from Notion, using demo data
-      } finally {
-        if (abortControllerRef.current === abortController) {
-          setLoading(false);
-          setLoadingProgress(null);
-        }
-      }
-    },
-    [
-      setItems,
-      setLoading,
-      setError,
-      hasValidNotionConfig,
-      handleFetchProgress,
-      loadSampleData,
-      scheduleExpandAll,
-    ]
-  );
-
-  // Load data on mount and when config changes
-  useEffect(() => {
-    loadData(effectiveConfig);
-  }, [effectiveConfig, loadData]);
-
-  // Cleanup timeout, abort controller, and cooldown interval on unmount
-  useEffect(() => {
-    return () => {
-      if (expandTimeoutRef.current) {
-        clearTimeout(expandTimeoutRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      if (cooldownIntervalRef.current) {
-        clearInterval(cooldownIntervalRef.current);
-      }
-    };
-  }, []);
+  // UI state
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDetailPanel, setShowDetailPanel] = useState(true);
+  const [showStats, setShowStats] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [modalKey, setModalKey] = useState(0);
 
   const handleRefresh = async () => {
     // Check if refresh is allowed based on cooldown
-    const { allowed, remainingMs } = checkRefreshCooldown();
-    if (!allowed) {
-      // Update the cooldown display
-      setRefreshCooldownRemaining(remainingMs);
-      startCooldownTimer();
-      return;
+    if (!checkAndStartCooldown()) {
+      return; // Still in cooldown
     }
 
     setIsRefreshing(true);
-    await loadData(effectiveConfig, true); // Force refresh, bypass cache
+    await refreshData();
     setIsRefreshing(false);
-
-    // Record the refresh time and start cooldown timer
-    setLastRefreshTime(Date.now());
-    startCooldownTimer();
   };
 
   const handleCloseDetail = () => {
@@ -258,11 +59,10 @@ function App() {
   };
 
   const handleConnect = () => {
-    // Config is already saved by the modal, the useEffect will trigger reload
+    // Config is already saved by the modal, the useEffect in useNotionData will trigger reload
   };
 
   // Render the appropriate view based on viewMode
-  // Lazy loaded views are wrapped in Suspense with a loading fallback
   const renderMainView = () => {
     const lazyFallback = <LoadingState message="Loading view..." size="lg" className="h-64" />;
 
@@ -293,7 +93,6 @@ function App() {
         );
       case 'tree':
       default:
-        // TreeView is not lazy loaded as it's the default view
         return <TreeView onNodeSelect={() => setShowDetailPanel(true)} />;
     }
   };
@@ -305,7 +104,7 @@ function App() {
         {/* Header */}
         <Header
           onOpenSettings={() => {
-            setModalKey(k => k + 1); // Force modal remount to reset form state
+            setModalKey(k => k + 1);
             setShowSettings(true);
           }}
           onRefresh={handleRefresh}
@@ -322,10 +121,7 @@ function App() {
 
         {/* Failed Databases Warning */}
         {failedDatabases && failedDatabases.length > 0 && !isLoading && (
-          <FailedDatabasesWarning
-            databases={failedDatabases}
-            onDismiss={() => setFailedDatabases(null)}
-          />
+          <FailedDatabasesWarning databases={failedDatabases} onDismiss={clearFailedDatabases} />
         )}
 
         {/* Stats Overview - Collapsible */}
@@ -405,7 +201,7 @@ function App() {
         </div>
       </div>
 
-      {/* Notion Config Modal - key forces remount to reset form state when opening */}
+      {/* Notion Config Modal */}
       <NotionConfigModal
         key={modalKey}
         isOpen={showSettings}

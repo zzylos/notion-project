@@ -162,15 +162,21 @@ describe('useLocalStorage', () => {
   });
 
   it('should update localStorage correctly with complex nested objects', () => {
-    const complexValue = {
+    type ComplexValue = {
+      user: { name?: string; email?: string };
+      settings: { theme?: string; notifications?: boolean };
+      items: number[];
+    };
+
+    const complexValue: ComplexValue = {
       user: { name: 'Test', email: 'test@example.com' },
       settings: { theme: 'dark', notifications: true },
       items: [1, 2, 3],
     };
 
-    const { result } = renderHook(() =>
-      useLocalStorage('complex', { user: {}, settings: {}, items: [] })
-    );
+    const initialValue: ComplexValue = { user: {}, settings: {}, items: [] };
+
+    const { result } = renderHook(() => useLocalStorage('complex', initialValue));
 
     act(() => {
       result.current[1](complexValue);

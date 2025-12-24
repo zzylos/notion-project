@@ -11,7 +11,7 @@ import type {
   DashboardStats,
 } from '../types';
 import { getStatusCategory } from '../utils/colors';
-import { TREE } from '../constants';
+import { buildTreeNodes, getItemPath as getItemPathUtil } from '../utils/treeBuilder';
 import { logger } from '../utils/logger';
 
 interface StoreState {
@@ -218,117 +218,18 @@ export const useStore = create<StoreState>()(
 
       /**
        * Builds a hierarchical tree structure from filtered work items.
+       * Delegates to the buildTreeNodes utility for actual tree construction.
        *
-       * ## Algorithm Overview
-       *
-       * 1. **Filter items**: Start with items that pass current filter criteria
-       * 2. **Identify roots**: Items with no parent OR whose parent isn't in the filtered set
-       * 3. **Build recursively**: For each root, recursively attach children
-       * 4. **Track state**: Mark each node with expansion, selection, and highlight status
-       *
-       * ## Safety Features
-       *
-       * - **Circular reference detection**: Tracks ancestors during traversal to prevent
-       *   infinite loops if data has circular parent references
-       * - **Depth limiting**: Stops recursion at TREE.MAX_DEPTH to prevent stack overflow
-       *   from extremely deep hierarchies
-       *
-       * ## Root Item Identification
-       *
-       * An item becomes a "root" in the tree if:
-       * - It has no parentId (true root), OR
-       * - Its parent was filtered out (orphaned by filter)
-       *
-       * This ensures the tree always shows something useful even when filters hide parents.
-       *
-       * ## Performance Notes
-       *
-       * - Called on every render that needs tree data (not memoized internally)
-       * - Callers should use useMemo with appropriate dependencies
-       * - O(n²) in worst case due to repeated filtering, but acceptable for typical data sizes
-       *
-       * @returns Array of TreeNode objects representing the tree structure
-       *
-       * @example
-       * // In a component:
-       * const { getTreeNodes } = useStore();
-       * const treeNodes = useMemo(() => getTreeNodes(), [getTreeNodes]);
+       * @see buildTreeNodes in utils/treeBuilder.ts for algorithm details
        */
       getTreeNodes: (): TreeNode[] => {
         const state = get();
         const filteredItems = state.getFilteredItems();
-        const filteredIds = new Set(filteredItems.map(i => i.id));
 
-        /**
-         * Recursively builds tree nodes for children of a given parent.
-         *
-         * @param parentId - ID of the parent item (undefined for finding root children)
-         * @param level - Current depth in the tree (0 = root level)
-         * @param ancestors - Set of ancestor IDs for cycle detection
-         * @returns Array of TreeNode objects for this level
-         */
-        const buildTree = (
-          parentId: string | undefined,
-          level: number,
-          ancestors: Set<string>
-        ): TreeNode[] => {
-          // Safety: Prevent stack overflow with very deep nesting
-          if (level > TREE.MAX_DEPTH) {
-            logger.warn(
-              'Store',
-              `Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`
-            );
-            return [];
-          }
-
-          // Find all children of this parent
-          const children = filteredItems.filter(item => item.parentId === parentId);
-
-          return children.map(item => {
-            // Safety: Check for circular reference
-            if (ancestors.has(item.id)) {
-              logger.warn('Store', `Circular reference detected in tree at item: ${item.id}`);
-              return {
-                item,
-                children: [], // Stop recursion to prevent infinite loop
-                level,
-                isExpanded: state.expandedIds.has(item.id),
-                isSelected: state.selectedItemId === item.id,
-                isHighlighted: state.focusedItemId === item.id,
-              };
-            }
-
-            // Track this item as an ancestor for deeper levels
-            const newAncestors = new Set(ancestors);
-            newAncestors.add(item.id);
-
-            return {
-              item,
-              children: buildTree(item.id, level + 1, newAncestors),
-              level,
-              isExpanded: state.expandedIds.has(item.id),
-              isSelected: state.selectedItemId === item.id,
-              isHighlighted: state.focusedItemId === item.id,
-            };
-          });
-        };
-
-        // Identify root items: no parent OR parent not in filtered set
-        const rootItems = filteredItems.filter(
-          item => !item.parentId || !filteredIds.has(item.parentId)
-        );
-
-        // Build tree starting from each root
-        return rootItems.map(item => {
-          const ancestors = new Set<string>([item.id]);
-          return {
-            item,
-            children: buildTree(item.id, 1, ancestors),
-            level: 0,
-            isExpanded: state.expandedIds.has(item.id),
-            isSelected: state.selectedItemId === item.id,
-            isHighlighted: state.focusedItemId === item.id,
-          };
+        return buildTreeNodes(filteredItems, {
+          expandedIds: state.expandedIds,
+          selectedItemId: state.selectedItemId,
+          focusedItemId: state.focusedItemId,
         });
       },
 
@@ -435,30 +336,15 @@ export const useStore = create<StoreState>()(
         };
       },
 
+      /**
+       * Get the path from root to a specific item.
+       * Delegates to the getItemPath utility for actual path construction.
+       *
+       * @see getItemPath in utils/treeBuilder.ts for algorithm details
+       */
       getItemPath: (id: string): WorkItem[] => {
         const state = get();
-        const path: WorkItem[] = [];
-        const visited = new Set<string>(); // Track visited IDs to detect cycles
-        let currentId: string | undefined = id;
-
-        while (currentId) {
-          // Check for circular reference
-          if (visited.has(currentId)) {
-            logger.warn('Store', `Circular parent reference detected at item: ${currentId}`);
-            break;
-          }
-          visited.add(currentId);
-
-          const item = state.items.get(currentId);
-          if (item) {
-            path.unshift(item);
-            currentId = item.parentId;
-          } else {
-            break;
-          }
-        }
-
-        return path;
+        return getItemPathUtil(id, state.items);
       },
     }),
     {
