@@ -176,8 +176,6 @@ npm run test:coverage # Run tests with coverage report
 
 ### Quick Setup with Environment Variables
 
-### note to self - use .env config or everythings fucked, fix that later
-
 The easiest way to configure the app is with a `.env` file:
 
 ```bash
@@ -547,7 +545,7 @@ Click the Settings icon in the header to configure via the UI. Settings are save
 
 ### Developer Experience
 
-- **Testing infrastructure** - Vitest with React Testing Library and 74+ unit tests
+- **Testing infrastructure** - Vitest with React Testing Library and 200+ unit tests
 - **Unified logging** - Consistent, color-coded console output via logger utility
 - **Error handling utilities** - Custom error classes with retry logic
 - **Type guards** - Runtime type checking utilities for safer code

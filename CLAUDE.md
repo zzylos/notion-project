@@ -333,7 +333,7 @@ interface DatabaseConfig {
 
 ## Known Considerations
 
-1. **Multi-Database Fetching**: Items from each database are fetched sequentially, then merged. Parent relations work across databases.
+1. **Multi-Database Fetching**: Items from each database are fetched in parallel, then merged. Parent relations work across databases.
 
 2. **CORS Proxy**: The app uses `corsproxy.io` to bypass CORS restrictions when calling Notion API from the browser. This may have rate limits.
 
@@ -453,7 +453,7 @@ import { logger } from './utils/logger';
 logger.info('Notion', 'Fetching items...');
 logger.warn('Store', 'Cache miss');
 logger.error('App', 'Failed to load', error);
-logger.table('Debug', items);  // Tabular output
+logger.table('Debug', items); // Tabular output
 ```
 
 ### Type Guards (`src/utils/typeGuards.ts`)
@@ -463,8 +463,10 @@ Type-safe runtime checks:
 ```typescript
 import { isAbortError, isNonEmptyString, getErrorMessage } from './utils/typeGuards';
 
-if (isAbortError(error)) return;  // Handle user cancellation
-if (isNonEmptyString(value)) { /* value is string */ }
+if (isAbortError(error)) return; // Handle user cancellation
+if (isNonEmptyString(value)) {
+  /* value is string */
+}
 const message = getErrorMessage(error, 'Default message');
 ```
 
