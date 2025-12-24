@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NotionConfig, NotionPage, NotionQueryResponse } from '../types';
+import type * as ConstantsModule from '../constants';
 
 // Mock import.meta.env before importing notionService
 vi.mock('../constants', async importOriginal => {
-  const actual = await importOriginal<typeof import('../constants')>();
+  const actual = await importOriginal<typeof ConstantsModule>();
   return {
     ...actual,
     NOTION: {

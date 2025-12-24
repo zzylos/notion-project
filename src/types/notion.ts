@@ -3,6 +3,8 @@
  * These types represent the structure of data returned by the Notion API.
  */
 
+import type { WorkItem } from './index';
+
 /**
  * Represents a single property value from a Notion page.
  * Uses a discriminated union pattern based on the `type` field.
@@ -77,7 +79,7 @@ export interface FetchProgress {
   /** Total items if known, null if unknown */
   total: number | null;
   /** Current items loaded */
-  items: import('./index').WorkItem[];
+  items: WorkItem[];
   /** Whether fetching is complete */
   done: boolean;
   /** Currently fetching database type */

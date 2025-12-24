@@ -242,7 +242,10 @@ export const useStore = create<StoreState>()(
         ): TreeNode[] => {
           // Safety: Prevent stack overflow with very deep nesting
           if (level > TREE.MAX_DEPTH) {
-            logger.warn('Store', `Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`);
+            logger.warn(
+              'Store',
+              `Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`
+            );
             return [];
           }
 
@@ -463,6 +466,10 @@ export const useStore = create<StoreState>()(
       }),
       merge: (persisted, current) => {
         try {
+          // Handle undefined or null persisted state
+          if (!persisted || typeof persisted !== 'object') {
+            return current;
+          }
           const persistedState = persisted as Partial<StoreState> & { expandedIds?: string[] };
           // Validate expandedIds is an array before converting to Set
           const expandedIdsArray = Array.isArray(persistedState.expandedIds)
