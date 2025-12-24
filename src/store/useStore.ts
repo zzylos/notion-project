@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { getStatusCategory } from '../utils/colors';
 import { TREE } from '../constants';
+import { logger } from '../utils/logger';
 
 interface StoreState {
   // Data
@@ -241,9 +242,7 @@ export const useStore = create<StoreState>()(
         ): TreeNode[] => {
           // Safety: Prevent stack overflow with very deep nesting
           if (level > TREE.MAX_DEPTH) {
-            console.warn(
-              `[Store] Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`
-            );
+            logger.warn('Store', `Maximum tree depth (${TREE.MAX_DEPTH}) exceeded, stopping recursion`);
             return [];
           }
 
@@ -253,7 +252,7 @@ export const useStore = create<StoreState>()(
           return children.map(item => {
             // Safety: Check for circular reference
             if (ancestors.has(item.id)) {
-              console.warn(`[Store] Circular reference detected in tree at item: ${item.id}`);
+              logger.warn('Store', `Circular reference detected in tree at item: ${item.id}`);
               return {
                 item,
                 children: [], // Stop recursion to prevent infinite loop
@@ -435,7 +434,7 @@ export const useStore = create<StoreState>()(
         while (currentId) {
           // Check for circular reference
           if (visited.has(currentId)) {
-            console.warn(`[Store] Circular parent reference detected at item: ${currentId}`);
+            logger.warn('Store', `Circular parent reference detected at item: ${currentId}`);
             break;
           }
           visited.add(currentId);
@@ -475,7 +474,7 @@ export const useStore = create<StoreState>()(
             expandedIds: new Set(expandedIdsArray),
           };
         } catch (error) {
-          console.warn('[Store] Failed to merge persisted state, using defaults:', error);
+          logger.warn('Store', 'Failed to merge persisted state, using defaults:', error);
           return current;
         }
       },

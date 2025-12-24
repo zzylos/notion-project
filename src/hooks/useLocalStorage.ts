@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { logger } from '../utils/logger';
 
 /**
  * A hook for type-safe localStorage access with JSON serialization.
@@ -36,7 +37,7 @@ export function useLocalStorage<T>(
       const item = window.localStorage.getItem(key);
       return item ? (JSON.parse(item) as T) : initialValue;
     } catch (error) {
-      console.warn(`Error reading localStorage key "${key}":`, error);
+      logger.warn('LocalStorage', `Error reading key "${key}":`, error);
       return initialValue;
     }
   });
@@ -62,7 +63,7 @@ export function useLocalStorage<T>(
           return valueToStore;
         });
       } catch (error) {
-        console.warn(`Error setting localStorage key "${key}":`, error);
+        logger.warn('LocalStorage', `Error setting key "${key}":`, error);
       }
     },
     [key]
@@ -81,7 +82,7 @@ export function useLocalStorage<T>(
       window.localStorage.removeItem(key);
       setStoredValue(initialValueRef.current);
     } catch (error) {
-      console.warn(`Error removing localStorage key "${key}":`, error);
+      logger.warn('LocalStorage', `Error removing key "${key}":`, error);
     }
   }, [key]);
 

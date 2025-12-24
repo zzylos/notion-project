@@ -16,6 +16,7 @@ import {
   checkRefreshCooldown,
   setLastRefreshTime,
 } from './utils/config';
+import { logger } from './utils/logger';
 import {
   PanelRightClose,
   PanelRight,
@@ -155,7 +156,7 @@ function App() {
                   setItems(progress.items);
                 }
               } catch (e) {
-                console.error('Error in progress callback:', e);
+                logger.error('App', 'Error in progress callback:', e);
               }
             },
           });
@@ -179,7 +180,7 @@ function App() {
           return;
         }
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('Failed to load data from Notion:', error);
+        logger.error('App', 'Failed to load data from Notion:', error);
         setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
         setItems(sampleData);
       } finally {
