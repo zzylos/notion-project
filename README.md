@@ -162,8 +162,16 @@ npm run build
 # Build both frontend and backend
 npm run build:all
 
-# Run linter
-npm run lint
+# Code quality
+npm run lint         # Run ESLint
+npm run lint:fix     # Run ESLint with auto-fix
+npm run typecheck    # Run TypeScript type checking
+npm run format       # Format code with Prettier
+
+# Testing
+npm run test         # Run tests in watch mode
+npm run test:run     # Run tests once
+npm run test:coverage # Run tests with coverage report
 ```
 
 ### Quick Setup with Environment Variables
@@ -261,6 +269,8 @@ Each Notion database should have these properties (configurable in settings):
 - **@tanstack/react-virtual** - List virtualization
 - **Lucide React** - Icons
 - **D3.js** - Data visualization utilities
+- **Vitest** - Testing framework
+- **React Testing Library** - Component testing utilities
 
 ### Backend (Optional)
 
@@ -280,15 +290,23 @@ src/
 │   ├── views/          # KanbanView, ListView, TimelineView
 │   ├── filters/        # Filter panel components
 │   └── common/         # Shared components (Header, DetailPanel, etc.)
+├── hooks/              # Custom React hooks
 ├── services/
 │   ├── notionService.ts  # Notion API service with multi-database support
 │   └── apiClient.ts      # Backend API client (for backend mode)
 ├── store/              # Zustand state management
+├── test/               # Test setup and utilities
+│   └── setup.ts        # Vitest setup with mocks
 ├── types/              # TypeScript type definitions
 ├── utils/
 │   ├── colors.ts       # Color utilities and status mapping
 │   ├── config.ts       # Environment variable configuration loader
+│   ├── errors.ts       # Error classes and handling utilities
+│   ├── logger.ts       # Unified logging utility
+│   ├── typeGuards.ts   # Type guard utilities
+│   ├── validation.ts   # Input validation utilities
 │   └── sampleData.ts   # Demo data for offline use
+├── constants.ts        # Application-wide constants
 └── App.tsx             # Main application with all view modes
 
 server/                 # Backend API server (optional)
@@ -309,6 +327,8 @@ scripts/
 └── test-notion-connection.js   # API credential validation script
 
 .env.example            # Template for frontend environment configuration
+vitest.config.ts        # Vitest test configuration
+CONTRIBUTING.md         # Development and contribution guidelines
 ```
 
 ## Key Features for Employee Feedback
@@ -524,3 +544,16 @@ Click the Settings icon in the header to configure via the UI. Settings are save
 - **Sticky header/filters** - Header and filters stay visible while scrolling
 - **Improved canvas usability** - Canvas view works better without fullscreen mode
 - **Config source indicator** - Shows when using `.env` configuration
+
+### Developer Experience
+
+- **Testing infrastructure** - Vitest with React Testing Library and 74+ unit tests
+- **Unified logging** - Consistent, color-coded console output via logger utility
+- **Error handling utilities** - Custom error classes with retry logic
+- **Type guards** - Runtime type checking utilities for safer code
+- **ESLint complexity rules** - Automated detection of overly complex code
+- **Optimized builds** - Vite chunk splitting for better caching
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, code style guidelines, and contribution process.
