@@ -109,7 +109,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
         {item.owner && (
           <div className="flex items-center gap-1.5">
             <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600">
-              {item.owner.name.charAt(0)}
+              {item.owner.name?.charAt(0)?.toUpperCase() || '?'}
             </div>
             <span className="text-[10px] text-gray-500 truncate">{item.owner.name}</span>
           </div>
