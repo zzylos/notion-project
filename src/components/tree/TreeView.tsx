@@ -29,14 +29,14 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   // Get total item count for limit check
   const totalFilteredCount = useMemo(() => getFilteredItems().length, [getFilteredItems]);
 
-  // Helper function to count all nodes in a tree - defined outside useMemo to be reused
-  const countNodesInTree = (node: TreeNodeType): number => {
-    return 1 + node.children.reduce((acc, child) => acc + countNodesInTree(child), 0);
-  };
-
   // Determine if we should limit and how many root nodes to show
   // Also computes totalNodes to avoid duplicate traversal
   const { treeNodes, isLimited, displayedCount, totalNodes } = useMemo(() => {
+    // Helper function to count all nodes in a tree - defined inside useMemo to satisfy exhaustive-deps
+    const countNodesInTree = (node: TreeNodeType): number => {
+      return 1 + node.children.reduce((acc, child) => acc + countNodesInTree(child), 0);
+    };
+
     // Calculate total node count once
     const total = allTreeNodes.reduce((acc, node) => acc + countNodesInTree(node), 0);
 

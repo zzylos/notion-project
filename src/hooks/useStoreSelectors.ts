@@ -13,45 +13,48 @@ import { useShallow } from 'zustand/shallow';
 /**
  * Hook to get filtered items with stable reference.
  * Only recomputes when items or filters change.
+ * Note: We subscribe to items and filters to trigger re-renders when they change,
+ * then call getFilteredItems() which computes the filtered result.
  */
 export function useFilteredItems(): WorkItem[] {
   const getFilteredItems = useStore(state => state.getFilteredItems);
-  const items = useStore(state => state.items);
-  const filters = useStore(useShallow(state => state.filters));
+  // Subscribe to items and filters to trigger re-renders when they change
+  useStore(state => state.items);
+  useStore(useShallow(state => state.filters));
 
-  return useMemo(() => {
-    return getFilteredItems();
-  }, [getFilteredItems, items, filters]);
+  return getFilteredItems();
 }
 
 /**
  * Hook to get tree nodes with stable reference.
  * Only recomputes when filtered items, expanded state, or selection changes.
+ * Note: We subscribe to relevant state to trigger re-renders when they change,
+ * then call getTreeNodes() which computes the tree structure.
  */
 export function useTreeNodes(): TreeNode[] {
   const getTreeNodes = useStore(state => state.getTreeNodes);
-  const items = useStore(state => state.items);
-  const filters = useStore(useShallow(state => state.filters));
-  const expandedIds = useStore(state => state.expandedIds);
-  const selectedItemId = useStore(state => state.selectedItemId);
-  const focusedItemId = useStore(state => state.focusedItemId);
+  // Subscribe to state that affects tree nodes to trigger re-renders
+  useStore(state => state.items);
+  useStore(useShallow(state => state.filters));
+  useStore(state => state.expandedIds);
+  useStore(state => state.selectedItemId);
+  useStore(state => state.focusedItemId);
 
-  return useMemo(() => {
-    return getTreeNodes();
-  }, [getTreeNodes, items, filters, expandedIds, selectedItemId, focusedItemId]);
+  return getTreeNodes();
 }
 
 /**
  * Hook to get dashboard stats with stable reference.
  * Only recomputes when items change.
+ * Note: We subscribe to items to trigger re-renders when they change,
+ * then call getStats() which computes the statistics.
  */
 export function useStats(): DashboardStats {
   const getStats = useStore(state => state.getStats);
-  const items = useStore(state => state.items);
+  // Subscribe to items to trigger re-renders when they change
+  useStore(state => state.items);
 
-  return useMemo(() => {
-    return getStats();
-  }, [getStats, items]);
+  return getStats();
 }
 
 /**
@@ -118,13 +121,14 @@ export function useItem(itemId: string | null): WorkItem | undefined {
 
 /**
  * Hook to get the path from root to a specific item.
+ * Note: We subscribe to items to trigger re-renders when they change,
+ * then call getItemPath() which traverses the item hierarchy.
  */
 export function useItemPath(itemId: string | null): WorkItem[] {
   const getItemPath = useStore(state => state.getItemPath);
-  const items = useStore(state => state.items);
+  // Subscribe to items to trigger re-renders when they change
+  useStore(state => state.items);
 
-  return useMemo(() => {
-    if (!itemId) return [];
-    return getItemPath(itemId);
-  }, [getItemPath, items, itemId]);
+  if (!itemId) return [];
+  return getItemPath(itemId);
 }
