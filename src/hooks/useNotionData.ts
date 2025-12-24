@@ -71,7 +71,10 @@ function hasValidNotionConfig(config: NotionConfig | null): config is NotionConf
 export function useNotionData(effectiveConfig: NotionConfig | null): UseNotionDataReturn {
   const { setItems, setLoading, setError, expandAll } = useStore();
 
-  const [isUsingDemoData, setIsUsingDemoData] = useState(true);
+  // Initialize based on config validity - if valid config exists, assume we're not using demo data
+  const [isUsingDemoData, setIsUsingDemoData] = useState(
+    () => !hasValidNotionConfig(effectiveConfig)
+  );
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress | null>(null);
   const [failedDatabases, setFailedDatabases] = useState<FailedDatabase[] | null>(null);
 
