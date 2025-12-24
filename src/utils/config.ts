@@ -1,5 +1,6 @@
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../types';
 import { DEFAULT_PROPERTY_MAPPINGS, REFRESH } from '../constants';
+import { logger } from './logger';
 
 /**
  * Configuration loader that supports:
@@ -58,7 +59,7 @@ export function getLastRefreshTime(): number | null {
       }
     }
   } catch (error) {
-    console.warn('[Config] Failed to read last refresh time:', error);
+    logger.warn('Config', 'Failed to read last refresh time:', error);
   }
   return null;
 }
@@ -70,7 +71,7 @@ export function setLastRefreshTime(timestamp: number): void {
   try {
     localStorage.setItem(REFRESH.LAST_REFRESH_KEY, timestamp.toString());
   } catch (error) {
-    console.warn('[Config] Failed to save last refresh time:', error);
+    logger.warn('Config', 'Failed to save last refresh time:', error);
   }
 }
 
@@ -179,13 +180,13 @@ export function getMergedConfig(storedConfig: NotionConfig | null): NotionConfig
 
   // If env config exists and is complete, use it
   if (envConfig) {
-    console.info('%c[Config] Using configuration from environment variables', 'color: #10b981');
+    logger.info('Config', 'Using configuration from environment variables');
     return envConfig;
   }
 
   // Otherwise use stored config
   if (storedConfig) {
-    console.info('%c[Config] Using configuration from localStorage', 'color: #3b82f6');
+    logger.info('Config', 'Using configuration from localStorage');
   }
 
   return storedConfig;

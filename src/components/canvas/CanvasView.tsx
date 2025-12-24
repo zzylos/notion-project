@@ -18,6 +18,7 @@ import { useItemLimit } from '../../hooks/useItemLimit';
 import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import { calculateLayout } from '../../utils/layoutCalculator';
+import { logger } from '../../utils/logger';
 import CanvasNode from './CanvasNode';
 import CanvasLegend from './CanvasLegend';
 import CanvasControls from './CanvasControls';
@@ -204,16 +205,16 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       if (error instanceof Error) {
         // SecurityError or NotAllowedError - fullscreen not permitted
         if (error.name === 'SecurityError' || error.name === 'NotAllowedError') {
-          console.warn('[Canvas] Fullscreen not allowed:', error.message);
+          logger.warn('Canvas', `Fullscreen not allowed: ${error.message}`);
           return;
         }
         // TypeError - fullscreen API not supported
         if (error.name === 'TypeError') {
-          console.warn('[Canvas] Fullscreen API not supported');
+          logger.warn('Canvas', 'Fullscreen API not supported');
           return;
         }
         // Log unexpected errors for debugging
-        console.error('[Canvas] Unexpected fullscreen error:', error);
+        logger.error('Canvas', 'Unexpected fullscreen error:', error);
       }
     }
   }, []);

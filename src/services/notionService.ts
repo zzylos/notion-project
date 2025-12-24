@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import { NOTION, DEFAULT_CORS_PROXY, PROPERTY_ALIASES } from '../constants';
 import { apiClient } from './apiClient';
+import { logger } from '../utils/logger';
 
 // Type for Notion API responses
 type NotionPage = {
@@ -175,10 +176,7 @@ class NotionService {
         if (now - cached.timestamp < PERSISTENT_CACHE_TIMEOUT) {
           this.cache.set(key, cached);
           if (this.debugMode) {
-            console.info(
-              `%c[Notion] Loaded ${cached.items.length} items from persistent cache`,
-              'color: #10b981'
-            );
+            logger.info('Notion', `Loaded ${cached.items.length} items from persistent cache`);
           }
         } else {
           // Clean up expired cache
@@ -186,7 +184,7 @@ class NotionService {
         }
       }
     } catch (error) {
-      console.warn('[Notion] Failed to load persistent cache:', error);
+      logger.warn('Notion', 'Failed to load persistent cache:', error);
     }
   }
 
@@ -210,14 +208,11 @@ class NotionService {
       localStorage.setItem(CACHE_METADATA_KEY, JSON.stringify(metadata));
 
       if (this.debugMode) {
-        console.info(
-          `%c[Notion] Saved ${items.length} items to persistent cache`,
-          'color: #10b981'
-        );
+        logger.info('Notion', `Saved ${items.length} items to persistent cache`);
       }
     } catch (error) {
       // localStorage might be full or unavailable
-      console.warn('[Notion] Failed to save persistent cache:', error);
+      logger.warn('Notion', 'Failed to save persistent cache:', error);
     }
   }
 
@@ -235,7 +230,7 @@ class NotionService {
       }
       localStorage.removeItem(CACHE_METADATA_KEY);
     } catch (error) {
-      console.warn('[Notion] Failed to clear persistent cache:', error);
+      logger.warn('Notion', 'Failed to clear persistent cache:', error);
     }
   }
 
@@ -347,11 +342,8 @@ class NotionService {
       hasValue: this.hasPropertyValue(value),
     }));
 
-    console.info(
-      `%c[Notion Debug] ${databaseType.toUpperCase()} database properties:`,
-      'color: #0ea5e9; font-weight: bold'
-    );
-    console.table(propertyInfo);
+    logger.info('Notion', `[Debug] ${databaseType.toUpperCase()} database properties:`);
+    logger.table('Notion', propertyInfo);
   }
 
   private hasPropertyValue(prop: NotionPropertyValue): boolean {
@@ -714,12 +706,13 @@ class NotionService {
 
     // Always log orphaned items warning if any are found
     if (orphanedItems.length > 0) {
-      console.warn(
-        `[Notion] ${orphanedItems.length} orphaned items (parent not found). ` +
+      logger.warn(
+        'Notion',
+        `${orphanedItems.length} orphaned items (parent not found). ` +
           `This may indicate missing databases or cross-database relations that couldn't be resolved.`
       );
       if (this.debugMode) {
-        console.table(orphanedItems);
+        logger.table('Notion', orphanedItems);
       }
     }
 
@@ -826,15 +819,15 @@ class NotionService {
 
     try {
       if (this.debugMode) {
-        console.info('%c[Notion] Fetching from backend API...', 'color: #10b981');
+        logger.info('Notion', 'Fetching from backend API...');
       }
 
       const result = await apiClient.fetchItems(signal);
 
       if (this.debugMode) {
-        console.info(
-          `%c[Notion] Backend returned ${result.items.length} items (cached: ${result.cached})`,
-          'color: #10b981'
+        logger.info(
+          'Notion',
+          `Backend returned ${result.items.length} items (cached: ${result.cached})`
         );
       }
 
@@ -857,7 +850,7 @@ class NotionService {
       // If backend fails, try to return cached data
       const persistentCached = this.cache.get(cacheKey);
       if (persistentCached) {
-        console.warn('[Notion] Backend fetch failed, using cached data:', error);
+        logger.warn('Notion', 'Backend fetch failed, using cached data:', error);
         onProgress?.({
           loaded: persistentCached.items.length,
           total: persistentCached.items.length,
@@ -921,19 +914,13 @@ class NotionService {
     }
 
     if (this.debugMode) {
-      console.info(
-        `%c[Notion] Fetching ${dbConfigs.length} databases in parallel...`,
-        'color: #10b981'
-      );
+      logger.info('Notion', `Fetching ${dbConfigs.length} databases in parallel...`);
     }
 
     // Fetch all databases in parallel for faster loading
     const fetchPromises = dbConfigs.map(async dbConfig => {
       if (this.debugMode) {
-        console.info(
-          `%c[Notion] Starting fetch for ${dbConfig.type} database...`,
-          'color: #10b981'
-        );
+        logger.info('Notion', `Starting fetch for ${dbConfig.type} database...`);
       }
 
       try {
@@ -945,7 +932,7 @@ class NotionService {
           throw error;
         }
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`Failed to fetch ${dbConfig.type} database:`, error);
+        logger.error('Notion', `Failed to fetch ${dbConfig.type} database:`, error);
         return { success: false as const, error: errorMessage, type: dbConfig.type };
       }
     });
@@ -961,10 +948,7 @@ class NotionService {
       if (result.success) {
         allItems.push(...result.items);
         if (this.debugMode) {
-          console.info(
-            `%c[Notion] Fetched ${result.items.length} items from ${result.type}`,
-            'color: #10b981'
-          );
+          logger.info('Notion', `Fetched ${result.items.length} items from ${result.type}`);
         }
       } else {
         failedDatabases.push({ type: result.type, error: result.error });
