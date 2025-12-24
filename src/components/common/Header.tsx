@@ -17,6 +17,8 @@ interface HeaderProps {
   isRefreshing: boolean;
   /** Remaining cooldown time in milliseconds before next refresh is allowed */
   refreshCooldownRemaining?: number;
+  /** Whether the app is currently using demo/sample data instead of real Notion data */
+  isUsingDemoData?: boolean;
 }
 
 /**
@@ -50,10 +52,14 @@ const Header: React.FC<HeaderProps> = ({
   onRefresh,
   isRefreshing,
   refreshCooldownRemaining = 0,
+  isUsingDemoData = false,
 }) => {
   const { viewMode, setViewMode, notionConfig } = useStore();
   const isOnCooldown = refreshCooldownRemaining > 0;
   const isRefreshDisabled = isRefreshing || isOnCooldown;
+
+  // Determine connection status based on both config and actual data source
+  const isConnectedToNotion = notionConfig && !isUsingDemoData;
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
@@ -100,7 +106,7 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-2">
           {/* Connection status */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-            {notionConfig ? (
+            {isConnectedToNotion ? (
               <>
                 <div className="w-2 h-2 rounded-full bg-green-500" />
                 <span className="text-xs text-gray-600">Connected to Notion</span>
@@ -113,31 +119,41 @@ const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Refresh button */}
-          <button
-            onClick={onRefresh}
-            disabled={isRefreshDisabled}
-            className={`
-              flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors
-              ${
-                isRefreshDisabled
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+          {/* Refresh button with cooldown indicator */}
+          <div className="relative">
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshDisabled}
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors
+                ${
+                  isOnCooldown
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : isRefreshing
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }
+              `}
+              title={
+                isOnCooldown
+                  ? `Rate limited - refresh available in ${formatCooldownTime(refreshCooldownRemaining)}`
+                  : isRefreshing
+                    ? 'Refreshing...'
+                    : 'Refresh data from Notion'
               }
-            `}
-            title={
-              isOnCooldown
-                ? `Refresh available in ${formatCooldownTime(refreshCooldownRemaining)}`
-                : 'Refresh data'
-            }
-          >
-            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            >
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isOnCooldown && (
+                <span className="text-xs font-medium tabular-nums">
+                  {formatCooldownTime(refreshCooldownRemaining)}
+                </span>
+              )}
+            </button>
+            {/* Cooldown badge for visibility */}
             {isOnCooldown && (
-              <span className="text-xs font-medium text-gray-400">
-                {formatCooldownTime(refreshCooldownRemaining)}
-              </span>
+              <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full" />
             )}
-          </button>
+          </div>
 
           {/* Settings button */}
           <button

@@ -61,6 +61,8 @@ function App() {
   }> | null>(null);
   // Refresh cooldown state
   const [refreshCooldownRemaining, setRefreshCooldownRemaining] = useState(0);
+  // Track whether we're using demo data (vs real Notion data)
+  const [isUsingDemoData, setIsUsingDemoData] = useState(true);
   // Counter to force modal remount when opening (resets form state)
   const [modalKey, setModalKey] = useState(0);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,9 +178,16 @@ function App() {
 
           if (!abortController.signal.aborted) {
             setItems(items);
+            setIsUsingDemoData(false); // Successfully loaded from Notion
+            // Expand all items after loading from Notion (same as sample data)
+            if (expandTimeoutRef.current) {
+              clearTimeout(expandTimeoutRef.current);
+            }
+            expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
           }
         } else {
           loadSampleData();
+          setIsUsingDemoData(true);
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -186,6 +195,7 @@ function App() {
         logger.error('App', 'Failed to load data from Notion:', error);
         setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
         setItems(sampleData);
+        setIsUsingDemoData(true);
       } finally {
         if (abortControllerRef.current === abortController) {
           setLoading(false);
@@ -293,6 +303,7 @@ function App() {
           onRefresh={handleRefresh}
           isRefreshing={isRefreshing || isLoading}
           refreshCooldownRemaining={refreshCooldownRemaining}
+          isUsingDemoData={isUsingDemoData}
         />
 
         {/* Environment config indicator */}
@@ -309,23 +320,33 @@ function App() {
         )}
 
         {/* Loading Progress Bar */}
-        {isLoading && loadingProgress && (
+        {isLoading && (
           <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
             <div className="flex items-center gap-3">
               <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
               <span className="text-sm text-blue-700">
-                Loading items from Notion... {loadingProgress.loaded} items loaded
-                {loadingProgress.total && ` of ~${loadingProgress.total}`}
+                {loadingProgress && loadingProgress.loaded > 0 ? (
+                  <>
+                    Loading items from Notion... {loadingProgress.loaded} items loaded
+                    {loadingProgress.total && ` of ~${loadingProgress.total}`}
+                  </>
+                ) : (
+                  'Connecting to Notion...'
+                )}
               </span>
             </div>
             <div className="mt-1 w-full h-1 bg-blue-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-blue-600 rounded-full transition-all duration-300"
                 style={{
-                  width: loadingProgress.total
-                    ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
-                    : '100%',
-                  animation: loadingProgress.total ? 'none' : 'pulse 1.5s ease-in-out infinite',
+                  width:
+                    loadingProgress?.total && loadingProgress.loaded > 0
+                      ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
+                      : '30%',
+                  animation:
+                    loadingProgress?.total && loadingProgress.loaded > 0
+                      ? 'none'
+                      : 'pulse 1.5s ease-in-out infinite',
                 }}
               />
             </div>
@@ -380,7 +401,7 @@ function App() {
       </div>
 
       {/* Main content area - scrollable with minimum height */}
-      <div className="flex-1 flex min-h-[500px]">
+      <div className="flex-1 flex min-h-[500px] overflow-hidden">
         {/* Main view - with minimum height for canvas usability */}
         <div className="flex-1 overflow-auto min-h-[500px]">
           <ErrorBoundary>{renderMainView()}</ErrorBoundary>
@@ -398,17 +419,18 @@ function App() {
           )}
         </button>
 
-        {/* Detail panel */}
+        {/* Detail panel - fixed on mobile, static flex child on desktop */}
+        {/* Mobile: Fixed overlay with slide animation */}
         <div
           className={`
             fixed inset-y-0 right-0 z-30 w-80 bg-white border-l border-gray-200 shadow-xl
             transform transition-transform duration-300 ease-out
-            lg:relative lg:transform-none lg:shadow-none lg:z-0
-            ${showDetailPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0 lg:hidden'}
+            lg:hidden
+            ${showDetailPanel ? 'translate-x-0' : 'translate-x-full'}
           `}
         >
           {/* Panel header for mobile */}
-          <div className="lg:hidden flex items-center justify-between p-3 border-b border-gray-200">
+          <div className="flex items-center justify-between p-3 border-b border-gray-200">
             <span className="text-sm font-medium text-gray-700">Item Details</span>
             <button
               onClick={() => setShowDetailPanel(false)}
@@ -417,6 +439,22 @@ function App() {
               <PanelRightClose className="w-5 h-5" />
             </button>
           </div>
+          <ErrorBoundary
+            fallback={
+              <div className="h-full flex items-center justify-center p-8 text-center">
+                <div className="text-gray-500">
+                  <p className="font-medium">Failed to load item details</p>
+                  <p className="text-sm mt-1">Try selecting a different item</p>
+                </div>
+              </div>
+            }
+          >
+            <DetailPanel onClose={handleCloseDetail} />
+          </ErrorBoundary>
+        </div>
+
+        {/* Desktop: Static panel as flex child - always visible */}
+        <div className="hidden lg:block w-80 flex-shrink-0 bg-white border-l border-gray-200 overflow-hidden">
           <ErrorBoundary
             fallback={
               <div className="h-full flex items-center justify-center p-8 text-center">

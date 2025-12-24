@@ -246,12 +246,28 @@ export class NotionPropertyMapper {
   }
 
   /**
-   * Extract relation IDs from properties
+   * Normalize a Notion UUID to consistent format (with dashes).
+   * Notion sometimes returns IDs with or without dashes depending on context.
+   */
+  normalizeUuid(id: string): string {
+    // Remove any existing dashes and convert to lowercase
+    const clean = id.replace(/-/g, '').toLowerCase();
+
+    // If it's not a valid UUID length, return as-is
+    if (clean.length !== 32) return id;
+
+    // Insert dashes in standard UUID positions: 8-4-4-4-12
+    return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
+  }
+
+  /**
+   * Extract relation IDs from properties.
+   * Normalizes IDs to ensure consistent format for parent-child matching.
    */
   extractRelation(props: Record<string, NotionPropertyValue>, mappingName: string): string[] {
     const prop = this.findProperty(props, mappingName, 'relation');
     if (!prop || prop.type !== 'relation' || !prop.relation) return [];
-    return prop.relation.map(r => r.id);
+    return prop.relation.map(r => this.normalizeUuid(r.id));
   }
 
   /**

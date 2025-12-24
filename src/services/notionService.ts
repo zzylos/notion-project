@@ -347,6 +347,11 @@ class NotionService {
 
       return result.items;
     } catch (error) {
+      // Don't log or handle AbortError - it's expected during component unmount
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw error;
+      }
+
       const persistentCached = this.cacheManager.getStale(cacheKey);
       if (persistentCached) {
         logger.warn('Notion', 'Backend fetch failed, using cached data:', error);

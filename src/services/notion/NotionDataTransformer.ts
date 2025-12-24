@@ -44,8 +44,11 @@ export class NotionDataTransformer {
     const parentRelations = this.propertyMapper.extractRelation(props, mappings.parent);
     const tags = this.propertyMapper.extractMultiSelect(props, mappings.tags);
 
+    // Normalize the page ID to ensure consistent format for parent-child matching
+    const normalizedId = this.propertyMapper.normalizeUuid(page.id);
+
     return {
-      id: page.id,
+      id: normalizedId,
       title: title || 'Untitled',
       type: itemType,
       status: this.propertyMapper.mapToItemStatus(status),
