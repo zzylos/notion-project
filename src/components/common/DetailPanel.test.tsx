@@ -15,6 +15,7 @@ vi.mock('lucide-react', () => ({
   AlertTriangle: () => <span data-testid="icon-alert">⚠</span>,
   Target: () => <span data-testid="icon-target">🎯</span>,
   ChevronRight: () => <span data-testid="icon-chevron">&gt;</span>,
+  Home: () => <span data-testid="icon-home">🏠</span>,
 }));
 
 // Mock utils
