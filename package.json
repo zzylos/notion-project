@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm run dev --prefix server",
+    "dev:full": "concurrently \"npm run dev:server\" \"npm run dev\"",
     "build": "tsc -b && vite build",
+    "build:server": "npm run build --prefix server",
+    "build:all": "npm run build && npm run build:server",
+    "start:server": "npm run start --prefix server",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
@@ -13,7 +18,8 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test:notion": "node scripts/test-notion-connection.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "cd server && npm install"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -45,6 +51,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.23",
+    "concurrently": "^9.1.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-react-hooks": "^7.0.1",

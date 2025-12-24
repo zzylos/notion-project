@@ -9,6 +9,7 @@ import type {
   DatabaseConfig,
 } from '../types';
 import { NOTION, DEFAULT_CORS_PROXY, PROPERTY_ALIASES } from '../constants';
+import { apiClient } from './apiClient';
 
 // Type for Notion API responses
 type NotionPage = {
@@ -85,9 +86,16 @@ export interface FetchOptions {
  * 3. Use environment variables for sensitive configuration
  *
  * Configure CORS proxy via VITE_CORS_PROXY environment variable.
+ * Or use VITE_USE_BACKEND_API=true to use the backend API server.
  */
 const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || DEFAULT_CORS_PROXY;
 const NOTION_API_BASE = NOTION.API_BASE;
+
+/**
+ * Check if the backend API should be used instead of direct Notion calls.
+ * This is more secure as the API key stays on the server.
+ */
+const USE_BACKEND_API = import.meta.env.VITE_USE_BACKEND_API === 'true';
 
 // LocalStorage cache key prefix
 const CACHE_KEY_PREFIX = 'notion-cache-';
@@ -742,6 +750,11 @@ class NotionService {
 
   // Fetch all items from all configured databases
   async fetchAllItems(options?: FetchOptions): Promise<WorkItem[]> {
+    // Use backend API if configured
+    if (USE_BACKEND_API) {
+      return this.fetchAllItemsFromBackend(options);
+    }
+
     if (!this.config) {
       throw new Error('NotionService not initialized. Call initialize() first.');
     }
@@ -788,6 +801,72 @@ class NotionService {
     } finally {
       // Clean up pending request when done
       this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  /**
+   * Fetch items from the backend API server.
+   * Used when VITE_USE_BACKEND_API=true.
+   */
+  private async fetchAllItemsFromBackend(options?: FetchOptions): Promise<WorkItem[]> {
+    const { signal, onProgress } = options || {};
+
+    // Check client-side cache first (for offline UX)
+    const cacheKey = 'backend-api';
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      onProgress?.({
+        loaded: cached.items.length,
+        total: cached.items.length,
+        items: cached.items,
+        done: true,
+      });
+      return cached.items;
+    }
+
+    try {
+      if (this.debugMode) {
+        console.info('%c[Notion] Fetching from backend API...', 'color: #10b981');
+      }
+
+      const result = await apiClient.fetchItems(signal);
+
+      if (this.debugMode) {
+        console.info(
+          `%c[Notion] Backend returned ${result.items.length} items (cached: ${result.cached})`,
+          'color: #10b981'
+        );
+      }
+
+      // Cache the result locally for quick access
+      const timestamp = Date.now();
+      this.cache.set(cacheKey, { items: result.items, timestamp });
+      this.savePersistentCache(cacheKey, result.items, timestamp);
+
+      onProgress?.({
+        loaded: result.items.length,
+        total: result.items.length,
+        items: result.items,
+        done: true,
+        failedDatabases: result.failedDatabases,
+        orphanedItemsCount: result.orphanedItemsCount,
+      });
+
+      return result.items;
+    } catch (error) {
+      // If backend fails, try to return cached data
+      const persistentCached = this.cache.get(cacheKey);
+      if (persistentCached) {
+        console.warn('[Notion] Backend fetch failed, using cached data:', error);
+        onProgress?.({
+          loaded: persistentCached.items.length,
+          total: persistentCached.items.length,
+          items: persistentCached.items,
+          done: true,
+        });
+        return persistentCached.items;
+      }
+      throw error;
     }
   }
 
@@ -930,6 +1009,11 @@ class NotionService {
   }
 
   async fetchItem(pageId: string): Promise<WorkItem> {
+    // Use backend API if configured
+    if (USE_BACKEND_API) {
+      return apiClient.fetchItem(pageId);
+    }
+
     if (!this.config) {
       throw new Error('NotionService not initialized');
     }
@@ -940,6 +1024,13 @@ class NotionService {
   }
 
   async updateItemStatus(pageId: string, status: ItemStatus): Promise<void> {
+    // Use backend API if configured
+    if (USE_BACKEND_API) {
+      await apiClient.updateItemStatus(pageId, status);
+      this.clearCache();
+      return;
+    }
+
     if (!this.config) {
       throw new Error('NotionService not initialized');
     }
@@ -961,6 +1052,13 @@ class NotionService {
   }
 
   async updateItemProgress(pageId: string, progress: number): Promise<void> {
+    // Use backend API if configured
+    if (USE_BACKEND_API) {
+      await apiClient.updateItemProgress(pageId, progress);
+      this.clearCache();
+      return;
+    }
+
     if (!this.config) {
       throw new Error('NotionService not initialized');
     }
@@ -979,6 +1077,23 @@ class NotionService {
     });
 
     this.clearCache();
+  }
+
+  /**
+   * Invalidate the server-side cache (when using backend API)
+   */
+  async invalidateServerCache(): Promise<void> {
+    if (USE_BACKEND_API) {
+      await apiClient.invalidateCache();
+    }
+    this.clearCache();
+  }
+
+  /**
+   * Check if backend API mode is enabled
+   */
+  isUsingBackendApi(): boolean {
+    return USE_BACKEND_API;
   }
 }
 
