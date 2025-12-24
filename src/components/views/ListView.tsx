@@ -45,21 +45,39 @@ const ListView: React.FC = memo(() => {
       {/* Item limit warning banner */}
       {isLimited && <ItemLimitBanner totalItems={totalCount} displayedItems={items.length} />}
 
-      <div ref={parentRef} className="flex-1 overflow-auto">
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-auto"
+        role="table"
+        aria-label="Work items list"
+      >
         {/* Fixed header */}
-        <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
-          <div className="grid grid-cols-[48px_1fr_100px_80px_120px_120px] px-4 py-3">
-            <div className="text-xs font-semibold text-gray-500 uppercase">Status</div>
-            <div className="text-xs font-semibold text-gray-500 uppercase">Title</div>
-            <div className="text-xs font-semibold text-gray-500 uppercase">Type</div>
-            <div className="text-xs font-semibold text-gray-500 uppercase">Priority</div>
-            <div className="text-xs font-semibold text-gray-500 uppercase">Owner</div>
-            <div className="text-xs font-semibold text-gray-500 uppercase">Progress</div>
+        <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200" role="rowgroup">
+          <div className="grid grid-cols-[48px_1fr_100px_80px_120px_120px] px-4 py-3" role="row">
+            <div role="columnheader" className="text-xs font-semibold text-gray-500 uppercase">
+              Status
+            </div>
+            <div role="columnheader" className="text-xs font-semibold text-gray-500 uppercase">
+              Title
+            </div>
+            <div role="columnheader" className="text-xs font-semibold text-gray-500 uppercase">
+              Type
+            </div>
+            <div role="columnheader" className="text-xs font-semibold text-gray-500 uppercase">
+              Priority
+            </div>
+            <div role="columnheader" className="text-xs font-semibold text-gray-500 uppercase">
+              Owner
+            </div>
+            <div role="columnheader" className="text-xs font-semibold text-gray-500 uppercase">
+              Progress
+            </div>
           </div>
         </div>
 
         {/* Virtualized rows */}
         <div
+          role="rowgroup"
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
             width: '100%',
@@ -94,14 +112,22 @@ const ListView: React.FC = memo(() => {
                 tabIndex={0}
                 aria-selected={selectedItemId === item.id}
               >
-                <div>
+                <div role="cell">
                   <div className={`w-3 h-3 rounded-full ${getStatusColors(item.status).dot}`} />
                 </div>
-                <div className="text-sm font-medium text-gray-800 truncate pr-2">{item.title}</div>
-                <div className="text-sm text-gray-600 capitalize">{item.type}</div>
-                <div className="text-sm text-gray-600">{item.priority || '-'}</div>
-                <div className="text-sm text-gray-600 truncate">{item.owner?.name || '-'}</div>
-                <div>
+                <div role="cell" className="text-sm font-medium text-gray-800 truncate pr-2">
+                  {item.title}
+                </div>
+                <div role="cell" className="text-sm text-gray-600 capitalize">
+                  {item.type}
+                </div>
+                <div role="cell" className="text-sm text-gray-600">
+                  {item.priority || '-'}
+                </div>
+                <div role="cell" className="text-sm text-gray-600 truncate">
+                  {item.owner?.name || '-'}
+                </div>
+                <div role="cell">
                   {item.progress !== undefined ? (
                     <div className="flex items-center gap-2">
                       <div className="w-12 h-1.5 bg-gray-200 rounded-full">

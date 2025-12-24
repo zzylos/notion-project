@@ -156,9 +156,9 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
         {item.owner && (
           <div
             className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium text-gray-600"
-            title={item.owner.name}
+            title={item.owner.name || 'Unknown'}
           >
-            {item.owner.name.charAt(0).toUpperCase()}
+            {item.owner.name?.charAt(0)?.toUpperCase() || '?'}
           </div>
         )}
 
