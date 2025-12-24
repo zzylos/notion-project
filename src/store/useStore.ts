@@ -77,6 +77,38 @@ const defaultFilters: FilterState = {
   filterMode: 'show',
 };
 
+/**
+ * Check if an item matches the current filter criteria.
+ * This helper is extracted for readability.
+ */
+function itemMatchesFilters(item: WorkItem, filters: FilterState): boolean {
+  // Type filter
+  if (filters.types.length > 0 && !filters.types.includes(item.type)) {
+    return false;
+  }
+
+  // Status filter
+  if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) {
+    return false;
+  }
+
+  // Priority filter
+  if (filters.priorities.length > 0) {
+    if (!item.priority || !filters.priorities.includes(item.priority)) {
+      return false;
+    }
+  }
+
+  // Owner filter
+  if (filters.owners.length > 0) {
+    if (!item.owner || !filters.owners.includes(item.owner.id)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
@@ -306,36 +338,14 @@ export const useStore = create<StoreState>()(
         const allItems = Array.from(state.items.values());
         const isHideMode = filters.filterMode === 'hide';
 
+        // Check if any filters are active
+        const hasActiveFilters =
+          filters.types.length > 0 ||
+          filters.statuses.length > 0 ||
+          filters.priorities.length > 0 ||
+          filters.owners.length > 0;
+
         return allItems.filter(item => {
-          // Check if item matches the filter criteria
-          const matchesFilters = (() => {
-            // Type filter
-            if (filters.types.length > 0 && !filters.types.includes(item.type)) {
-              return false;
-            }
-
-            // Status filter
-            if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) {
-              return false;
-            }
-
-            // Priority filter
-            if (filters.priorities.length > 0) {
-              if (!item.priority || !filters.priorities.includes(item.priority)) {
-                return false;
-              }
-            }
-
-            // Owner filter
-            if (filters.owners.length > 0) {
-              if (!item.owner || !filters.owners.includes(item.owner.id)) {
-                return false;
-              }
-            }
-
-            return true;
-          })();
-
           // Search query is always inclusive (not affected by hide mode)
           if (filters.searchQuery) {
             const query = filters.searchQuery.toLowerCase();
@@ -347,19 +357,16 @@ export const useStore = create<StoreState>()(
             }
           }
 
-          // In hide mode: return true if item does NOT match filters (hide matching items)
-          // In show mode: return true if item DOES match filters (show matching items)
           // If no filters are set, show all items regardless of mode
-          const hasActiveFilters =
-            filters.types.length > 0 ||
-            filters.statuses.length > 0 ||
-            filters.priorities.length > 0 ||
-            filters.owners.length > 0;
-
           if (!hasActiveFilters) {
-            return true; // No filters = show all
+            return true;
           }
 
+          // Check if item matches filter criteria
+          const matchesFilters = itemMatchesFilters(item, filters);
+
+          // In hide mode: return true if item does NOT match filters (hide matching items)
+          // In show mode: return true if item DOES match filters (show matching items)
           return isHideMode ? !matchesFilters : matchesFilters;
         });
       },

@@ -179,9 +179,10 @@ export class NotionPropertyMapper {
   }
 
   /**
-   * Extract status from properties
+   * Extract select or status value from properties.
+   * Handles both 'select' and 'status' property types (Notion uses both).
    */
-  extractStatus(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
+  extractSelect(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
     const prop = this.findProperty(props, mappingName);
     if (!prop) return null;
 
@@ -196,20 +197,11 @@ export class NotionPropertyMapper {
   }
 
   /**
-   * Extract select value from properties
+   * Extract status from properties.
+   * Alias for extractSelect - kept for semantic clarity in calling code.
    */
-  extractSelect(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
-    const prop = this.findProperty(props, mappingName);
-    if (!prop) return null;
-
-    if (prop.type === 'select' && prop.select) {
-      return prop.select.name;
-    }
-    if (prop.type === 'status' && prop.status) {
-      return prop.status.name;
-    }
-
-    return null;
+  extractStatus(props: Record<string, NotionPropertyValue>, mappingName: string): string | null {
+    return this.extractSelect(props, mappingName);
   }
 
   /**

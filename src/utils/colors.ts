@@ -255,7 +255,10 @@ export function getStatusStyle(status: string): StatusStyle {
   };
 }
 
-// Legacy export for backwards compatibility
+/**
+ * @deprecated Use `getStatusColors(status)` instead for dynamic status support.
+ * This export is kept for backwards compatibility only.
+ */
 export const statusColors = statusCategoryColors;
 
 // Type colors
@@ -319,7 +322,11 @@ export const priorityColors: Record<Priority, { bg: string; text: string; border
   },
 };
 
-// Get status label - for dynamic statuses, just return the status itself
+/**
+ * Get status label.
+ * @deprecated This function is a no-op (returns input unchanged).
+ * It exists for backwards compatibility. Use the status string directly.
+ */
 export function getStatusLabel(status: string): string {
   return status;
 }
