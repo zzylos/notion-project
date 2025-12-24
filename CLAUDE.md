@@ -7,12 +7,29 @@ This is a Notion Opportunity Tree Visualizer for HouseSigma. It displays work it
 ## Quick Commands
 
 ```bash
+# Development
 npm run dev          # Start development server (Vite)
 npm run dev:server   # Start backend API server
 npm run dev:full     # Start both frontend and backend concurrently
+
+# Building
 npm run build        # TypeScript check + production build
 npm run build:all    # Build frontend and backend
+
+# Code Quality
 npm run lint         # Run ESLint
+npm run lint:fix     # Run ESLint with auto-fix
+npm run typecheck    # Run TypeScript type checking
+npm run format       # Format code with Prettier
+npm run format:check # Check code formatting
+
+# Testing
+npm run test         # Run tests in watch mode
+npm run test:run     # Run tests once
+npm run test:coverage # Run tests with coverage report
+npm run test:ui      # Run tests with Vitest UI
+
+# Utilities
 npm run test:notion <API_KEY> <DATABASE_ID>  # Test Notion API connection
 ```
 
@@ -189,7 +206,14 @@ This ensures fast responses while keeping data fresh.
 | `src/components/filters/FilterPanel.tsx`      | Dynamic filter controls                     |
 | `src/types/index.ts`                          | TypeScript type definitions                 |
 | `src/utils/colors.ts`                         | Color utilities with dynamic status support |
+| `src/utils/errors.ts`                         | Error classes and error handling utilities  |
+| `src/utils/logger.ts`                         | Unified logging utility                     |
+| `src/utils/typeGuards.ts`                     | Type guard utilities for runtime checks     |
+| `src/utils/validation.ts`                     | Input validation utilities                  |
 | `src/utils/sampleData.ts`                     | Demo data for offline use                   |
+| `src/constants.ts`                            | Application-wide constants                  |
+| `src/test/setup.ts`                           | Vitest test setup and mocks                 |
+| `vitest.config.ts`                            | Vitest configuration                        |
 | `server/src/index.ts`                         | Backend API server entry point              |
 | `server/src/services/notion.ts`               | Server-side Notion API service              |
 | `server/src/services/cache.ts`                | Server-side caching service                 |
@@ -352,13 +376,54 @@ This validates:
 2. Database is accessible (404 = not shared with integration)
 3. Query works (returns sample items)
 
+## Testing
+
+The project uses Vitest with React Testing Library for testing.
+
+### Running Tests
+
+```bash
+npm run test          # Watch mode - re-runs on file changes
+npm run test:run      # Single run - useful for CI
+npm run test:coverage # Generate coverage report
+npm run test:ui       # Visual test runner UI
+```
+
+### Test Structure
+
+Tests are colocated with source files using the `.test.ts` or `.test.tsx` suffix:
+
+```
+src/utils/
+├── validation.ts
+├── validation.test.ts    # Tests for validation.ts
+├── typeGuards.ts
+├── typeGuards.test.ts    # Tests for typeGuards.ts
+└── errors.ts
+└── errors.test.ts        # Tests for errors.ts
+```
+
+### Writing Tests
+
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { functionToTest } from './module';
+
+describe('functionToTest', () => {
+  it('should handle valid input', () => {
+    expect(functionToTest('input')).toBe('expected');
+  });
+});
+```
+
 ## Build & Lint
 
 Always run before committing:
 
 ```bash
-npm run build   # Catches TypeScript errors
-npm run lint    # Catches ESLint issues
+npm run build      # Catches TypeScript errors
+npm run lint       # Catches ESLint issues
+npm run test:run   # Runs all tests
 ```
 
 Common lint fixes:
@@ -366,6 +431,7 @@ Common lint fixes:
 - Remove unused variables (prefix with `_` if intentionally unused)
 - Fix useMemo/useCallback dependencies
 - Remove unused imports
+- Reduce function complexity (max 15)
 
 ## Debug Mode
 
@@ -374,3 +440,58 @@ In development mode, the app logs helpful debug info to the console:
 - Property names detected from each database
 - Warnings when Type or Parent properties are not found
 - Which database is currently being fetched
+
+## Utility Modules
+
+### Logger (`src/utils/logger.ts`)
+
+Unified logging utility with consistent formatting:
+
+```typescript
+import { logger } from './utils/logger';
+
+logger.info('Notion', 'Fetching items...');
+logger.warn('Store', 'Cache miss');
+logger.error('App', 'Failed to load', error);
+logger.table('Debug', items);  // Tabular output
+```
+
+### Type Guards (`src/utils/typeGuards.ts`)
+
+Type-safe runtime checks:
+
+```typescript
+import { isAbortError, isNonEmptyString, getErrorMessage } from './utils/typeGuards';
+
+if (isAbortError(error)) return;  // Handle user cancellation
+if (isNonEmptyString(value)) { /* value is string */ }
+const message = getErrorMessage(error, 'Default message');
+```
+
+### Error Utilities (`src/utils/errors.ts`)
+
+Custom error classes and error handling:
+
+```typescript
+import { ApiError, NetworkError, withRetry, shouldRetry } from './utils/errors';
+
+// Custom error classes
+throw new ApiError('Not found', '/api/items', { statusCode: 404 });
+
+// Retry with exponential backoff
+const result = await withRetry(() => fetchData(), { maxRetries: 3 });
+```
+
+### Constants (`src/constants.ts`)
+
+Application-wide constants organized by category:
+
+- `CANVAS` - Canvas view layout constants
+- `TREE` - Tree view constants
+- `NOTION` - API constants
+- `CACHE` - Caching timeouts and keys
+- `TIMING` - Animation and debounce delays
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development guidelines, code style, and contribution process.
