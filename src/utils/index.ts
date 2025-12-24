@@ -8,10 +8,19 @@
 export {
   getStatusCategory,
   getStatusColors,
+  getStatusStyle,
+  getStatusLabel,
+  getStatusHexColor,
+  getProgressColor,
+  getUniqueStatuses,
+  statusColors,
   typeColors,
   typeHexColors,
   priorityColors,
+  typeLabels,
+  priorityLabels,
 } from './colors';
+export type { StatusStyle } from './colors';
 
 // Configuration
 export {
