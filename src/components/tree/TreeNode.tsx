@@ -12,16 +12,7 @@ import { typeIcons } from '../../utils/icons';
 import { useStore } from '../../store/useStore';
 import { TREE } from '../../constants';
 import { isOverdue, formatDate } from '../../utils/dateUtils';
-
-// Validate that a URL is a valid Notion URL
-const isValidNotionUrl = (url: string): boolean => {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname === 'notion.so' || parsed.hostname.endsWith('.notion.so');
-  } catch {
-    return false;
-  }
-};
+import { isValidNotionUrl } from '../../utils/validation';
 
 interface TreeNodeProps {
   node: TreeNodeType;

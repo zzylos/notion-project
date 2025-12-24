@@ -11,7 +11,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import type { WorkItem, ItemType } from '../../types';
+import type { WorkItem } from '../../types';
 import {
   getStatusColors,
   getStatusCategory,
@@ -22,16 +22,8 @@ import {
 } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
 import { isOverdue, formatDate } from '../../utils/dateUtils';
-
-// Validate that a URL is a valid Notion URL
-const isValidNotionUrl = (url: string): boolean => {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname === 'notion.so' || parsed.hostname.endsWith('.notion.so');
-  } catch {
-    return false;
-  }
-};
+import { isValidNotionUrl } from '../../utils/validation';
+import RelationshipList from './RelationshipList';
 
 interface DetailPanelProps {
   onClose: () => void;
@@ -268,97 +260,34 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
         )}
 
         {/* Blocked By */}
-        {blockedBy.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3 text-red-500" />
-              Blocked By
-            </label>
-            <div className="space-y-1">
-              {blockedBy.map(blocker => {
-                const BlockerIcon = typeIcons[blocker.type];
-                return (
-                  <button
-                    key={blocker.id}
-                    onClick={() => handleNavigate(blocker.id)}
-                    className="flex items-center gap-2 w-full p-2 text-left bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                  >
-                    <BlockerIcon className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-red-800 truncate">{blocker.title}</span>
-                    <span
-                      className={`
-                        ml-auto px-1.5 py-0.5 text-xs rounded
-                        ${getStatusColors(blocker.status).bg} ${getStatusColors(blocker.status).text}
-                      `}
-                    >
-                      {blocker.status}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <RelationshipList
+          title="Blocked By"
+          icon={AlertTriangle}
+          items={blockedBy}
+          onNavigate={handleNavigate}
+          variant="blocked"
+          iconColorClass="text-red-500"
+        />
 
         {/* Parent */}
         {parent && (
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-              <ArrowUp className="w-3 h-3" />
-              Parent
-            </label>
-            <button
-              onClick={() => handleNavigate(parent.id)}
-              className="flex items-center gap-2 w-full p-2 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              {(() => {
-                // Validate parent.type is a valid ItemType before using
-                const validTypes: ItemType[] = [
-                  'mission',
-                  'problem',
-                  'solution',
-                  'design',
-                  'project',
-                ];
-                const isValidType = validTypes.includes(parent.type as ItemType);
-                if (!isValidType) return null;
-
-                const ParentIcon = typeIcons[parent.type];
-                const parentStyle = typeColors[parent.type];
-                return ParentIcon ? (
-                  <ParentIcon className={`w-4 h-4 ${parentStyle?.icon || ''}`} />
-                ) : null;
-              })()}
-              <span className="text-sm text-gray-800 truncate">{parent.title}</span>
-            </button>
-          </div>
+          <RelationshipList
+            title="Parent"
+            icon={ArrowUp}
+            items={[parent]}
+            onNavigate={handleNavigate}
+          />
         )}
 
         {/* Children */}
-        {children.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-              <ArrowDown className="w-3 h-3" />
-              Children ({children.length})
-            </label>
-            <div className="space-y-1">
-              {children.map(child => {
-                const ChildIcon = typeIcons[child.type];
-                return (
-                  <button
-                    key={child.id}
-                    onClick={() => handleNavigate(child.id)}
-                    className="flex items-center gap-2 w-full p-2 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <ChildIcon className={`w-4 h-4 ${typeColors[child.type].icon}`} />
-                    <span className="text-sm text-gray-800 truncate flex-1">{child.title}</span>
-                    <div className={`w-2 h-2 rounded-full ${getStatusColors(child.status).dot}`} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <RelationshipList
+          title="Children"
+          icon={ArrowDown}
+          items={children}
+          onNavigate={handleNavigate}
+          showStatusDot
+          titleSuffix={children.length > 0 ? ` (${children.length})` : undefined}
+        />
       </div>
 
       {/* Footer with Notion link - only show for valid Notion URLs */}

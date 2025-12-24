@@ -144,3 +144,17 @@ export const STATUS_GROUPS: Record<string, string[]> = {
   ],
   Canceled: ['Canceled', 'Cancelled', 'Duplicate', "Won't Do", 'Wontfix'],
 } as const;
+
+/**
+ * Reverse lookup map: status string (lowercase) -> group name.
+ * Pre-computed once at module load for efficient lookups in FilterPanel.
+ */
+export const STATUS_TO_GROUP: Map<string, string> = (() => {
+  const map = new Map<string, string>();
+  for (const [group, statuses] of Object.entries(STATUS_GROUPS)) {
+    for (const status of statuses) {
+      map.set(status.toLowerCase(), group);
+    }
+  }
+  return map;
+})();

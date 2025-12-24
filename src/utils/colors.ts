@@ -215,6 +215,46 @@ export function getStatusColors(status: string): StatusColorSet {
   return colors;
 }
 
+/**
+ * Combined status style information.
+ * Returns both the status category and colors in a single call,
+ * avoiding redundant lookups when both are needed.
+ */
+export interface StatusStyle {
+  category: StatusCategory;
+  colors: StatusColorSet;
+  isInProgress: boolean;
+  isCompleted: boolean;
+  isBlocked: boolean;
+}
+
+/**
+ * Gets the complete status style including category and colors.
+ * This is more efficient than calling getStatusCategory and getStatusColors separately
+ * when you need both values.
+ *
+ * @param status - The status string from Notion
+ * @returns StatusStyle object with category, colors, and convenience booleans
+ *
+ * @example
+ * const style = getStatusStyle("In Progress");
+ * // style.category === 'in-progress'
+ * // style.colors === { bg: '...', text: '...', ... }
+ * // style.isInProgress === true
+ */
+export function getStatusStyle(status: string): StatusStyle {
+  const category = getStatusCategory(status);
+  const colors = statusCategoryColors[category];
+
+  return {
+    category,
+    colors,
+    isInProgress: category === 'in-progress',
+    isCompleted: category === 'completed',
+    isBlocked: category === 'blocked',
+  };
+}
+
 // Legacy export for backwards compatibility
 export const statusColors = statusCategoryColors;
 
