@@ -11,15 +11,7 @@ import {
   getStatusCategory,
 } from '../../utils/colors';
 import { typeIcons } from '../../utils/icons';
-import { STATUS_GROUPS } from '../../constants';
-
-// Reverse lookup: status string -> group name
-const STATUS_TO_GROUP = new Map<string, string>();
-for (const [group, statuses] of Object.entries(STATUS_GROUPS)) {
-  for (const status of statuses) {
-    STATUS_TO_GROUP.set(status.toLowerCase(), group);
-  }
-}
+import { STATUS_GROUPS, STATUS_TO_GROUP } from '../../constants';
 
 interface CollapsibleSectionProps {
   title: string;

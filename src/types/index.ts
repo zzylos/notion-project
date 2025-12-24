@@ -12,6 +12,21 @@
 export type ItemType = 'mission' | 'problem' | 'solution' | 'design' | 'project';
 
 /**
+ * Map of ItemType to database IDs.
+ * Used for configuration where each item type has a corresponding database.
+ *
+ * @example
+ * const databases: DatabaseIdMap = {
+ *   mission: 'abc123...',
+ *   problem: 'def456...',
+ *   solution: '',  // Optional - empty string means not configured
+ *   design: '',
+ *   project: ''
+ * };
+ */
+export type DatabaseIdMap = Record<ItemType, string>;
+
+/**
  * Status of work items - dynamic string type.
  * Preserves the original Notion status value for display,
  * while using StatusCategory internally for color mapping.
