@@ -10,7 +10,6 @@ export interface ServerConfig {
   notion: NotionConfig;
   cache: {
     ttlSeconds: number;
-    checkPeriodSeconds: number;
   };
 }
 
@@ -110,17 +109,40 @@ export function loadConfig(): ServerConfig {
       process.env.MAPPING_TAGS || process.env.VITE_MAPPING_TAGS || DEFAULT_PROPERTY_MAPPINGS.tags,
   };
 
+  // Validate and parse port
+  const port = parseInt(process.env.PORT || '3001', 10);
+  if (isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid port number: ${process.env.PORT}. Must be between 1 and 65535.`);
+  }
+
+  // Validate CORS origin
+  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  try {
+    new URL(corsOrigin);
+  } catch {
+    throw new Error(
+      `Invalid CORS_ORIGIN: ${corsOrigin}. Must be a valid URL (e.g., http://localhost:5173).`
+    );
+  }
+
+  // Validate cache TTL
+  const ttlSeconds = parseInt(process.env.CACHE_TTL_SECONDS || '300', 10);
+  if (isNaN(ttlSeconds) || ttlSeconds < 1) {
+    throw new Error(
+      `Invalid CACHE_TTL_SECONDS: ${process.env.CACHE_TTL_SECONDS}. Must be a positive number.`
+    );
+  }
+
   return {
-    port: parseInt(process.env.PORT || '3001', 10),
-    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    port,
+    corsOrigin,
     notion: {
       apiKey,
       databases,
       defaultMappings: mappings,
     },
     cache: {
-      ttlSeconds: parseInt(process.env.CACHE_TTL_SECONDS || '300', 10), // 5 minutes default
-      checkPeriodSeconds: parseInt(process.env.CACHE_CHECK_PERIOD || '60', 10), // 1 minute check
+      ttlSeconds,
     },
   };
 }

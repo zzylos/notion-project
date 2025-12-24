@@ -12,7 +12,7 @@ export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
 export interface Owner {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   avatar?: string;
 }
 
