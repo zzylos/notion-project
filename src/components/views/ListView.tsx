@@ -7,7 +7,14 @@ import EmptyState from '../ui/EmptyState';
 import LoadingState from '../ui/LoadingState';
 import ItemLimitBanner from '../ui/ItemLimitBanner';
 
-const ListView: React.FC = memo(() => {
+/**
+ * ListView component with virtualized rows for performance.
+ *
+ * Note: TanStack Virtual's useVirtualizer returns functions that cannot be memoized by React Compiler.
+ * This is expected behavior - the virtualizer needs fresh function references to work correctly.
+ * The component itself is wrapped with memo() to optimize re-renders.
+ */
+const ListView: React.FC = memo(function ListViewInner() {
   const { getFilteredItems, setSelectedItem, selectedItemId, isLoading } = useStore();
   const allItems = getFilteredItems();
 
