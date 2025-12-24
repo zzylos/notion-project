@@ -99,7 +99,7 @@ NOTION_DB_MISSION=xxx
 **Benefits:**
 
 - API key stays on the server (more secure)
-- Server-side caching with configurable TTL
+- Server-side caching with stale-while-revalidate pattern
 - No CORS proxy needed
 - Better rate limiting control
 
@@ -109,20 +109,31 @@ NOTION_DB_MISSION=xxx
 Browser → Backend API Server → Notion API
               ↓
          Server Cache
-         (node-cache)
+    (Stale-While-Revalidate)
 ```
+
+**Stale-While-Revalidate Caching:**
+
+When cache TTL expires:
+
+1. Returns stale data immediately to the client
+2. Triggers background refresh from Notion
+3. Updates cache when fresh data arrives
+
+This ensures fast responses while keeping data fresh.
 
 **Backend API Endpoints:**
 
-| Endpoint                  | Method | Description              |
-| ------------------------- | ------ | ------------------------ |
-| `/api/items`              | GET    | Fetch all items (cached) |
-| `/api/items/:id`          | GET    | Fetch single item        |
-| `/api/items/:id/status`   | PATCH  | Update item status       |
-| `/api/items/:id/progress` | PATCH  | Update item progress     |
-| `/api/cache/invalidate`   | POST   | Clear server cache       |
-| `/api/cache/stats`        | GET    | Get cache statistics     |
-| `/api/health`             | GET    | Health check             |
+| Endpoint                  | Method | Description                                   |
+| ------------------------- | ------ | --------------------------------------------- |
+| `/api/items`              | GET    | Fetch all items (stale-while-revalidate)      |
+| `/api/items/refresh`      | POST   | Force refresh cache (waits for completion)    |
+| `/api/items/:id`          | GET    | Fetch single item                             |
+| `/api/items/:id/status`   | PATCH  | Update item status                            |
+| `/api/items/:id/progress` | PATCH  | Update item progress                          |
+| `/api/cache/invalidate`   | POST   | Clear server cache                            |
+| `/api/cache/stats`        | GET    | Get cache statistics (includes stale metrics) |
+| `/api/health`             | GET    | Health check                                  |
 
 ## Architecture
 
