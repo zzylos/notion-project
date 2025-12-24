@@ -8,3 +8,12 @@
 export { useFetch } from './useFetch';
 export { useLocalStorage } from './useLocalStorage';
 export { useItemLimit } from './useItemLimit';
+export {
+  useFilteredItems,
+  useTreeNodes,
+  useStats,
+  useFilterOptions,
+  useItemCountsByType,
+  useItem,
+  useItemPath,
+} from './useStoreSelectors';

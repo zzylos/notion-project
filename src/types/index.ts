@@ -303,3 +303,13 @@ export interface DashboardStats {
   overdueItems: number;
   blockedItems: number;
 }
+
+// Re-export Notion API types
+export type {
+  NotionPropertyValue,
+  NotionPage,
+  NotionQueryResponse,
+  FetchProgress,
+  FetchProgressCallback,
+  FetchOptions,
+} from './notion';

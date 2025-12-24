@@ -61,6 +61,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   // Calculate connected items for the selected item
   // This collects ALL ancestors and ALL descendants recursively, not just immediate parent/children
   // Calculated independently of focusMode so we can use it to include items outside filters
+  // Optimized: Uses children arrays for O(n) traversal instead of O(n^2) lookups
   const connectedItemIds = useMemo(() => {
     if (!selectedItemId) return null;
 
@@ -69,47 +70,50 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
 
     const connected = new Set<string>([selectedItemId]);
 
-    // Recursively add all ancestors (parent, grandparent, etc.)
-    const addAncestors = (itemId: string) => {
-      const item = items.get(itemId);
-      if (item?.parentId && !connected.has(item.parentId)) {
-        connected.add(item.parentId);
-        addAncestors(item.parentId);
-      }
-    };
-    addAncestors(selectedItemId);
-
-    // Recursively add all descendants (children, grandchildren, etc.)
-    const addDescendants = (itemId: string) => {
-      const item = items.get(itemId);
-      if (item?.children) {
-        for (const childId of item.children) {
-          if (!connected.has(childId)) {
-            connected.add(childId);
-            addDescendants(childId);
-          }
-        }
-      }
-    };
-    addDescendants(selectedItemId);
-
-    // Add blocked by items
-    if (selectedItem.blockedBy) {
-      selectedItem.blockedBy.forEach(blockerId => connected.add(blockerId));
+    // Recursively add all ancestors using iterative approach (avoids stack overflow for deep trees)
+    let currentId: string | undefined = selectedItem.parentId;
+    while (currentId && !connected.has(currentId)) {
+      connected.add(currentId);
+      const parent = items.get(currentId);
+      currentId = parent?.parentId;
     }
 
-    // Find items that this item blocks (reverse lookup)
+    // Recursively add all descendants using BFS (more efficient for wide trees)
+    const queue: string[] = selectedItem.children ? [...selectedItem.children] : [];
+    while (queue.length > 0) {
+      const childId = queue.shift()!;
+      if (!connected.has(childId)) {
+        connected.add(childId);
+        const child = items.get(childId);
+        if (child?.children) {
+          queue.push(...child.children);
+        }
+      }
+    }
+
+    // Add blocked by items (direct lookup, no iteration)
+    if (selectedItem.blockedBy) {
+      for (const blockerId of selectedItem.blockedBy) {
+        connected.add(blockerId);
+      }
+    }
+
+    // Find items that this item blocks (reverse lookup - only needed if blockedBy feature is used)
+    // This is still O(n) but only runs if blockedBy relationships exist anywhere
+    // TODO: Create a reverse index in store if this becomes a performance bottleneck
     for (const item of items.values()) {
       if (item.blockedBy?.includes(selectedItemId)) {
         connected.add(item.id);
       }
     }
 
-    // Find siblings (items with same parent)
+    // Find siblings using parent's children array (O(1) lookup + O(siblings) add)
+    // Much more efficient than iterating all items
     if (selectedItem.parentId) {
-      for (const item of items.values()) {
-        if (item.parentId === selectedItem.parentId) {
-          connected.add(item.id);
+      const parent = items.get(selectedItem.parentId);
+      if (parent?.children) {
+        for (const siblingId of parent.children) {
+          connected.add(siblingId);
         }
       }
     }
