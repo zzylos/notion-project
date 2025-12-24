@@ -22,6 +22,26 @@ interface CanvasControlsProps {
   hasSelection: boolean;
 }
 
+const baseButtonClass =
+  'flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-sm transition-colors';
+
+function getFocusButtonStyles(hasSelection: boolean, focusMode: boolean): string {
+  if (!hasSelection) return 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed';
+  if (focusMode) return 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200';
+  return 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50';
+}
+
+function getFocusButtonTitle(hasSelection: boolean, focusMode: boolean): string {
+  if (!hasSelection) return 'Select an item to enable focus mode';
+  if (focusMode) return 'Disable focus mode';
+  return 'Focus mode: Highlight connected items (parent, children, siblings)';
+}
+
+function getOrphanButtonStyles(hideOrphanItems: boolean): string {
+  if (hideOrphanItems) return 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100';
+  return 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50';
+}
+
 /**
  * CanvasControls provides action buttons for the canvas view,
  * including layout reset, fullscreen toggle, orphan filtering, and focus mode.
@@ -43,23 +63,8 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
       <button
         onClick={onToggleFocusMode}
         disabled={!hasSelection}
-        className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-sm transition-colors
-          ${
-            !hasSelection
-              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-              : focusMode
-                ? 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-          }
-        `}
-        title={
-          !hasSelection
-            ? 'Select an item to enable focus mode'
-            : focusMode
-              ? 'Disable focus mode'
-              : 'Focus mode: Highlight connected items (parent, children, siblings)'
-        }
+        className={`${baseButtonClass} ${getFocusButtonStyles(hasSelection, focusMode)}`}
+        title={getFocusButtonTitle(hasSelection, focusMode)}
         aria-label={focusMode ? 'Disable focus mode' : 'Enable focus mode'}
         aria-pressed={focusMode}
       >
@@ -70,14 +75,7 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
       {/* Orphan items toggle */}
       <button
         onClick={onToggleOrphanItems}
-        className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-sm transition-colors
-          ${
-            hideOrphanItems
-              ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-          }
-        `}
+        className={`${baseButtonClass} ${getOrphanButtonStyles(hideOrphanItems)}`}
         title={
           hideOrphanItems ? 'Show orphan items' : 'Hide orphan items (items with no connections)'
         }
@@ -90,7 +88,7 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
 
       <button
         onClick={onResetLayout}
-        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+        className={`${baseButtonClass} bg-white border-gray-200 text-gray-700 hover:bg-gray-50`}
         title="Reset layout to original positions"
         aria-label="Reset layout to original positions"
       >
@@ -99,7 +97,7 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
       </button>
       <button
         onClick={onToggleFullscreen}
-        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+        className={`${baseButtonClass} bg-white border-gray-200 text-gray-700 hover:bg-gray-50`}
         title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
         aria-label={isFullscreen ? 'Exit fullscreen mode' : 'Enter fullscreen mode'}
       >

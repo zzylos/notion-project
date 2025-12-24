@@ -8,46 +8,57 @@ interface ActiveFiltersBarProps {
   onClear: () => void;
 }
 
+interface FilterCounts {
+  types: number;
+  statuses: number;
+  priorities: number;
+  owners: number;
+  hasSearch: boolean;
+}
+
+function getFilterCounts(filters: FilterState): FilterCounts {
+  return {
+    types: filters.types.length,
+    statuses: filters.statuses.length,
+    priorities: filters.priorities.length,
+    owners: filters.owners.length,
+    hasSearch: filters.searchQuery.length > 0,
+  };
+}
+
+function buildFilterSummary(counts: FilterCounts): string {
+  const parts: string[] = [];
+  if (counts.types > 0) parts.push(`${counts.types} types`);
+  if (counts.statuses > 0) parts.push(`${counts.statuses} statuses`);
+  if (counts.priorities > 0) parts.push(`${counts.priorities} priorities`);
+  if (counts.owners > 0) parts.push(`${counts.owners} owners`);
+  if (counts.hasSearch) parts.push('search');
+  return parts.join(', ');
+}
+
 const ActiveFiltersBar: React.FC<ActiveFiltersBarProps> = memo(
   ({ filters, filterMode, onClear }) => {
+    const counts = getFilterCounts(filters);
     const hasActiveFilters =
-      filters.types.length > 0 ||
-      filters.statuses.length > 0 ||
-      filters.priorities.length > 0 ||
-      filters.owners.length > 0 ||
-      filters.searchQuery.length > 0;
-
+      counts.types + counts.statuses + counts.priorities + counts.owners > 0 || counts.hasSearch;
     const hasSelectionFilters =
-      filters.types.length > 0 ||
-      filters.statuses.length > 0 ||
-      filters.priorities.length > 0 ||
-      filters.owners.length > 0;
+      counts.types + counts.statuses + counts.priorities + counts.owners > 0;
 
-    if (!hasActiveFilters) {
-      return null;
-    }
+    if (!hasActiveFilters) return null;
 
-    const filterSummary = [
-      filters.types.length > 0 && `${filters.types.length} types`,
-      filters.statuses.length > 0 && `${filters.statuses.length} statuses`,
-      filters.priorities.length > 0 && `${filters.priorities.length} priorities`,
-      filters.owners.length > 0 && `${filters.owners.length} owners`,
-      filters.searchQuery && 'search',
-    ]
-      .filter(Boolean)
-      .join(', ');
+    const isHideMode = filterMode === 'hide' && hasSelectionFilters;
 
     return (
       <div className="flex items-center justify-between pt-2 border-t border-gray-100">
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Filter className="w-4 h-4" />
           <span>
-            {filterMode === 'hide' && hasSelectionFilters ? (
+            {isHideMode ? (
               <span className="text-red-600 font-medium">Hiding: </span>
             ) : (
               'Active filters: '
             )}
-            {filterSummary}
+            {buildFilterSummary(counts)}
           </span>
         </div>
         <button

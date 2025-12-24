@@ -1,28 +1,206 @@
-import React, { useState } from 'react';
-import {
-  X,
-  ExternalLink,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Unplug,
-  Gauge,
-  Lock,
-  FileCode,
-} from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../../types';
 import ApiKeySection from './modal/ApiKeySection';
 import DatabaseConfigSection from './modal/DatabaseConfigSection';
 import PropertyMappingsSection from './modal/PropertyMappingsSection';
+import ConnectionStatus from './modal/ConnectionStatus';
+import PerformanceSettings from './modal/PerformanceSettings';
+import LockedConfigBanner from './modal/LockedConfigBanner';
 import { isValidDatabaseId } from '../../utils/validation';
 import { migrateConfig, isConfigUIDisabled, hasEnvConfig } from '../../utils/config';
-import { DEFAULT_PROPERTY_MAPPINGS, VIEW_LIMITS } from '../../constants';
+import { DEFAULT_PROPERTY_MAPPINGS } from '../../constants';
 
 interface NotionConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConnect: () => void;
+}
+
+type ValidationErrors = Record<ItemType, string | null>;
+
+const EMPTY_VALIDATION_ERRORS: ValidationErrors = {
+  mission: null,
+  problem: null,
+  solution: null,
+  project: null,
+  design: null,
+};
+
+const EMPTY_DATABASES: Record<ItemType, string> = {
+  mission: '',
+  problem: '',
+  solution: '',
+  project: '',
+  design: '',
+};
+
+function validateDatabases(databases: Record<ItemType, string>): {
+  errors: ValidationErrors;
+  hasErrors: boolean;
+} {
+  const errors: ValidationErrors = { ...EMPTY_VALIDATION_ERRORS };
+  let hasErrors = false;
+
+  for (const [type, dbId] of Object.entries(databases) as [ItemType, string][]) {
+    if (dbId.trim() && !isValidDatabaseId(dbId)) {
+      errors[type] = 'Invalid ID format';
+      hasErrors = true;
+    }
+  }
+
+  return { errors, hasErrors };
+}
+
+function buildDatabaseConfigs(databases: Record<ItemType, string>): DatabaseConfig[] {
+  return Object.entries(databases)
+    .filter(([, dbId]) => dbId.trim())
+    .map(([type, dbId]) => ({ databaseId: dbId.trim(), type: type as ItemType }));
+}
+
+const ModalHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="flex items-center justify-between p-4 border-b border-gray-200">
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
+        <span className="text-white text-xl font-bold">N</span>
+      </div>
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Connect to Notion</h2>
+        <p className="text-sm text-gray-500">Configure your Notion databases</p>
+      </div>
+    </div>
+    <button
+      onClick={onClose}
+      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+    >
+      <X className="w-5 h-5" />
+    </button>
+  </div>
+);
+
+const ErrorMessage: React.FC<{ error: string }> = ({ error }) => (
+  <div className="px-4 pt-4">
+    <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+      <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+      <div className="text-sm">{error}</div>
+    </div>
+  </div>
+);
+
+const InfoBox: React.FC = () => (
+  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+    <p className="text-xs text-blue-800">
+      <strong>Note:</strong> Each database type will be fetched separately and combined into a
+      unified view. Parent relations can link items across different databases.
+    </p>
+  </div>
+);
+
+interface SubmitButtonProps {
+  isConnecting: boolean;
+  isConnected: boolean;
+  disabled: boolean;
+}
+
+const SubmitButton: React.FC<SubmitButtonProps> = ({ isConnecting, isConnected, disabled }) => (
+  <div className="flex gap-3 pt-2">
+    <button
+      type="submit"
+      disabled={disabled}
+      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    >
+      {isConnecting ? (
+        <>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Connecting...
+        </>
+      ) : (
+        <>
+          <CheckCircle2 className="w-4 h-4" />
+          {isConnected ? 'Update Connection' : 'Connect to Notion'}
+        </>
+      )}
+    </button>
+  </div>
+);
+
+const DemoDataOption: React.FC<{ onUseDemoData: () => void }> = ({ onUseDemoData }) => (
+  <div className="p-4 border-t border-gray-200 bg-gray-50">
+    <div className="text-center">
+      <p className="text-sm text-gray-600 mb-2">
+        Don't have Notion set up yet? Try with demo data:
+      </p>
+      <button
+        onClick={onUseDemoData}
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+      >
+        <ExternalLink className="w-4 h-4" />
+        Use Demo Data Instead
+      </button>
+    </div>
+  </div>
+);
+
+interface FormSubmitParams {
+  databases: Record<ItemType, string>;
+  apiKey: string;
+  mappings: PropertyMappings;
+  setNotionConfig: (config: NotionConfig | null) => void;
+  callbacks: { onConnect: () => void; onClose: () => void };
+  stateSetters: {
+    setError: (error: string | null) => void;
+    setValidationErrors: (errors: ValidationErrors) => void;
+    setIsConnecting: (connecting: boolean) => void;
+  };
+}
+
+function useFormSubmit(params: FormSubmitParams) {
+  const { databases, apiKey, mappings, setNotionConfig, callbacks, stateSetters } = params;
+  const { onConnect, onClose } = callbacks;
+  const { setError, setValidationErrors, setIsConnecting } = stateSetters;
+
+  return useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsConnecting(true);
+      setError(null);
+
+      const { errors, hasErrors } = validateDatabases(databases);
+      setValidationErrors(errors);
+
+      if (hasErrors) {
+        setError(
+          'Please fix the invalid database IDs. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+        );
+        setIsConnecting(false);
+        return;
+      }
+
+      const databaseConfigs = buildDatabaseConfigs(databases);
+      if (databaseConfigs.length === 0) {
+        setError('Please enter at least one database ID');
+        setIsConnecting(false);
+        return;
+      }
+
+      setNotionConfig({ apiKey, databases: databaseConfigs, defaultMappings: mappings });
+      setIsConnecting(false);
+      onConnect();
+      onClose();
+    },
+    [
+      databases,
+      apiKey,
+      mappings,
+      setNotionConfig,
+      onConnect,
+      onClose,
+      setError,
+      setValidationErrors,
+      setIsConnecting,
+    ]
+  );
 }
 
 const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, onConnect }) => {
@@ -38,296 +216,91 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Record<ItemType, string | null>>({
-    mission: null,
-    problem: null,
-    solution: null,
-    project: null,
-    design: null,
+  const [validationErrors, setValidationErrors] =
+    useState<ValidationErrors>(EMPTY_VALIDATION_ERRORS);
+
+  const handleSubmit = useFormSubmit({
+    databases,
+    apiKey,
+    mappings,
+    setNotionConfig,
+    callbacks: { onConnect, onClose },
+    stateSetters: { setError, setValidationErrors, setIsConnecting },
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsConnecting(true);
-    setError(null);
-
-    // Validate all database IDs
-    const newValidationErrors: Record<ItemType, string | null> = {
-      mission: null,
-      problem: null,
-      solution: null,
-      project: null,
-      design: null,
-    };
-    let hasValidationErrors = false;
-
-    for (const [type, dbId] of Object.entries(databases) as [ItemType, string][]) {
-      if (dbId.trim() && !isValidDatabaseId(dbId)) {
-        newValidationErrors[type] = 'Invalid ID format';
-        hasValidationErrors = true;
-      }
-    }
-
-    setValidationErrors(newValidationErrors);
-
-    if (hasValidationErrors) {
-      setError(
-        'Please fix the invalid database IDs. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-      );
-      setIsConnecting(false);
-      return;
-    }
-
-    // Build database configs from non-empty entries
-    const databaseConfigs: DatabaseConfig[] = [];
-    for (const [type, dbId] of Object.entries(databases)) {
-      if (dbId.trim()) {
-        databaseConfigs.push({
-          databaseId: dbId.trim(),
-          type: type as ItemType,
-        });
-      }
-    }
-
-    if (databaseConfigs.length === 0) {
-      setError('Please enter at least one database ID');
-      setIsConnecting(false);
-      return;
-    }
-
-    const config: NotionConfig = {
-      apiKey,
-      databases: databaseConfigs,
-      defaultMappings: mappings,
-    };
-
-    setNotionConfig(config);
-    setIsConnecting(false);
-    onConnect();
-    onClose();
-  };
-
-  const handleDisconnect = () => {
+  const handleDisconnect = useCallback(() => {
     setNotionConfig(null);
     setApiKey('');
-    setDatabases({
-      mission: '',
-      problem: '',
-      solution: '',
-      project: '',
-      design: '',
-    });
+    setDatabases({ ...EMPTY_DATABASES });
     setMappings({ ...DEFAULT_PROPERTY_MAPPINGS });
     onConnect();
     onClose();
-  };
+  }, [setNotionConfig, onConnect, onClose]);
 
-  const handleUseDemoData = () => {
+  const handleUseDemoData = useCallback(() => {
     setNotionConfig(null);
     onConnect();
     onClose();
-  };
+  }, [setNotionConfig, onConnect, onClose]);
 
-  const updateDatabase = (type: ItemType, value: string) => {
+  const updateDatabase = useCallback((type: ItemType, value: string) => {
     setDatabases(prev => ({ ...prev, [type]: value }));
-    // Clear validation error when user starts typing
-    if (validationErrors[type]) {
-      setValidationErrors(prev => ({ ...prev, [type]: null }));
-    }
-    // Validate on blur would be nicer, but for now validate as they type if there's content
+    setValidationErrors(prev => (prev[type] ? { ...prev, [type]: null } : prev));
     if (value.trim() && !isValidDatabaseId(value)) {
       setValidationErrors(prev => ({ ...prev, [type]: 'Invalid format' }));
     }
-  };
+  }, []);
 
   if (!isOpen) return null;
 
   const hasAnyDatabase = Object.values(databases).some(id => id.trim());
-  const isConnected =
-    notionConfig &&
-    notionConfig.apiKey &&
-    (notionConfig.databases?.length > 0 || notionConfig.databaseId);
+  const isConnected = Boolean(
+    notionConfig?.apiKey && (notionConfig.databases?.length || notionConfig.databaseId)
+  );
+  const canSubmit = apiKey && hasAnyDatabase && !isConnecting;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xl font-bold">N</span>
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Connect to Notion</h2>
-              <p className="text-sm text-gray-500">Configure your Notion databases</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <ModalHeader onClose={onClose} />
+        <ConnectionStatus
+          isConnected={isConnected}
+          configUIDisabled={configUIDisabled}
+          onDisconnect={handleDisconnect}
+        />
+        {error && <ErrorMessage error={error} />}
 
-        {/* Current status */}
-        {isConnected && (
-          <div className="px-4 pt-4">
-            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center gap-2 text-green-700">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="text-sm font-medium">Connected to Notion</span>
-              </div>
-              {/* Only show disconnect button when config UI is enabled */}
-              {!configUIDisabled && (
-                <button
-                  onClick={handleDisconnect}
-                  className="flex items-center gap-1 px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-                >
-                  <Unplug className="w-4 h-4" />
-                  Disconnect
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Error message */}
-        {error && (
-          <div className="px-4 pt-4">
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div className="text-sm">{error}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* Config UI Disabled Banner */}
-          {configUIDisabled && (
-            <div className="flex items-start gap-3 p-4 bg-slate-100 border border-slate-200 rounded-lg">
-              <Lock className="w-5 h-5 text-slate-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-800">
-                  Configuration Managed by Server
-                </h3>
-                <p className="text-sm text-slate-600 mt-1">
-                  Notion API settings are configured via environment variables and cannot be
-                  modified through this interface. Contact your administrator to change these
-                  settings.
-                </p>
-                {usingEnvConfig && (
-                  <div className="flex items-center gap-2 mt-3 text-xs text-green-700">
-                    <FileCode className="w-4 h-4" />
-                    <span>
-                      Configuration loaded from{' '}
-                      <code className="px-1 py-0.5 bg-green-100 rounded">.env</code> file
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+          {configUIDisabled ? (
+            <LockedConfigBanner usingEnvConfig={usingEnvConfig} />
+          ) : (
+            <>
+              <ApiKeySection apiKey={apiKey} onChange={setApiKey} />
+              <DatabaseConfigSection
+                databases={databases}
+                validationErrors={validationErrors}
+                onDatabaseChange={updateDatabase}
+              />
+              <PropertyMappingsSection
+                mappings={mappings}
+                showAdvanced={showAdvanced}
+                onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
+                onMappingChange={(key, value) => setMappings(prev => ({ ...prev, [key]: value }))}
+              />
+            </>
           )}
-
-          {/* API Key - disabled when config UI is disabled */}
-          {!configUIDisabled && <ApiKeySection apiKey={apiKey} onChange={setApiKey} />}
-
-          {/* Multiple Databases - disabled when config UI is disabled */}
+          <PerformanceSettings
+            disableItemLimit={disableItemLimit}
+            onToggle={() => setDisableItemLimit(!disableItemLimit)}
+          />
+          {!configUIDisabled && <InfoBox />}
           {!configUIDisabled && (
-            <DatabaseConfigSection
-              databases={databases}
-              validationErrors={validationErrors}
-              onDatabaseChange={updateDatabase}
+            <SubmitButton
+              isConnecting={isConnecting}
+              isConnected={isConnected}
+              disabled={!canSubmit}
             />
           )}
-
-          {/* Property Mappings - disabled when config UI is disabled */}
-          {!configUIDisabled && (
-            <PropertyMappingsSection
-              mappings={mappings}
-              showAdvanced={showAdvanced}
-              onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
-              onMappingChange={(key, value) => setMappings(prev => ({ ...prev, [key]: value }))}
-            />
-          )}
-
-          {/* Performance Settings */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-gray-600" />
-              <h3 className="text-sm font-semibold text-gray-700">Performance Settings</h3>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-700">Limit items for performance</div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  When enabled, views will show at most {VIEW_LIMITS.ITEM_LIMIT} items to prevent
-                  lag
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={!disableItemLimit}
-                onClick={() => setDisableItemLimit(!disableItemLimit)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                  !disableItemLimit ? 'bg-blue-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    !disableItemLimit ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {disableItemLimit && (
-              <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">
-                  Item limit is disabled. Views with many items may be slow to render.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Info box - only show when config UI is enabled */}
-          {!configUIDisabled && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-800">
-                <strong>Note:</strong> Each database type will be fetched separately and combined
-                into a unified view. Parent relations can link items across different databases.
-              </p>
-            </div>
-          )}
-
-          {/* Submit button - only show when config UI is enabled */}
-          {!configUIDisabled && (
-            <div className="flex gap-3 pt-2">
-              <button
-                type="submit"
-                disabled={!apiKey || !hasAnyDatabase || isConnecting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    {isConnected ? 'Update Connection' : 'Connect to Notion'}
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Close button - only show when config UI is disabled */}
           {configUIDisabled && (
             <div className="flex gap-3 pt-2">
               <button
@@ -341,23 +314,7 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
           )}
         </form>
 
-        {/* Demo data option - only show when config UI is enabled */}
-        {!configUIDisabled && (
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-2">
-                Don't have Notion set up yet? Try with demo data:
-              </p>
-              <button
-                onClick={handleUseDemoData}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Use Demo Data Instead
-              </button>
-            </div>
-          </div>
-        )}
+        {!configUIDisabled && <DemoDataOption onUseDemoData={handleUseDemoData} />}
       </div>
     </div>
   );

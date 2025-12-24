@@ -24,6 +24,108 @@ import CanvasLegend from './CanvasLegend';
 import CanvasControls from './CanvasControls';
 import ItemLimitBanner from '../ui/ItemLimitBanner';
 
+/**
+ * Collect all ancestors of an item (iterative to avoid stack overflow)
+ */
+function collectAncestors(
+  startId: string | undefined,
+  items: Map<string, WorkItem>,
+  connected: Set<string>
+): void {
+  let currentId = startId;
+  while (currentId && !connected.has(currentId)) {
+    connected.add(currentId);
+    currentId = items.get(currentId)?.parentId;
+  }
+}
+
+/**
+ * Collect all descendants of an item using BFS
+ */
+function collectDescendants(
+  children: string[] | undefined,
+  items: Map<string, WorkItem>,
+  connected: Set<string>
+): void {
+  const queue = children ? [...children] : [];
+  while (queue.length > 0) {
+    const childId = queue.shift()!;
+    if (!connected.has(childId)) {
+      connected.add(childId);
+      const child = items.get(childId);
+      if (child?.children) queue.push(...child.children);
+    }
+  }
+}
+
+/**
+ * Build the set of connected item IDs for focus mode
+ */
+function buildConnectedIds(
+  selectedItemId: string,
+  items: Map<string, WorkItem>
+): Set<string> | null {
+  const selectedItem = items.get(selectedItemId);
+  if (!selectedItem) return null;
+
+  const connected = new Set<string>([selectedItemId]);
+
+  collectAncestors(selectedItem.parentId, items, connected);
+  collectDescendants(selectedItem.children, items, connected);
+
+  // Add blocked by items
+  selectedItem.blockedBy?.forEach(id => connected.add(id));
+
+  // Find items that this item blocks
+  for (const item of items.values()) {
+    if (item.blockedBy?.includes(selectedItemId)) {
+      connected.add(item.id);
+    }
+  }
+
+  // Add siblings
+  if (selectedItem.parentId) {
+    const parent = items.get(selectedItem.parentId);
+    parent?.children?.forEach(id => connected.add(id));
+  }
+
+  return connected;
+}
+
+/**
+ * Filter orphan items from the list
+ */
+function filterOrphans(
+  items: WorkItem[],
+  hideOrphanItems: boolean,
+  focusMode: boolean
+): { filtered: WorkItem[]; orphanCount: number } {
+  const itemIds = new Set(items.map(i => i.id));
+  const itemsWithChildren = new Set<string>();
+
+  for (const item of items) {
+    if (item.parentId && itemIds.has(item.parentId)) {
+      itemsWithChildren.add(item.parentId);
+    }
+  }
+
+  const orphans = items.filter(item => {
+    const hasParentInSet = item.parentId && itemIds.has(item.parentId);
+    const hasChildren = itemsWithChildren.has(item.id);
+    return !hasParentInSet && !hasChildren;
+  });
+
+  if (hideOrphanItems && !focusMode) {
+    const orphanIds = new Set(orphans.map(o => o.id));
+    return {
+      filtered: items.filter(item => !orphanIds.has(item.id)),
+      orphanCount: orphans.length,
+    };
+  }
+
+  return { filtered: items, orphanCount: orphans.length };
+}
+
 // Custom node types
 const nodeTypes = {
   workItem: CanvasNode,
@@ -59,123 +161,30 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   }, []);
 
   // Calculate connected items for the selected item
-  // This collects ALL ancestors and ALL descendants recursively, not just immediate parent/children
-  // Calculated independently of focusMode so we can use it to include items outside filters
-  // Optimized: Uses children arrays for O(n) traversal instead of O(n^2) lookups
   const connectedItemIds = useMemo(() => {
     if (!selectedItemId) return null;
-
-    const selectedItem = items.get(selectedItemId);
-    if (!selectedItem) return null;
-
-    const connected = new Set<string>([selectedItemId]);
-
-    // Recursively add all ancestors using iterative approach (avoids stack overflow for deep trees)
-    let currentId: string | undefined = selectedItem.parentId;
-    while (currentId && !connected.has(currentId)) {
-      connected.add(currentId);
-      const parent = items.get(currentId);
-      currentId = parent?.parentId;
-    }
-
-    // Recursively add all descendants using BFS (more efficient for wide trees)
-    const queue: string[] = selectedItem.children ? [...selectedItem.children] : [];
-    while (queue.length > 0) {
-      const childId = queue.shift()!;
-      if (!connected.has(childId)) {
-        connected.add(childId);
-        const child = items.get(childId);
-        if (child?.children) {
-          queue.push(...child.children);
-        }
-      }
-    }
-
-    // Add blocked by items (direct lookup, no iteration)
-    if (selectedItem.blockedBy) {
-      for (const blockerId of selectedItem.blockedBy) {
-        connected.add(blockerId);
-      }
-    }
-
-    // Find items that this item blocks (reverse lookup - only needed if blockedBy feature is used)
-    // This is still O(n) but only runs if blockedBy relationships exist anywhere
-    // TODO: Create a reverse index in store if this becomes a performance bottleneck
-    for (const item of items.values()) {
-      if (item.blockedBy?.includes(selectedItemId)) {
-        connected.add(item.id);
-      }
-    }
-
-    // Find siblings using parent's children array (O(1) lookup + O(siblings) add)
-    // Much more efficient than iterating all items
-    if (selectedItem.parentId) {
-      const parent = items.get(selectedItem.parentId);
-      if (parent?.children) {
-        for (const siblingId of parent.children) {
-          connected.add(siblingId);
-        }
-      }
-    }
-
-    return connected;
+    return buildConnectedIds(selectedItemId, items);
   }, [selectedItemId, items]);
 
   // Calculate which items are orphans and determine final filtered items
-  // When focus mode is ON, include connected items even if they're outside filters
   const { itemsAfterOrphanFilter, orphanCount } = useMemo(() => {
-    // Start with filtered items
     let baseItems = allFilteredItems;
 
     // When focus mode is active, add connected items that are outside the filter
     if (focusMode && connectedItemIds) {
       const filteredIds = new Set(allFilteredItems.map(i => i.id));
-      const additionalItems: WorkItem[] = [];
-
-      for (const connectedId of connectedItemIds) {
-        if (!filteredIds.has(connectedId)) {
-          const item = items.get(connectedId);
-          if (item) {
-            additionalItems.push(item);
-          }
-        }
-      }
+      const additionalItems = [...connectedItemIds]
+        .filter(id => !filteredIds.has(id))
+        .map(id => items.get(id))
+        .filter((item): item is WorkItem => item !== undefined);
 
       if (additionalItems.length > 0) {
         baseItems = [...allFilteredItems, ...additionalItems];
       }
     }
 
-    const itemIds = new Set(baseItems.map(i => i.id));
-    const itemsWithChildren = new Set<string>();
-
-    // Find all items that have children
-    for (const item of baseItems) {
-      if (item.parentId && itemIds.has(item.parentId)) {
-        itemsWithChildren.add(item.parentId);
-      }
-    }
-
-    // An orphan is an item with no parent (in set) AND no children
-    const orphans = baseItems.filter(item => {
-      const hasParentInSet = item.parentId && itemIds.has(item.parentId);
-      const hasChildren = itemsWithChildren.has(item.id);
-      return !hasParentInSet && !hasChildren;
-    });
-
-    // Don't hide orphans when focus mode is active (connected items might appear as orphans)
-    if (hideOrphanItems && !focusMode) {
-      const orphanIds = new Set(orphans.map(o => o.id));
-      return {
-        itemsAfterOrphanFilter: baseItems.filter(item => !orphanIds.has(item.id)),
-        orphanCount: orphans.length,
-      };
-    }
-
-    return {
-      itemsAfterOrphanFilter: baseItems,
-      orphanCount: orphans.length,
-    };
+    const { filtered, orphanCount } = filterOrphans(baseItems, hideOrphanItems, focusMode);
+    return { itemsAfterOrphanFilter: filtered, orphanCount };
   }, [allFilteredItems, hideOrphanItems, focusMode, connectedItemIds, items]);
 
   // Apply item limit for performance
@@ -205,19 +214,16 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
         await document.exitFullscreen();
       }
     } catch (error: unknown) {
-      // Handle specific fullscreen errors
-      if (error instanceof Error) {
-        // SecurityError or NotAllowedError - fullscreen not permitted
-        if (error.name === 'SecurityError' || error.name === 'NotAllowedError') {
-          logger.warn('Canvas', `Fullscreen not allowed: ${error.message}`);
-          return;
-        }
-        // TypeError - fullscreen API not supported
-        if (error.name === 'TypeError') {
-          logger.warn('Canvas', 'Fullscreen API not supported');
-          return;
-        }
-        // Log unexpected errors for debugging
+      if (!(error instanceof Error)) return;
+
+      const isPermissionError = error.name === 'SecurityError' || error.name === 'NotAllowedError';
+      const isNotSupported = error.name === 'TypeError';
+
+      if (isPermissionError) {
+        logger.warn('Canvas', `Fullscreen not allowed: ${error.message}`);
+      } else if (isNotSupported) {
+        logger.warn('Canvas', 'Fullscreen API not supported');
+      } else {
         logger.error('Canvas', 'Unexpected fullscreen error:', error);
       }
     }

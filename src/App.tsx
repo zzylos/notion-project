@@ -103,95 +103,97 @@ function App() {
     startCooldownTimer();
   }, [startCooldownTimer]);
 
+  // Check if config has valid Notion credentials
+  const hasValidNotionConfig = useCallback(
+    (config: NotionConfig | null): config is NotionConfig => {
+      return Boolean(
+        config?.apiKey && (config.databaseId || (config.databases && config.databases.length > 0))
+      );
+    },
+    []
+  );
+
+  // Handle progress updates during data fetch
+  const handleFetchProgress = useCallback(
+    (
+      abortController: AbortController,
+      progress: {
+        loaded: number;
+        total: number | null;
+        items: Array<unknown>;
+        done: boolean;
+        failedDatabases?: Array<{ type: string; error: string }>;
+      }
+    ) => {
+      if (abortController.signal.aborted) return;
+
+      setLoadingProgress({ loaded: progress.loaded, total: progress.total });
+
+      if (progress.failedDatabases?.length) {
+        setFailedDatabases(progress.failedDatabases);
+      }
+
+      if (progress.items.length > 0 && !progress.done) {
+        setItems(progress.items as Parameters<typeof setItems>[0]);
+      }
+    },
+    [setItems]
+  );
+
+  // Load sample data as fallback
+  const loadSampleData = useCallback(() => {
+    setItems(sampleData);
+    if (expandTimeoutRef.current) {
+      clearTimeout(expandTimeoutRef.current);
+    }
+    expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
+  }, [setItems, expandAll]);
+
   // Load data function with progressive updates
   const loadData = useCallback(
     async (config: NotionConfig | null, forceRefresh = false) => {
-      // Cancel any previous in-flight request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
 
-      // Create new AbortController for this request
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
       setLoading(true);
       setError(null);
-      // Set initial progress immediately so progress bar shows up right away
       setLoadingProgress({ loaded: 0, total: null });
       setFailedDatabases(null);
 
       try {
-        // Check for valid config - support both legacy databaseId and new databases array
-        const hasValidConfig =
-          config &&
-          config.apiKey &&
-          (config.databaseId || (config.databases && config.databases.length > 0));
-
-        if (hasValidConfig) {
-          // Clear cache if force refresh
-          if (forceRefresh) {
-            notionService.clearCache();
-          }
-
-          // Initialize Notion service and fetch data with progress
+        if (hasValidNotionConfig(config)) {
+          if (forceRefresh) notionService.clearCache();
           notionService.initialize(config);
 
           const items = await notionService.fetchAllItems({
             signal: abortController.signal,
-            onProgress: progress => {
-              // Don't update state if aborted
-              if (abortController.signal.aborted) return;
-
-              try {
-                setLoadingProgress({ loaded: progress.loaded, total: progress.total });
-
-                // Track failed databases
-                if (progress.failedDatabases && progress.failedDatabases.length > 0) {
-                  setFailedDatabases(progress.failedDatabases);
-                }
-
-                // Update items progressively for faster perceived performance
-                if (progress.items.length > 0 && !progress.done) {
-                  setItems(progress.items);
-                }
-              } catch (e) {
-                logger.error('App', 'Error in progress callback:', e);
-              }
-            },
+            onProgress: progress => handleFetchProgress(abortController, progress),
           });
 
-          // Don't update state if aborted
-          if (abortController.signal.aborted) return;
-
-          setItems(items);
-        } else {
-          // Use sample data
-          setItems(sampleData);
-          // Expand all nodes for demo (clear any existing timeout first)
-          if (expandTimeoutRef.current) {
-            clearTimeout(expandTimeoutRef.current);
+          if (!abortController.signal.aborted) {
+            setItems(items);
           }
-          expandTimeoutRef.current = setTimeout(() => expandAll(), 100);
+        } else {
+          loadSampleData();
         }
       } catch (error) {
-        // Ignore abort errors - they're expected when canceling
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return;
-        }
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         logger.error('App', 'Failed to load data from Notion:', error);
         setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
         setItems(sampleData);
       } finally {
-        // Only update loading state if this is still the current request
         if (abortControllerRef.current === abortController) {
           setLoading(false);
           setLoadingProgress(null);
         }
       }
     },
-    [setItems, setLoading, setError, expandAll]
+    [setItems, setLoading, setError, hasValidNotionConfig, handleFetchProgress, loadSampleData]
   );
 
   // Load data on mount and when config changes
