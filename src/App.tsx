@@ -166,8 +166,12 @@ function App() {
       setLoadingProgress({ loaded: 0, total: null });
       setFailedDatabases(null);
 
+      // Update demo data indicator immediately based on config validity
+      const usingNotion = hasValidNotionConfig(config);
+      setIsUsingDemoData(!usingNotion);
+
       try {
-        if (hasValidNotionConfig(config)) {
+        if (usingNotion) {
           if (forceRefresh) notionService.clearCache();
           notionService.initialize(config);
 
@@ -178,7 +182,6 @@ function App() {
 
           if (!abortController.signal.aborted) {
             setItems(items);
-            setIsUsingDemoData(false); // Successfully loaded from Notion
             // Expand all items after loading from Notion (same as sample data)
             if (expandTimeoutRef.current) {
               clearTimeout(expandTimeoutRef.current);
@@ -187,7 +190,6 @@ function App() {
           }
         } else {
           loadSampleData();
-          setIsUsingDemoData(true);
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -195,7 +197,7 @@ function App() {
         logger.error('App', 'Failed to load data from Notion:', error);
         setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
         setItems(sampleData);
-        setIsUsingDemoData(true);
+        setIsUsingDemoData(true); // Failed to load from Notion, using demo data
       } finally {
         if (abortControllerRef.current === abortController) {
           setLoading(false);
@@ -331,25 +333,32 @@ function App() {
                     {loadingProgress.total && ` of ~${loadingProgress.total}`}
                   </>
                 ) : (
-                  'Connecting to Notion...'
+                  'Loading data from Notion...'
                 )}
               </span>
             </div>
             <div className="mt-1 w-full h-1 bg-blue-200 rounded-full overflow-hidden">
               <div
-                className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
                 style={{
                   width:
                     loadingProgress?.total && loadingProgress.loaded > 0
                       ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
-                      : '30%',
+                      : '100%',
+                  backgroundSize: '200% 100%',
                   animation:
                     loadingProgress?.total && loadingProgress.loaded > 0
                       ? 'none'
-                      : 'pulse 1.5s ease-in-out infinite',
+                      : 'shimmer 1.5s ease-in-out infinite',
                 }}
               />
             </div>
+            <style>{`
+              @keyframes shimmer {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+              }
+            `}</style>
           </div>
         )}
 
@@ -400,10 +409,10 @@ function App() {
         <FilterPanel />
       </div>
 
-      {/* Main content area - scrollable with minimum height */}
-      <div className="flex-1 flex min-h-[500px] overflow-hidden">
-        {/* Main view - with minimum height for canvas usability */}
-        <div className="flex-1 overflow-auto min-h-[500px]">
+      {/* Main content area with fixed detail panel */}
+      <div className="flex-1 flex min-h-0">
+        {/* Main view container - scrolls independently */}
+        <div className="flex-1 overflow-auto min-h-[500px] lg:mr-80">
           <ErrorBoundary>{renderMainView()}</ErrorBoundary>
         </div>
 
@@ -419,8 +428,8 @@ function App() {
           )}
         </button>
 
-        {/* Detail panel - fixed on mobile, static flex child on desktop */}
-        {/* Mobile: Fixed overlay with slide animation */}
+        {/* Detail panel - fixed position on both mobile and desktop */}
+        {/* Mobile: Slide-in overlay */}
         <div
           className={`
             fixed inset-y-0 right-0 z-30 w-80 bg-white border-l border-gray-200 shadow-xl
@@ -429,7 +438,6 @@ function App() {
             ${showDetailPanel ? 'translate-x-0' : 'translate-x-full'}
           `}
         >
-          {/* Panel header for mobile */}
           <div className="flex items-center justify-between p-3 border-b border-gray-200">
             <span className="text-sm font-medium text-gray-700">Item Details</span>
             <button
@@ -439,34 +447,38 @@ function App() {
               <PanelRightClose className="w-5 h-5" />
             </button>
           </div>
-          <ErrorBoundary
-            fallback={
-              <div className="h-full flex items-center justify-center p-8 text-center">
-                <div className="text-gray-500">
-                  <p className="font-medium">Failed to load item details</p>
-                  <p className="text-sm mt-1">Try selecting a different item</p>
+          <div className="h-[calc(100%-49px)] overflow-auto">
+            <ErrorBoundary
+              fallback={
+                <div className="h-full flex items-center justify-center p-8 text-center">
+                  <div className="text-gray-500">
+                    <p className="font-medium">Failed to load item details</p>
+                    <p className="text-sm mt-1">Try selecting a different item</p>
+                  </div>
                 </div>
-              </div>
-            }
-          >
-            <DetailPanel onClose={handleCloseDetail} />
-          </ErrorBoundary>
+              }
+            >
+              <DetailPanel onClose={handleCloseDetail} />
+            </ErrorBoundary>
+          </div>
         </div>
 
-        {/* Desktop: Static panel as flex child - always visible */}
-        <div className="hidden lg:block w-80 flex-shrink-0 bg-white border-l border-gray-200 overflow-hidden">
-          <ErrorBoundary
-            fallback={
-              <div className="h-full flex items-center justify-center p-8 text-center">
-                <div className="text-gray-500">
-                  <p className="font-medium">Failed to load item details</p>
-                  <p className="text-sm mt-1">Try selecting a different item</p>
+        {/* Desktop: Fixed panel on the right side - does NOT scroll with content */}
+        <div className="hidden lg:flex lg:flex-col fixed top-0 right-0 bottom-0 w-80 bg-white border-l border-gray-200 z-10">
+          <div className="flex-1 overflow-auto">
+            <ErrorBoundary
+              fallback={
+                <div className="h-full flex items-center justify-center p-8 text-center">
+                  <div className="text-gray-500">
+                    <p className="font-medium">Failed to load item details</p>
+                    <p className="text-sm mt-1">Try selecting a different item</p>
+                  </div>
                 </div>
-              </div>
-            }
-          >
-            <DetailPanel onClose={handleCloseDetail} />
-          </ErrorBoundary>
+              }
+            >
+              <DetailPanel onClose={handleCloseDetail} />
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
 

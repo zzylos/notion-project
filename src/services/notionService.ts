@@ -320,6 +320,15 @@ class NotionService {
       return cached.items;
     }
 
+    // Report that loading has started (for progress bar feedback)
+    onProgress?.({
+      loaded: 0,
+      total: null,
+      items: [],
+      done: false,
+      currentDatabase: 'backend',
+    });
+
     try {
       if (this.debugMode) {
         logger.info('Notion', 'Fetching from backend API...');
