@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import TreeView from './TreeView';
 import { useStore } from '../../store/useStore';
 import type { WorkItem } from '../../types';
@@ -426,8 +426,10 @@ describe('TreeView', () => {
     const { rerender } = render(<TreeView />);
     expect(screen.getByText('Expand')).toBeInTheDocument();
 
-    // Expand all
-    useStore.setState({ expandedIds: new Set(['parent']) });
+    // Expand all - wrap in act() to properly handle state updates
+    act(() => {
+      useStore.setState({ expandedIds: new Set(['parent']) });
+    });
     rerender(<TreeView />);
     expect(screen.getByText('Collapse')).toBeInTheDocument();
   });
