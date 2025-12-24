@@ -15,6 +15,7 @@ npm run dev:full     # Start both frontend and backend concurrently
 # Building
 npm run build        # TypeScript check + production build
 npm run build:all    # Build frontend and backend
+npm run preview      # Preview production build locally
 
 # Code Quality
 npm run lint         # Run ESLint
@@ -108,9 +109,21 @@ VITE_USE_BACKEND_API=true
 VITE_API_URL=http://localhost:3001  # Or your production backend URL
 
 # Backend server/.env
+PORT=3001                           # Server port (default: 3001)
+CORS_ORIGIN=http://localhost:5173   # Frontend URL for CORS
 NOTION_API_KEY=secret_xxx
 NOTION_DB_MISSION=xxx
-# ... other database IDs
+NOTION_DB_PROBLEM=xxx
+NOTION_DB_SOLUTION=xxx
+NOTION_DB_PROJECT=xxx
+NOTION_DB_DESIGN=xxx
+# Property mappings (optional)
+MAPPING_TITLE=Name
+MAPPING_STATUS=Status
+# ... other mappings
+# Cache settings
+CACHE_TTL_SECONDS=300               # Cache TTL (default: 5 minutes)
+CACHE_CHECK_PERIOD=60               # Cache check interval (default: 1 minute)
 ```
 
 **Benefits:**
@@ -157,8 +170,9 @@ This ensures fast responses while keeping data fresh.
 ### State Management
 
 - **Zustand** store at `src/store/useStore.ts`
-- Key state: `items`, `filters`, `expandedIds`, `selectedItemId`, `viewMode`, `notionConfig`
-- Computed: `getFilteredItems()`, `getTreeNodes()`
+- Key state: `items`, `filters`, `expandedIds`, `selectedItemId`, `viewMode`, `notionConfig`, `hideOrphanItems`, `disableItemLimit`
+- Computed: `getFilteredItems()`, `getTreeNodes()`, `getStats()`, `getItemPath()`
+- Tree building delegated to `src/utils/treeBuilder.ts` for better modularity
 
 ### View Modes
 
@@ -168,9 +182,33 @@ This ensures fast responses while keeping data fresh.
 - **List View** (`src/components/views/ListView.tsx`) - Virtualized table with @tanstack/react-virtual
 - **Timeline View** (`src/components/views/TimelineView.tsx`) - Chronological view by due date
 
+### Custom Hooks
+
+The `src/hooks/` directory contains reusable hooks:
+
+- `useNotionData.ts` - Data fetching orchestration with progress tracking
+- `useCooldownTimer.ts` - Refresh rate limiting with countdown
+- `useFilterToggle.ts` - Filter state management helpers
+- `useItemLimit.ts` - Item limit management for performance
+- `useStoreSelectors.ts` - Optimized Zustand selectors (useFilteredItems, useTreeNodes, useStats, etc.)
+- `useFetch.ts` - Generic fetch hook with abort support
+- `useLocalStorage.ts` - Persistent localStorage hook
+
+### Shared Code
+
+The `shared/` directory contains code shared between frontend and backend:
+
+- `shared/types.ts` - Core types (WorkItem, NotionConfig, etc.) - single source of truth
+- `shared/constants.ts` - Shared constants (PROPERTY_ALIASES, DEFAULT_PROPERTY_MAPPINGS, NOTION_API)
+- `shared/index.ts` - Exports for both client and server
+
 ### Notion Integration
 
 - Service at `src/services/notionService.ts`
+- Modular service components in `src/services/notion/`:
+  - `NotionCacheManager.ts` - Client-side caching logic
+  - `NotionDataTransformer.ts` - Data transformation from Notion format
+  - `NotionPropertyMapper.ts` - Property mapping and alias resolution
 - API client at `src/services/apiClient.ts` (for backend mode)
 - **Multi-database support**: Fetches from up to 5 databases (Objectives, Problems, Solutions, Projects, Deliverables)
 - **Two operation modes**:
@@ -187,38 +225,101 @@ This ensures fast responses while keeping data fresh.
 
 ## Key Files
 
-| File                                          | Purpose                                     |
-| --------------------------------------------- | ------------------------------------------- |
-| `src/App.tsx`                                 | Main app, view switching, collapsible stats |
-| `src/store/useStore.ts`                       | Zustand state management                    |
-| `src/services/notionService.ts`               | Multi-database Notion API integration       |
-| `src/services/apiClient.ts`                   | Backend API client (for backend mode)       |
-| `src/components/common/NotionConfigModal.tsx` | Settings with multi-database inputs         |
-| `src/components/canvas/CanvasView.tsx`        | React Flow canvas with hierarchical layout  |
-| `src/components/canvas/CanvasNode.tsx`        | Custom node component for canvas            |
-| `src/components/tree/TreeView.tsx`            | Tree view with expand/collapse              |
-| `src/components/tree/TreeNode.tsx`            | Individual tree node component              |
-| `src/components/views/KanbanView.tsx`         | Dynamic status columns from data            |
-| `src/components/views/ListView.tsx`           | Virtualized list view                       |
-| `src/components/views/TimelineView.tsx`       | Timeline view                               |
-| `src/components/common/DetailPanel.tsx`       | Selected item details sidebar               |
-| `src/components/common/StatsOverview.tsx`     | Collapsible statistics panel                |
-| `src/components/filters/FilterPanel.tsx`      | Dynamic filter controls                     |
-| `src/types/index.ts`                          | TypeScript type definitions                 |
-| `src/utils/colors.ts`                         | Color utilities with dynamic status support |
-| `src/utils/errors.ts`                         | Error classes and error handling utilities  |
-| `src/utils/logger.ts`                         | Unified logging utility                     |
-| `src/utils/typeGuards.ts`                     | Type guard utilities for runtime checks     |
-| `src/utils/validation.ts`                     | Input validation utilities                  |
-| `src/utils/sampleData.ts`                     | Demo data for offline use                   |
-| `src/constants.ts`                            | Application-wide constants                  |
-| `src/test/setup.ts`                           | Vitest test setup and mocks                 |
-| `vitest.config.ts`                            | Vitest configuration                        |
-| `server/src/index.ts`                         | Backend API server entry point              |
-| `server/src/services/notion.ts`               | Server-side Notion API service              |
-| `server/src/services/cache.ts`                | Server-side caching service                 |
-| `server/src/routes/items.ts`                  | Items API endpoints                         |
-| `server/src/routes/cache.ts`                  | Cache management endpoints                  |
+### Core Application
+
+| File                     | Purpose                                     |
+| ------------------------ | ------------------------------------------- |
+| `src/App.tsx`            | Main app, view switching, collapsible stats |
+| `src/main.tsx`           | Vite entry point                            |
+| `src/constants.ts`       | Application-wide constants                  |
+| `src/store/useStore.ts`  | Zustand state management                    |
+| `src/types/index.ts`     | TypeScript type definitions (re-exports)    |
+| `src/types/notion.ts`    | Notion API-specific types                   |
+
+### Shared (Client/Server)
+
+| File                   | Purpose                                                        |
+| ---------------------- | -------------------------------------------------------------- |
+| `shared/types.ts`      | Core types (WorkItem, NotionConfig) - single source of truth   |
+| `shared/constants.ts`  | Shared constants (PROPERTY_ALIASES, DEFAULT_PROPERTY_MAPPINGS) |
+
+### Services
+
+| File                                       | Purpose                                    |
+| ------------------------------------------ | ------------------------------------------ |
+| `src/services/notionService.ts`            | Multi-database Notion API integration      |
+| `src/services/apiClient.ts`                | Backend API client (for backend mode)      |
+| `src/services/notion/NotionCacheManager.ts`     | Client-side caching logic             |
+| `src/services/notion/NotionDataTransformer.ts`  | Data transformation from Notion       |
+| `src/services/notion/NotionPropertyMapper.ts`   | Property mapping and alias resolution |
+
+### Hooks
+
+| File                             | Purpose                                        |
+| -------------------------------- | ---------------------------------------------- |
+| `src/hooks/useNotionData.ts`     | Data fetching orchestration with progress      |
+| `src/hooks/useCooldownTimer.ts`  | Refresh rate limiting with countdown           |
+| `src/hooks/useFilterToggle.ts`   | Filter state management helpers                |
+| `src/hooks/useItemLimit.ts`      | Item limit management for performance          |
+| `src/hooks/useStoreSelectors.ts` | Optimized Zustand selectors                    |
+| `src/hooks/useFetch.ts`          | Generic fetch hook with abort support          |
+| `src/hooks/useLocalStorage.ts`   | Persistent localStorage hook                   |
+
+### Components
+
+| File                                          | Purpose                                    |
+| --------------------------------------------- | ------------------------------------------ |
+| `src/components/common/NotionConfigModal.tsx` | Settings with multi-database inputs        |
+| `src/components/common/DetailPanel.tsx`       | Selected item details sidebar              |
+| `src/components/common/StatsOverview.tsx`     | Collapsible statistics panel               |
+| `src/components/common/Header.tsx`            | App header with controls                   |
+| `src/components/common/ErrorBoundary.tsx`     | Error boundary wrapper                     |
+| `src/components/canvas/CanvasView.tsx`        | React Flow canvas with hierarchical layout |
+| `src/components/canvas/CanvasNode.tsx`        | Custom node component for canvas           |
+| `src/components/canvas/CanvasControls.tsx`    | Canvas control toolbar                     |
+| `src/components/tree/TreeView.tsx`            | Tree view with expand/collapse             |
+| `src/components/tree/TreeNode.tsx`            | Individual tree node component             |
+| `src/components/views/KanbanView.tsx`         | Dynamic status columns from data           |
+| `src/components/views/ListView.tsx`           | Virtualized list view                      |
+| `src/components/views/TimelineView.tsx`       | Timeline view                              |
+| `src/components/filters/FilterPanel.tsx`      | Dynamic filter controls                    |
+
+### Utilities
+
+| File                            | Purpose                                    |
+| ------------------------------- | ------------------------------------------ |
+| `src/utils/colors.ts`           | Color utilities with dynamic status support|
+| `src/utils/config.ts`           | Configuration loading and merging          |
+| `src/utils/errors.ts`           | Error classes and error handling utilities |
+| `src/utils/logger.ts`           | Unified logging utility                    |
+| `src/utils/typeGuards.ts`       | Type guard utilities for runtime checks    |
+| `src/utils/validation.ts`       | Input validation utilities                 |
+| `src/utils/sampleData.ts`       | Demo data for offline use                  |
+| `src/utils/treeBuilder.ts`      | Tree building and path utilities           |
+| `src/utils/layoutCalculator.ts` | Canvas layout calculations                 |
+| `src/utils/dateUtils.ts`        | Date parsing and formatting                |
+| `src/utils/arrayUtils.ts`       | Array manipulation helpers                 |
+| `src/utils/icons.ts`            | Icon utilities for item types              |
+
+### Backend Server
+
+| File                               | Purpose                        |
+| ---------------------------------- | ------------------------------ |
+| `server/src/index.ts`              | Backend API server entry point |
+| `server/src/config.ts`             | Server configuration loading   |
+| `server/src/services/notion.ts`    | Server-side Notion API service |
+| `server/src/services/cache.ts`     | Server-side caching service    |
+| `server/src/routes/items.ts`       | Items API endpoints            |
+| `server/src/routes/cache.ts`       | Cache management endpoints     |
+| `server/src/middleware/rateLimit.ts` | Rate limiting middleware     |
+| `server/src/utils/logger.ts`       | Server logging utility         |
+
+### Testing
+
+| File                 | Purpose                     |
+| -------------------- | --------------------------- |
+| `src/test/setup.ts`  | Vitest test setup and mocks |
+| `vitest.config.ts`   | Vitest configuration        |
 
 ## Important Patterns
 
@@ -293,6 +394,8 @@ const rowVirtualizer = useVirtualizer({
 
 ## Data Types
 
+Types are defined in `shared/types.ts` (single source of truth) and re-exported from `src/types/index.ts`.
+
 ### WorkItem (main data type)
 
 ```typescript
@@ -302,13 +405,27 @@ interface WorkItem {
   type: 'mission' | 'problem' | 'solution' | 'design' | 'project';
   status: string; // Dynamic - preserves original Notion status
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
-  parentId?: string;
-  owner?: { id: string; name: string; avatar?: string };
   progress?: number;
-  dueDate?: string;
-  tags?: string[];
+  owner?: Owner;
+  assignees?: Owner[]; // Multiple assignees support
+  parentId?: string;
+  children?: string[]; // Child item IDs
   description?: string;
+  dueDate?: string;
+  createdAt: string; // Required - from Notion
+  updatedAt: string; // Required - from Notion
+  notionPageId?: string;
   notionUrl?: string;
+  tags?: string[];
+  dependencies?: string[]; // Dependency item IDs
+  blockedBy?: string[]; // Blocker item IDs
+}
+
+interface Owner {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
 }
 ```
 
@@ -319,7 +436,7 @@ interface NotionConfig {
   apiKey: string;
   databases: DatabaseConfig[]; // Multiple databases
   defaultMappings: PropertyMappings;
-  // Legacy support
+  // Legacy support (deprecated)
   databaseId?: string;
   mappings?: PropertyMappings & { type: string };
 }
@@ -328,6 +445,17 @@ interface DatabaseConfig {
   databaseId: string;
   type: ItemType;
   mappings?: Partial<PropertyMappings>; // Optional per-database overrides
+}
+
+interface PropertyMappings {
+  title: string;
+  status: string;
+  priority: string;
+  owner: string;
+  parent: string;
+  progress: string;
+  dueDate: string;
+  tags: string;
 }
 ```
 
@@ -488,11 +616,70 @@ const result = await withRetry(() => fetchData(), { maxRetries: 3 });
 
 Application-wide constants organized by category:
 
-- `CANVAS` - Canvas view layout constants
-- `TREE` - Tree view constants
-- `NOTION` - API constants
-- `CACHE` - Caching timeouts and keys
+- `CANVAS` - Canvas view layout (spacing, node width, tree gap)
+- `TREE` - Tree view (max depth, indentation)
+- `VIEW_LIMITS` - Item rendering limits for performance
+- `NOTION` - API constants (cache timeout, page size, base URL)
+- `REFRESH` - Refresh rate limiting (default cooldown, localStorage key)
+- `CACHE` - Caching timeouts and keys (persistent timeout, metadata key)
+- `EDGE_STYLES` - Canvas edge styling (stroke width, colors)
 - `TIMING` - Animation and debounce delays
+- `VIEW_MODES` - Available view modes array
+- `TYPE_ORDER` / `PRIORITY_ORDER` - Display order for types and priorities
+- `DEFAULT_PROPERTY_MAPPINGS` - Default Notion property names
+- `PROPERTY_ALIASES` - Alternative property names for flexible matching
+- `STATUS_GROUPS` / `STATUS_TO_GROUP` - Status grouping for filters
+
+### Tree Builder (`src/utils/treeBuilder.ts`)
+
+Tree building utilities with safety features:
+
+```typescript
+import { buildTreeNodes, getItemPath, buildChildMap } from './utils/treeBuilder';
+
+// Build tree structure from flat items
+const nodes = buildTreeNodes(filteredItems, {
+  expandedIds: new Set(['id1']),
+  selectedItemId: 'id1',
+  focusedItemId: null,
+});
+
+// Get path from root to item
+const path = getItemPath(itemId, itemsMap);
+
+// Pre-compute child map for performance
+const childMap = buildChildMap(items);
+```
+
+Features:
+- Circular reference detection
+- Depth limiting (prevents stack overflow)
+- Handles orphaned items (parent filtered out)
+
+### Date Utilities (`src/utils/dateUtils.ts`)
+
+Date parsing and formatting:
+
+```typescript
+import { parseDate, formatDate, isOverdue, getRelativeTime } from './utils/dateUtils';
+
+const date = parseDate('2024-01-15');
+const formatted = formatDate(date); // "Jan 15, 2024"
+const overdue = isOverdue('2024-01-01'); // true if past
+const relative = getRelativeTime('2024-01-15'); // "in 2 days"
+```
+
+### Array Utilities (`src/utils/arrayUtils.ts`)
+
+Array manipulation helpers:
+
+```typescript
+import { toggleArrayItem, includesItem, unique } from './utils/arrayUtils';
+
+const newArray = toggleArrayItem(array, item); // Add if missing, remove if present
+const hasItem = includesItem(array, item);
+const uniqueItems = unique(arrayWithDuplicates);
+```
 
 ## Contributing
 
