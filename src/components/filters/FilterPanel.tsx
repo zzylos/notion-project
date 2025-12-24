@@ -1,6 +1,7 @@
 import { useState, useCallback, memo } from 'react';
 import { useStore } from '../../store/useStore';
-import type { ItemType, Priority, FilterMode } from '../../types';
+import { useFilterToggle } from '../../hooks';
+import type { FilterMode } from '../../types';
 import SearchBar from './SearchBar';
 import FilterModeToggle from './FilterModeToggle';
 import TypeFilterSection from './TypeFilterSection';
@@ -29,6 +30,8 @@ import ActiveFiltersBar from './ActiveFiltersBar';
  */
 const FilterPanel: React.FC = memo(() => {
   const { filters, setFilters, resetFilters, items } = useStore();
+  const { toggleType, toggleStatus, togglePriority, toggleOwner, toggleStatusGroup } =
+    useFilterToggle();
 
   // Collapsible section states - default to open
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -42,7 +45,6 @@ const FilterPanel: React.FC = memo(() => {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
   }, []);
 
-  // Toggle handlers
   const handleSearchChange = useCallback(
     (value: string) => {
       setFilters({ searchQuery: value });
@@ -50,77 +52,11 @@ const FilterPanel: React.FC = memo(() => {
     [setFilters]
   );
 
-  const toggleType = useCallback(
-    (type: ItemType) => {
-      const current = filters.types;
-      if (current.includes(type)) {
-        setFilters({ types: current.filter(t => t !== type) });
-      } else {
-        setFilters({ types: [...current, type] });
-      }
-    },
-    [filters.types, setFilters]
-  );
-
-  const toggleStatus = useCallback(
-    (status: string) => {
-      const current = filters.statuses;
-      if (current.includes(status)) {
-        setFilters({ statuses: current.filter(s => s !== status) });
-      } else {
-        setFilters({ statuses: [...current, status] });
-      }
-    },
-    [filters.statuses, setFilters]
-  );
-
-  const toggleStatusGroup = useCallback(
+  const handleToggleStatusGroup = useCallback(
     (_groupName: string, groupStatuses: string[]) => {
-      const current = filters.statuses;
-
-      // Check if ALL statuses in the group are currently selected
-      const allSelected = groupStatuses.every(s => current.includes(s));
-
-      if (allSelected) {
-        // Remove all statuses in this group
-        const groupSet = new Set(groupStatuses);
-        setFilters({ statuses: current.filter(s => !groupSet.has(s)) });
-      } else {
-        // Add all statuses in this group (avoiding duplicates)
-        const newStatuses = [...current];
-        for (const status of groupStatuses) {
-          if (!newStatuses.includes(status)) {
-            newStatuses.push(status);
-          }
-        }
-        setFilters({ statuses: newStatuses });
-      }
+      toggleStatusGroup(groupStatuses);
     },
-    [filters.statuses, setFilters]
-  );
-
-  const togglePriority = useCallback(
-    (priority: Priority) => {
-      const current = filters.priorities;
-      if (current.includes(priority)) {
-        setFilters({ priorities: current.filter(p => p !== priority) });
-      } else {
-        setFilters({ priorities: [...current, priority] });
-      }
-    },
-    [filters.priorities, setFilters]
-  );
-
-  const toggleOwner = useCallback(
-    (ownerId: string) => {
-      const current = filters.owners;
-      if (current.includes(ownerId)) {
-        setFilters({ owners: current.filter(o => o !== ownerId) });
-      } else {
-        setFilters({ owners: [...current, ownerId] });
-      }
-    },
-    [filters.owners, setFilters]
+    [toggleStatusGroup]
   );
 
   const toggleFilterMode = useCallback(() => {
@@ -159,7 +95,7 @@ const FilterPanel: React.FC = memo(() => {
           items={items}
           selectedStatuses={filters.statuses}
           onToggleStatus={toggleStatus}
-          onToggleGroup={toggleStatusGroup}
+          onToggleGroup={handleToggleStatusGroup}
           isOpen={openSections.status}
           onToggleSection={() => toggleSection('status')}
         />
@@ -181,11 +117,7 @@ const FilterPanel: React.FC = memo(() => {
       </div>
 
       {/* Active filters summary */}
-      <ActiveFiltersBar
-        filters={filters}
-        filterMode={filters.filterMode}
-        onClear={resetFilters}
-      />
+      <ActiveFiltersBar filters={filters} filterMode={filters.filterMode} onClear={resetFilters} />
     </div>
   );
 });

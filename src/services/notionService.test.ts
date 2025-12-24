@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import type { NotionConfig, NotionPage, NotionQueryResponse } from '../types';
 import type * as ConstantsModule from '../constants';
 
@@ -18,9 +18,9 @@ vi.mock('../constants', async importOriginal => {
 // rather than importing the singleton
 class TestNotionService {
   private config: NotionConfig | null = null;
-  private mockFetch: ReturnType<typeof vi.fn>;
+  private mockFetch: Mock;
 
-  constructor(mockFetch: ReturnType<typeof vi.fn>) {
+  constructor(mockFetch: Mock) {
     this.mockFetch = mockFetch;
   }
 
@@ -92,8 +92,11 @@ const createMockNotionPage = (overrides: Partial<NotionPage> = {}): NotionPage =
   ...overrides,
 });
 
-// Helper for pagination tests (reserved for future use)
-const _createMockQueryResponse = (pages: NotionPage[], hasMore = false): NotionQueryResponse => ({
+// Helper for pagination tests - exported to avoid unused variable warning
+export const createMockQueryResponse = (
+  pages: NotionPage[],
+  hasMore = false
+): NotionQueryResponse => ({
   results: pages,
   has_more: hasMore,
   next_cursor: hasMore ? 'next-cursor' : null,
@@ -116,7 +119,7 @@ const createTestConfig = (overrides: Partial<NotionConfig> = {}): NotionConfig =
 });
 
 describe('NotionService', () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: Mock;
   let service: TestNotionService;
 
   beforeEach(() => {
