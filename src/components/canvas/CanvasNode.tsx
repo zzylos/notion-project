@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import type { WorkItem } from '../../types';
+import type { WorkItem, Owner } from '../../types';
 import {
   getStatusColors,
   getStatusCategory,
@@ -18,6 +18,45 @@ interface CanvasNodeProps {
     isDimmed?: boolean;
   };
 }
+
+// Sub-components to reduce main component complexity
+const NodeProgress: React.FC<{ progress: number }> = memo(({ progress }) => (
+  <div className="mb-2">
+    <div className="flex items-center justify-between text-[10px] text-gray-500 mb-0.5">
+      <span>Progress</span>
+      <span>{progress}%</span>
+    </div>
+    <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all ${getProgressColor(progress)}`}
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  </div>
+));
+NodeProgress.displayName = 'NodeProgress';
+
+const NodeOwner: React.FC<{ owner: Owner }> = memo(({ owner }) => (
+  <div className="flex items-center gap-1.5">
+    <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600">
+      {owner.name?.charAt(0)?.toUpperCase() || '?'}
+    </div>
+    <span className="text-[10px] text-gray-500 truncate">{owner.name}</span>
+  </div>
+));
+NodeOwner.displayName = 'NodeOwner';
+
+const NodeTags: React.FC<{ tags: string[] }> = memo(({ tags }) => (
+  <div className="flex flex-wrap gap-1 mt-2">
+    {tags.slice(0, 3).map(tag => (
+      <span key={tag} className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-600 rounded">
+        {tag}
+      </span>
+    ))}
+    {tags.length > 3 && <span className="text-[9px] text-gray-400">+{tags.length - 3}</span>}
+  </div>
+));
+NodeTags.displayName = 'NodeTags';
 
 const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
   const { item, isSelected, isDimmed = false } = data;
@@ -90,47 +129,13 @@ const CanvasNode: React.FC<CanvasNodeProps> = memo(({ data }) => {
         </div>
 
         {/* Progress bar */}
-        {item.progress !== undefined && (
-          <div className="mb-2">
-            <div className="flex items-center justify-between text-[10px] text-gray-500 mb-0.5">
-              <span>Progress</span>
-              <span>{item.progress}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${getProgressColor(item.progress)}`}
-                style={{ width: `${item.progress}%` }}
-              />
-            </div>
-          </div>
-        )}
+        {item.progress !== undefined && <NodeProgress progress={item.progress} />}
 
         {/* Owner */}
-        {item.owner && (
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600">
-              {item.owner.name?.charAt(0)?.toUpperCase() || '?'}
-            </div>
-            <span className="text-[10px] text-gray-500 truncate">{item.owner.name}</span>
-          </div>
-        )}
+        {item.owner && <NodeOwner owner={item.owner} />}
 
         {/* Tags */}
-        {item.tags && item.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {item.tags.slice(0, 3).map(tag => (
-              <span
-                key={tag}
-                className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-600 rounded"
-              >
-                {tag}
-              </span>
-            ))}
-            {item.tags.length > 3 && (
-              <span className="text-[9px] text-gray-400">+{item.tags.length - 3}</span>
-            )}
-          </div>
-        )}
+        {item.tags && item.tags.length > 0 && <NodeTags tags={item.tags} />}
       </div>
 
       {/* Bottom handle for outgoing connections */}

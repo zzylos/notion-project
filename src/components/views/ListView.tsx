@@ -23,6 +23,7 @@ const ListView: React.FC = memo(function ListViewInner() {
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Virtualize rows for large datasets
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual functions are expected to be fresh
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,
