@@ -1,4 +1,8 @@
 import type { ItemType, Priority, ViewMode } from './types';
+import { CACHE as SHARED_CACHE_VALUES } from '../shared/constants';
+
+// Re-export shared constants for convenient imports
+export { PROPERTY_ALIASES, DEFAULT_PROPERTY_MAPPINGS, NOTION_API } from '../shared/constants';
 
 /**
  * Canvas view layout constants
@@ -56,18 +60,16 @@ export const REFRESH = {
 
 /**
  * Cache-related constants
+ * Extends shared constants with client-specific properties
  */
 export const CACHE = {
+  ...SHARED_CACHE_VALUES,
   /** Persistent cache timeout in milliseconds (24 hours) */
   PERSISTENT_TIMEOUT_MS: 24 * 60 * 60 * 1000,
   /** LocalStorage key prefix for cache entries */
   KEY_PREFIX: 'notion-cache-',
   /** LocalStorage key for cache metadata */
   METADATA_KEY: 'notion-cache-metadata',
-  /** Maximum wait time for force refresh in milliseconds (30 seconds) */
-  FORCE_REFRESH_MAX_WAIT_MS: 30000,
-  /** Polling interval for waiting on refresh in milliseconds */
-  REFRESH_POLL_INTERVAL_MS: 100,
   /** Throttle duration for page progress callbacks in milliseconds */
   PAGE_PROGRESS_THROTTLE_MS: 100,
 } as const;
@@ -117,55 +119,6 @@ export const TYPE_ORDER: ItemType[] = ['mission', 'problem', 'solution', 'design
  * Priority order for consistent display
  */
 export const PRIORITY_ORDER: Priority[] = ['P0', 'P1', 'P2', 'P3'];
-
-/**
- * Default property mappings for Notion databases
- */
-export const DEFAULT_PROPERTY_MAPPINGS = {
-  title: 'Name',
-  status: 'Status',
-  priority: 'Priority',
-  owner: 'Owner',
-  parent: 'Parent',
-  progress: 'Progress',
-  dueDate: 'Deadline',
-  tags: 'Tags',
-} as const;
-
-/**
- * Common property name aliases for flexible matching.
- * Used by notionService to find properties with different names.
- */
-export const PROPERTY_ALIASES: Record<string, string[]> = {
-  Status: ['Status', 'State', 'Stage', 'Phase'],
-  Priority: ['Priority', 'Importance', 'Urgency', 'Level', 'P'],
-  Parent: [
-    'Parent',
-    'Parent Item',
-    'Parent Task',
-    'Belongs To',
-    'Part Of',
-    'Epic',
-    'Initiative',
-    'Objective',
-    'Problem',
-    'Solution',
-    'Project',
-  ],
-  Owner: [
-    'Owner',
-    'Assignee',
-    'Assigned To',
-    'Responsible',
-    'Lead',
-    'Person',
-    'People',
-    'Assigned',
-  ],
-  Progress: ['Progress', 'Completion', 'Percent Complete', '% Complete', 'Done %'],
-  Deadline: ['Deadline', 'Due Date', 'Due', 'Target Date', 'End Date', 'Finish Date', 'Due By'],
-  Tags: ['Tags', 'Labels', 'Categories', 'Keywords'],
-} as const;
 
 /**
  * Status groups for combining similar statuses in the filter UI.
