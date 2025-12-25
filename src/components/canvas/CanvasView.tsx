@@ -233,8 +233,8 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, filteredItems, selectedItemId]);
 
-  // Update node selection and connection state without resetting positions
-  // Note: setNodes is stable from React Flow hooks, so not included in deps
+  // Update node and edge selection/connection state without resetting positions
+  // Note: setNodes/setEdges are stable from React Flow hooks, so not included in deps
   useEffect(() => {
     setNodes(currentNodes =>
       currentNodes.map(node => {
@@ -247,6 +247,22 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
             isSelected: node.id === selectedItemId,
             isConnected,
             isDimmed,
+          },
+        };
+      })
+    );
+
+    // Update edge opacity based on focus mode
+    setEdges(currentEdges =>
+      currentEdges.map(edge => {
+        const sourceConnected = connectedItemIds ? connectedItemIds.has(edge.source) : true;
+        const targetConnected = connectedItemIds ? connectedItemIds.has(edge.target) : true;
+        const isEdgeDimmed = focusMode && selectedItemId && (!sourceConnected || !targetConnected);
+        return {
+          ...edge,
+          style: {
+            ...edge.style,
+            opacity: isEdgeDimmed ? 0.2 : 1,
           },
         };
       })

@@ -13,6 +13,7 @@ const KanbanView: React.FC = memo(() => {
     setSelectedItem,
     selectedItemId,
     items: allItems,
+    filters,
     isLoading,
   } = useStore();
   const allFilteredItems = getFilteredItems();
@@ -21,8 +22,16 @@ const KanbanView: React.FC = memo(() => {
   const { limitedItems: filteredItems, totalCount, isLimited } = useItemLimit(allFilteredItems);
   const [hideEmptyColumns, setHideEmptyColumns] = useState(false);
 
-  // Get unique statuses from all items, preserving order of first occurrence
-  const statuses = useMemo(() => getUniqueStatuses(allItems.values()), [allItems]);
+  // Get unique statuses - use filtered items' statuses when status filters are active,
+  // otherwise use all items' statuses for a complete board view
+  const statuses = useMemo(() => {
+    // If status filters are active, only show those specific status columns
+    if (filters.statuses.length > 0) {
+      return filters.statuses;
+    }
+    // Otherwise show all statuses from the dataset
+    return getUniqueStatuses(allItems.values());
+  }, [allItems, filters.statuses]);
 
   // Pre-compute status items to avoid repeated filtering
   const statusItemsMap = useMemo(() => {

@@ -13,6 +13,7 @@ vi.mock('lucide-react', () => ({
   ArrowUp: () => <span data-testid="icon-arrow-up">↑</span>,
   ArrowDown: () => <span data-testid="icon-arrow-down">↓</span>,
   AlertTriangle: () => <span data-testid="icon-alert">⚠</span>,
+  AlertCircle: () => <span data-testid="icon-alert-circle">⚠</span>,
   Target: () => <span data-testid="icon-target">🎯</span>,
   ChevronRight: () => <span data-testid="icon-chevron">&gt;</span>,
   Home: () => <span data-testid="icon-home">🏠</span>,
@@ -452,15 +453,30 @@ describe('DetailPanel', () => {
     expect(state.expandedIds.has('parent')).toBe(true);
   });
 
-  it('returns null when selected item does not exist in store', () => {
+  it('shows item not found state when selected item does not exist in store', () => {
     useStore.setState({
       items: new Map(),
       selectedItemId: 'non-existent',
     });
 
-    const { container } = render(<DetailPanel onClose={mockOnClose} />);
+    render(<DetailPanel onClose={mockOnClose} />);
 
-    // Should render nothing (null)
-    expect(container.firstChild).toBeNull();
+    // Should show "Item not found" state with message and clear button
+    expect(screen.getByText('Item not found')).toBeInTheDocument();
+    expect(screen.getByText(/This item may have been deleted/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Clear selection/ })).toBeInTheDocument();
+  });
+
+  it('calls onClose when clear selection is clicked in item not found state', () => {
+    useStore.setState({
+      items: new Map(),
+      selectedItemId: 'non-existent',
+    });
+
+    render(<DetailPanel onClose={mockOnClose} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear selection/ }));
+
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 });
