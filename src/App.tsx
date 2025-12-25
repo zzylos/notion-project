@@ -1,6 +1,6 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, useRef, lazy, Suspense } from 'react';
 import { useStore } from './store/useStore';
-import { useNotionData, useCooldownTimer } from './hooks';
+import { useNotionData, useCooldownTimer, useFullscreen } from './hooks';
 import Header from './components/common/Header';
 import FilterPanel from './components/filters/FilterPanel';
 import TreeView from './components/tree/TreeView';
@@ -15,7 +15,14 @@ import {
   StatsToggle,
 } from './components/common/StatusIndicators';
 import { getMergedConfig, hasEnvConfig } from './utils/config';
-import { PanelRightClose, PanelRight } from 'lucide-react';
+import {
+  PanelRightClose,
+  PanelRight,
+  ChevronDown,
+  ChevronUp,
+  Maximize,
+  Minimize,
+} from 'lucide-react';
 
 // Lazy load heavy view components for better initial load performance
 const CanvasView = lazy(() => import('./components/canvas/CanvasView'));
@@ -36,10 +43,15 @@ function App() {
 
   const { remainingMs: refreshCooldownRemaining, checkAndStartCooldown } = useCooldownTimer();
 
+  // Fullscreen support for the main content area
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const { isFullscreen, toggleFullscreen } = useFullscreen(mainContentRef);
+
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [showDetailPanel, setShowDetailPanel] = useState(true);
   const [showStats, setShowStats] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [modalKey, setModalKey] = useState(0);
 
@@ -127,15 +139,40 @@ function App() {
         {/* Stats Overview - Collapsible */}
         <StatsToggle isOpen={showStats} onToggle={() => setShowStats(!showStats)} />
 
-        {/* Filter Panel */}
-        <FilterPanel />
+        {/* Filter Panel - Collapsible */}
+        <div className="border-b border-gray-200 bg-white">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <span className="text-sm font-medium text-gray-700">Filters</span>
+            {showFilters ? (
+              <ChevronUp className="w-4 h-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            )}
+          </button>
+          {showFilters && <FilterPanel />}
+        </div>
       </div>
 
       {/* Main content area - flex row with main view and detail panel side by side */}
-      <div className="flex-1 flex min-h-0">
+      <div ref={mainContentRef} className="flex-1 flex min-h-0 bg-gray-50">
         {/* Main view container - scrolls independently, takes remaining width */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto relative">
           <ErrorBoundary>{renderMainView()}</ErrorBoundary>
+
+          {/* Fullscreen toggle button - shown for non-canvas views (canvas has its own) */}
+          {viewMode !== 'canvas' && (
+            <button
+              onClick={toggleFullscreen}
+              className="fixed bottom-4 left-4 z-40 flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
+            </button>
+          )}
         </div>
 
         {/* Detail panel toggle button (mobile only) */}
