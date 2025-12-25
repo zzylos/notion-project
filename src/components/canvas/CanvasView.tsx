@@ -14,11 +14,10 @@ import {
 import type { Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStore } from '../../store/useStore';
-import { useItemLimit } from '../../hooks/useItemLimit';
+import { useItemLimit, useFullscreen } from '../../hooks';
 import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import { calculateLayout } from '../../utils/layoutCalculator';
-import { logger } from '../../utils/logger';
 import CanvasNode from './CanvasNode';
 import CanvasLegend from './CanvasLegend';
 import CanvasControls from './CanvasControls';
@@ -149,7 +148,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const fitViewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef);
   const [focusMode, setFocusMode] = useState(false);
 
   const handleToggleOrphanItems = useCallback(() => {
@@ -193,41 +192,6 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   // When focus mode is active, use all items (no limit) to ensure connected items are visible
   const filteredItems = focusMode && selectedItemId ? itemsAfterOrphanFilter : limitedItems;
   const showLimitBanner = focusMode && selectedItemId ? false : isLimited;
-
-  // Handle fullscreen changes (including ESC key)
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  // Toggle fullscreen mode
-  const handleToggleFullscreen = useCallback(async () => {
-    if (!containerRef.current) return;
-
-    try {
-      if (!document.fullscreenElement) {
-        await containerRef.current.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (error: unknown) {
-      if (!(error instanceof Error)) return;
-
-      const isPermissionError = error.name === 'SecurityError' || error.name === 'NotAllowedError';
-      const isNotSupported = error.name === 'TypeError';
-
-      if (isPermissionError) {
-        logger.warn('Canvas', `Fullscreen not allowed: ${error.message}`);
-      } else if (isNotSupported) {
-        logger.warn('Canvas', 'Fullscreen API not supported');
-      } else {
-        logger.error('Canvas', 'Unexpected fullscreen error:', error);
-      }
-    }
-  }, []);
 
   // Track the data key to detect when underlying data changes
   const dataKey = useMemo(
@@ -370,7 +334,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
           {/* Action buttons */}
           <CanvasControls
             onResetLayout={handleResetLayout}
-            onToggleFullscreen={handleToggleFullscreen}
+            onToggleFullscreen={toggleFullscreen}
             isFullscreen={isFullscreen}
             hideOrphanItems={hideOrphanItems}
             onToggleOrphanItems={handleToggleOrphanItems}

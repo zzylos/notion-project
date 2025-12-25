@@ -23,3 +23,5 @@ export {
   useItem,
   useItemPath,
 } from './useStoreSelectors';
+export { useFullscreen } from './useFullscreen';
+export type { UseFullscreenReturn } from './useFullscreen';
