@@ -83,3 +83,7 @@ export { isValidApiKey, isValidDatabaseId, isValidEmail, isValidNotionUrl } from
 
 // Array utilities
 export { toggleArrayItem, includesItem, unique } from './arrayUtils';
+
+// Tree building utilities
+export { buildTreeNodes, getItemPath, buildChildMap } from './treeBuilder';
+export type { TreeBuildState } from './treeBuilder';
