@@ -151,28 +151,51 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef);
   const [focusMode, setFocusMode] = useState(false);
 
+  // Track the item that was selected when focus mode was enabled
+  // This keeps the item set stable while navigating within focus mode
+  const [focusModeAnchorId, setFocusModeAnchorId] = useState<string | null>(null);
+
   const handleToggleOrphanItems = useCallback(() => {
     setHideOrphanItems(!hideOrphanItems);
   }, [hideOrphanItems, setHideOrphanItems]);
 
   const handleToggleFocusMode = useCallback(() => {
-    setFocusMode(prev => !prev);
-  }, []);
+    setFocusMode(prev => {
+      const newFocusMode = !prev;
+      // When enabling focus mode, anchor to the current selection
+      if (newFocusMode && selectedItemId) {
+        setFocusModeAnchorId(selectedItemId);
+      } else {
+        setFocusModeAnchorId(null);
+      }
+      return newFocusMode;
+    });
+  }, [selectedItemId]);
 
-  // Calculate connected items for the selected item
-  const connectedItemIds = useMemo(() => {
+  // Calculate connected items for the ANCHOR item (stable during focus mode navigation)
+  // This determines which items are displayed in the canvas
+  const anchorConnectedItemIds = useMemo(() => {
+    if (!focusModeAnchorId) return null;
+    return buildConnectedIds(focusModeAnchorId, items);
+  }, [focusModeAnchorId, items]);
+
+  // Calculate connected items for the currently selected item
+  // This determines which items are highlighted vs dimmed
+  const selectedConnectedItemIds = useMemo(() => {
     if (!selectedItemId) return null;
     return buildConnectedIds(selectedItemId, items);
   }, [selectedItemId, items]);
 
   // Calculate which items are orphans and determine final filtered items
+  // Use anchorConnectedItemIds for determining which items to show (stable set)
   const { itemsAfterOrphanFilter, orphanCount } = useMemo(() => {
     let baseItems = allFilteredItems;
 
     // When focus mode is active, add connected items that are outside the filter
-    if (focusMode && connectedItemIds) {
+    // Use the anchor's connected items to keep the item set stable
+    if (focusMode && anchorConnectedItemIds) {
       const filteredIds = new Set(allFilteredItems.map(i => i.id));
-      const additionalItems = [...connectedItemIds]
+      const additionalItems = [...anchorConnectedItemIds]
         .filter(id => !filteredIds.has(id))
         .map(id => items.get(id))
         .filter((item): item is WorkItem => item !== undefined);
@@ -184,14 +207,14 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
 
     const { filtered, orphanCount } = filterOrphans(baseItems, hideOrphanItems, focusMode);
     return { itemsAfterOrphanFilter: filtered, orphanCount };
-  }, [allFilteredItems, hideOrphanItems, focusMode, connectedItemIds, items]);
+  }, [allFilteredItems, hideOrphanItems, focusMode, anchorConnectedItemIds, items]);
 
   // Apply item limit for performance (bypass when in focus mode to ensure all connected items are visible)
   const { limitedItems, totalCount, isLimited } = useItemLimit(itemsAfterOrphanFilter);
 
   // When focus mode is active, use all items (no limit) to ensure connected items are visible
-  const filteredItems = focusMode && selectedItemId ? itemsAfterOrphanFilter : limitedItems;
-  const showLimitBanner = focusMode && selectedItemId ? false : isLimited;
+  const filteredItems = focusMode && focusModeAnchorId ? itemsAfterOrphanFilter : limitedItems;
+  const showLimitBanner = focusMode && focusModeAnchorId ? false : isLimited;
 
   // Track the data key to detect when underlying data changes
   const dataKey = useMemo(
@@ -234,11 +257,12 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   }, [dataKey, filteredItems, selectedItemId]);
 
   // Update node and edge selection/connection state without resetting positions
+  // Use selectedConnectedItemIds for highlighting (changes with selection)
   // Note: setNodes/setEdges are stable from React Flow hooks, so not included in deps
   useEffect(() => {
     setNodes(currentNodes =>
       currentNodes.map(node => {
-        const isConnected = connectedItemIds ? connectedItemIds.has(node.id) : true;
+        const isConnected = selectedConnectedItemIds ? selectedConnectedItemIds.has(node.id) : true;
         const isDimmed = focusMode && selectedItemId && !isConnected;
         return {
           ...node,
@@ -255,8 +279,12 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     // Update edge opacity based on focus mode
     setEdges(currentEdges =>
       currentEdges.map(edge => {
-        const sourceConnected = connectedItemIds ? connectedItemIds.has(edge.source) : true;
-        const targetConnected = connectedItemIds ? connectedItemIds.has(edge.target) : true;
+        const sourceConnected = selectedConnectedItemIds
+          ? selectedConnectedItemIds.has(edge.source)
+          : true;
+        const targetConnected = selectedConnectedItemIds
+          ? selectedConnectedItemIds.has(edge.target)
+          : true;
         const isEdgeDimmed = focusMode && selectedItemId && (!sourceConnected || !targetConnected);
         return {
           ...edge,
@@ -268,7 +296,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       })
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItemId, connectedItemIds, focusMode]);
+  }, [selectedItemId, selectedConnectedItemIds, focusMode]);
 
   // Reset layout to original positions
   // Note: setNodes/setEdges are stable from React Flow hooks

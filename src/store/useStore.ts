@@ -69,37 +69,41 @@ interface StoreState {
 
 const defaultFilters: FilterState = {
   types: [],
+  excludeTypes: [],
   statuses: [],
+  excludeStatuses: [],
   priorities: [],
+  excludePriorities: [],
   owners: [],
+  excludeOwners: [],
   searchQuery: '',
   showOnlyMyItems: false,
-  filterMode: 'show',
+  filterMode: 'show', // Kept for backwards compatibility, prefer using exclude arrays
 };
 
 /**
- * Check if an item matches the current filter criteria.
- * This helper is extracted for readability.
+ * Check if an item matches the include filters (show only these).
+ * Returns true if item should be included based on include criteria.
  */
-function itemMatchesFilters(item: WorkItem, filters: FilterState): boolean {
-  // Type filter
+function itemMatchesIncludeFilters(item: WorkItem, filters: FilterState): boolean {
+  // Type filter - if types are specified, item must match one
   if (filters.types.length > 0 && !filters.types.includes(item.type)) {
     return false;
   }
 
-  // Status filter
+  // Status filter - if statuses are specified, item must match one
   if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) {
     return false;
   }
 
-  // Priority filter
+  // Priority filter - if priorities are specified, item must have matching priority
   if (filters.priorities.length > 0) {
     if (!item.priority || !filters.priorities.includes(item.priority)) {
       return false;
     }
   }
 
-  // Owner filter
+  // Owner filter - if owners are specified, item must have matching owner
   if (filters.owners.length > 0) {
     if (!item.owner || !filters.owners.includes(item.owner.id)) {
       return false;
@@ -107,6 +111,38 @@ function itemMatchesFilters(item: WorkItem, filters: FilterState): boolean {
   }
 
   return true;
+}
+
+/**
+ * Check if an item matches any exclude filter (hide these).
+ * Returns true if item should be EXCLUDED (hidden).
+ */
+function itemMatchesExcludeFilters(item: WorkItem, filters: FilterState): boolean {
+  // Exclude by type
+  if (filters.excludeTypes.length > 0 && filters.excludeTypes.includes(item.type)) {
+    return true;
+  }
+
+  // Exclude by status
+  if (filters.excludeStatuses.length > 0 && filters.excludeStatuses.includes(item.status)) {
+    return true;
+  }
+
+  // Exclude by priority
+  if (filters.excludePriorities.length > 0 && item.priority) {
+    if (filters.excludePriorities.includes(item.priority)) {
+      return true;
+    }
+  }
+
+  // Exclude by owner
+  if (filters.excludeOwners.length > 0 && item.owner) {
+    if (filters.excludeOwners.includes(item.owner.id)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export const useStore = create<StoreState>()(
@@ -237,17 +273,23 @@ export const useStore = create<StoreState>()(
         const state = get();
         const { filters } = state;
         const allItems = Array.from(state.items.values());
-        const isHideMode = filters.filterMode === 'hide';
 
-        // Check if any filters are active
-        const hasActiveFilters =
+        // Check if any include filters are active
+        const hasIncludeFilters =
           filters.types.length > 0 ||
           filters.statuses.length > 0 ||
           filters.priorities.length > 0 ||
           filters.owners.length > 0;
 
+        // Check if any exclude filters are active
+        const hasExcludeFilters =
+          filters.excludeTypes.length > 0 ||
+          filters.excludeStatuses.length > 0 ||
+          filters.excludePriorities.length > 0 ||
+          filters.excludeOwners.length > 0;
+
         return allItems.filter(item => {
-          // Search query is always inclusive (not affected by hide mode)
+          // Search query is always applied first
           if (filters.searchQuery) {
             const query = filters.searchQuery.toLowerCase();
             const titleMatch = item.title.toLowerCase().includes(query);
@@ -258,17 +300,17 @@ export const useStore = create<StoreState>()(
             }
           }
 
-          // If no filters are set, show all items regardless of mode
-          if (!hasActiveFilters) {
-            return true;
+          // Step 1: Check exclude filters - if item matches any exclude, hide it
+          if (hasExcludeFilters && itemMatchesExcludeFilters(item, filters)) {
+            return false;
           }
 
-          // Check if item matches filter criteria
-          const matchesFilters = itemMatchesFilters(item, filters);
+          // Step 2: Check include filters - if include filters are set, item must match
+          if (hasIncludeFilters && !itemMatchesIncludeFilters(item, filters)) {
+            return false;
+          }
 
-          // In hide mode: return true if item does NOT match filters (hide matching items)
-          // In show mode: return true if item DOES match filters (show matching items)
-          return isHideMode ? !matchesFilters : matchesFilters;
+          return true;
         });
       },
 
