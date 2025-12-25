@@ -24,7 +24,10 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   } = useStore();
 
   // Get full tree for display
-  const allTreeNodes = useMemo(() => getTreeNodes(), [getTreeNodes]);
+  // Note: expandedIds is needed in deps to trigger re-render when nodes are expanded/collapsed.
+  // getTreeNodes() internally reads the latest state, but useMemo needs expandedIds to know when to re-run.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allTreeNodes = useMemo(() => getTreeNodes(), [getTreeNodes, expandedIds]);
 
   // Get total item count for limit check
   const totalFilteredCount = useMemo(() => getFilteredItems().length, [getFilteredItems]);

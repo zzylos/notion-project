@@ -98,7 +98,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 font-notion">
+    <div className="h-screen flex flex-col bg-gray-50 font-notion overflow-hidden">
       {/* Sticky header section */}
       <div className="sticky top-0 z-20 bg-gray-50">
         {/* Header */}
