@@ -1,5 +1,14 @@
 import React, { useCallback, useMemo } from 'react';
-import { ExternalLink, Clock, Tag, ArrowUp, ArrowDown, AlertTriangle, Target } from 'lucide-react';
+import {
+  ExternalLink,
+  Clock,
+  Tag,
+  ArrowUp,
+  ArrowDown,
+  AlertTriangle,
+  Target,
+  AlertCircle,
+} from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { WorkItem } from '../../types';
 import { getStatusColors } from '../../utils/colors';
@@ -18,6 +27,24 @@ const EmptyState: React.FC = () => (
       <Target className="w-12 h-12 mx-auto mb-4 text-gray-300" />
       <p className="text-lg font-medium">Select an item</p>
       <p className="text-sm mt-1">Click on any item in the tree to see its details</p>
+    </div>
+  </div>
+);
+
+const ItemNotFoundState: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="h-full flex items-center justify-center text-gray-400 p-8 text-center">
+    <div>
+      <AlertCircle className="w-12 h-12 mx-auto mb-4 text-amber-400" />
+      <p className="text-lg font-medium text-gray-600">Item not found</p>
+      <p className="text-sm mt-1 text-gray-500">
+        This item may have been deleted or is no longer available
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+      >
+        Clear selection
+      </button>
     </div>
   </div>
 );
@@ -110,7 +137,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
   );
 
   if (!selectedItemId) return <EmptyState />;
-  if (!item) return null;
+  if (!item) return <ItemNotFoundState onClose={onClose} />;
 
   const parent = item.parentId ? items.get(item.parentId) : undefined;
   const children = getRelatedItems(item.children, items);

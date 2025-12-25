@@ -160,7 +160,13 @@ export function useNotionData(effectiveConfig: NotionConfig | null): UseNotionDa
           loadSampleData();
         }
       } catch (error) {
+        // Don't handle aborted requests
         if (error instanceof DOMException && error.name === 'AbortError') return;
+
+        // Only handle errors if this is still the current request
+        // This prevents race conditions when config changes rapidly
+        if (abortControllerRef.current !== abortController) return;
+
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         logger.error('App', 'Failed to load data from Notion:', error);
         setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);

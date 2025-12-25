@@ -87,16 +87,22 @@ export function useCooldownTimer(): UseCooldownTimerReturn {
     return true;
   }, [startCooldown]);
 
-  // Start interval on mount if there's a cooldown
+  // Start interval on mount if there's an existing cooldown from localStorage.
+  // This is intentionally a mount-only effect (empty deps) because:
+  // 1. We read from localStorage (via checkRefreshCooldown) which is external state
+  // 2. startCooldown internally calls checkRefreshCooldown to get fresh values
+  // 3. Adding remainingMs/startCooldown to deps would cause re-runs on every tick
   useEffect(() => {
-    // Only start interval if there's remaining cooldown
-    if (remainingMs > 0) {
+    // Check localStorage directly for mount-time decision
+    const { remainingMs: initialRemaining } = checkRefreshCooldown();
+    if (initialRemaining > 0) {
       startCooldown();
     }
     return () => {
       clearCooldownInterval();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional mount-only effect
+  }, []);
 
   return {
     remainingMs,
