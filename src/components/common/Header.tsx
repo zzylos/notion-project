@@ -54,12 +54,13 @@ const Header: React.FC<HeaderProps> = ({
   refreshCooldownRemaining = 0,
   isUsingDemoData = false,
 }) => {
-  const { viewMode, setViewMode, notionConfig } = useStore();
+  const { viewMode, setViewMode } = useStore();
   const isOnCooldown = refreshCooldownRemaining > 0;
   const isRefreshDisabled = isRefreshing || isOnCooldown;
 
-  // Determine connection status based on both config and actual data source
-  const isConnectedToNotion = notionConfig && !isUsingDemoData;
+  // Determine connection status based on actual data source
+  // (isUsingDemoData already accounts for whether config is valid and data loaded successfully)
+  const isConnectedToNotion = !isUsingDemoData;
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
