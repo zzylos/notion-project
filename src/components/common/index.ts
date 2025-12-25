@@ -17,3 +17,9 @@ export {
   FailedDatabasesWarning,
   StatsToggle,
 } from './StatusIndicators';
+
+// Detail panel subcomponents
+export * from './detail';
+
+// Modal subcomponents
+export * from './modal';
