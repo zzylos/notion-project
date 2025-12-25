@@ -12,6 +12,7 @@ import type {
   NotionQueryResponse,
 } from '../types/index.js';
 import { PROPERTY_ALIASES, NOTION_API } from '../../../shared/index.js';
+import { logger } from '../utils/logger.js';
 
 const NOTION_API_BASE = NOTION_API.BASE_URL;
 
@@ -190,7 +191,7 @@ class NotionService {
       type: value.type,
     }));
 
-    console.info(`[Notion] ${databaseType.toUpperCase()} database properties:`, propertyInfo);
+    logger.notion.info(`${databaseType.toUpperCase()} database properties:`, propertyInfo);
   }
 
   /**
@@ -389,8 +390,11 @@ class NotionService {
     const parentRelations = this.extractRelation(props, mappings.parent);
     const tags = this.extractMultiSelect(props, mappings.tags);
 
+    // Normalize the page ID to ensure consistent format for parent-child matching
+    const normalizedId = this.normalizeUuid(page.id);
+
     return {
-      id: page.id,
+      id: normalizedId,
       title: title || 'Untitled',
       type: itemType,
       status: this.mapToItemStatus(status),
@@ -465,7 +469,7 @@ class NotionService {
     }
 
     if (orphanedItems.length > 0 && this.debugMode) {
-      console.warn(`[Notion] ${orphanedItems.length} orphaned items (parent not found).`);
+      logger.notion.warn(`${orphanedItems.length} orphaned items (parent not found).`);
     }
 
     return orphanedItems.length;
@@ -482,17 +486,17 @@ class NotionService {
     const allItems: WorkItem[] = [];
     const failedDatabases: Array<{ type: string; error: string }> = [];
 
-    console.info(`[Notion] Fetching ${this.config.databases.length} databases...`);
+    logger.notion.info(`Fetching ${this.config.databases.length} databases...`);
 
     // Fetch all databases in parallel
     const fetchPromises = this.config.databases.map(async dbConfig => {
       try {
         const items = await this.fetchAllFromDatabase(dbConfig);
-        console.info(`[Notion] Fetched ${items.length} items from ${dbConfig.type}`);
+        logger.notion.info(`Fetched ${items.length} items from ${dbConfig.type}`);
         return { success: true as const, items, type: dbConfig.type };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`[Notion] Failed to fetch ${dbConfig.type}:`, errorMessage);
+        logger.notion.error(`Failed to fetch ${dbConfig.type}:`, errorMessage);
         return { success: false as const, error: errorMessage, type: dbConfig.type };
       }
     });
@@ -510,7 +514,7 @@ class NotionService {
     // Build relationships
     const orphanedCount = this.buildRelationships(allItems);
 
-    console.info(`[Notion] Total items: ${allItems.length}, Orphaned: ${orphanedCount}`);
+    logger.notion.info(`Total items: ${allItems.length}, Orphaned: ${orphanedCount}`);
 
     return {
       items: allItems,
