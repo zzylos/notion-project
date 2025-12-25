@@ -1,9 +1,7 @@
 import { useState, useCallback, memo } from 'react';
 import { useStore } from '../../store/useStore';
 import { useFilterToggle } from '../../hooks';
-import type { FilterMode } from '../../types';
 import SearchBar from './SearchBar';
-import FilterModeToggle from './FilterModeToggle';
 import TypeFilterSection from './TypeFilterSection';
 import StatusFilterSection from './StatusFilterSection';
 import PriorityFilterSection from './PriorityFilterSection';
@@ -16,12 +14,11 @@ import ActiveFiltersBar from './ActiveFiltersBar';
  * Features:
  * - Search by title, description, or tags
  * - Filter by type, status, priority, and owner
- * - Toggle between "show" and "hide" filter modes
+ * - Click to cycle through show → hide → clear states
  * - Collapsible sections for better organization
  *
  * This component has been split into focused subcomponents for better maintainability:
  * - SearchBar: Text search input
- * - FilterModeToggle: Show/hide mode toggle
  * - TypeFilterSection: Item type filters
  * - StatusFilterSection: Status filters with grouping
  * - PriorityFilterSection: Priority filters
@@ -30,8 +27,18 @@ import ActiveFiltersBar from './ActiveFiltersBar';
  */
 const FilterPanel: React.FC = memo(() => {
   const { filters, setFilters, resetFilters, items } = useStore();
-  const { toggleType, toggleStatus, togglePriority, toggleOwner, toggleStatusGroup } =
-    useFilterToggle();
+  const {
+    toggleType,
+    toggleExcludeType,
+    toggleStatus,
+    toggleExcludeStatus,
+    togglePriority,
+    toggleExcludePriority,
+    toggleOwner,
+    toggleExcludeOwner,
+    toggleStatusGroup,
+    toggleExcludeStatusGroup,
+  } = useFilterToggle();
 
   // Collapsible section states - default to open
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -59,34 +66,27 @@ const FilterPanel: React.FC = memo(() => {
     [toggleStatusGroup]
   );
 
-  const toggleFilterMode = useCallback(() => {
-    const newMode: FilterMode = filters.filterMode === 'show' ? 'hide' : 'show';
-    setFilters({ filterMode: newMode });
-  }, [filters.filterMode, setFilters]);
-
-  const hasSelectionFilters =
-    filters.types.length > 0 ||
-    filters.statuses.length > 0 ||
-    filters.priorities.length > 0 ||
-    filters.owners.length > 0;
+  const handleToggleExcludeStatusGroup = useCallback(
+    (_groupName: string, groupStatuses: string[]) => {
+      toggleExcludeStatusGroup(groupStatuses);
+    },
+    [toggleExcludeStatusGroup]
+  );
 
   return (
     <div className="bg-white border-b border-gray-200 p-4 space-y-4">
-      {/* Search bar and filter mode toggle */}
+      {/* Search bar */}
       <div className="flex gap-3 items-center">
         <SearchBar value={filters.searchQuery} onChange={handleSearchChange} />
-        <FilterModeToggle
-          mode={filters.filterMode}
-          onToggle={toggleFilterMode}
-          visible={hasSelectionFilters}
-        />
       </div>
 
       {/* Filter sections */}
       <div className="flex flex-wrap gap-6">
         <TypeFilterSection
           selectedTypes={filters.types}
+          excludedTypes={filters.excludeTypes}
           onToggle={toggleType}
+          onToggleExclude={toggleExcludeType}
           isOpen={openSections.type}
           onToggleSection={() => toggleSection('type')}
         />
@@ -94,15 +94,20 @@ const FilterPanel: React.FC = memo(() => {
         <StatusFilterSection
           items={items}
           selectedStatuses={filters.statuses}
+          excludedStatuses={filters.excludeStatuses}
           onToggleStatus={toggleStatus}
+          onToggleExcludeStatus={toggleExcludeStatus}
           onToggleGroup={handleToggleStatusGroup}
+          onToggleExcludeGroup={handleToggleExcludeStatusGroup}
           isOpen={openSections.status}
           onToggleSection={() => toggleSection('status')}
         />
 
         <PriorityFilterSection
           selectedPriorities={filters.priorities}
+          excludedPriorities={filters.excludePriorities}
           onToggle={togglePriority}
+          onToggleExclude={toggleExcludePriority}
           isOpen={openSections.priority}
           onToggleSection={() => toggleSection('priority')}
         />
@@ -110,7 +115,9 @@ const FilterPanel: React.FC = memo(() => {
         <OwnerFilterSection
           items={items}
           selectedOwners={filters.owners}
+          excludedOwners={filters.excludeOwners}
           onToggle={toggleOwner}
+          onToggleExclude={toggleExcludeOwner}
           isOpen={openSections.owner}
           onToggleSection={() => toggleSection('owner')}
         />

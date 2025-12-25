@@ -5,7 +5,15 @@ import type { FilterState, ItemType, Priority } from '../types';
 /**
  * Key types that can be toggled in the filter state.
  */
-type ToggleableFilterKey = 'types' | 'statuses' | 'priorities' | 'owners';
+type ToggleableFilterKey =
+  | 'types'
+  | 'excludeTypes'
+  | 'statuses'
+  | 'excludeStatuses'
+  | 'priorities'
+  | 'excludePriorities'
+  | 'owners'
+  | 'excludeOwners';
 
 /**
  * Get the value type for a given filter key.
@@ -18,16 +26,26 @@ type FilterValueType<K extends ToggleableFilterKey> = FilterState[K] extends (in
  * Return type for the useFilterToggle hook.
  */
 export interface UseFilterToggleReturn {
-  /** Toggle a single type in the types filter */
+  /** Toggle a single type in the types filter (show mode) */
   toggleType: (type: ItemType) => void;
-  /** Toggle a single status in the statuses filter */
+  /** Toggle a single type in the excludeTypes filter (hide mode) */
+  toggleExcludeType: (type: ItemType) => void;
+  /** Toggle a single status in the statuses filter (show mode) */
   toggleStatus: (status: string) => void;
-  /** Toggle a single priority in the priorities filter */
+  /** Toggle a single status in the excludeStatuses filter (hide mode) */
+  toggleExcludeStatus: (status: string) => void;
+  /** Toggle a single priority in the priorities filter (show mode) */
   togglePriority: (priority: Priority) => void;
-  /** Toggle a single owner ID in the owners filter */
+  /** Toggle a single priority in the excludePriorities filter (hide mode) */
+  toggleExcludePriority: (priority: Priority) => void;
+  /** Toggle a single owner ID in the owners filter (show mode) */
   toggleOwner: (ownerId: string) => void;
+  /** Toggle a single owner ID in the excludeOwners filter (hide mode) */
+  toggleExcludeOwner: (ownerId: string) => void;
   /** Toggle a group of statuses (adds all if not all selected, removes all if all selected) */
   toggleStatusGroup: (groupStatuses: string[]) => void;
+  /** Toggle a group of statuses in exclude mode */
+  toggleExcludeStatusGroup: (groupStatuses: string[]) => void;
 }
 
 /**
@@ -67,6 +85,7 @@ function createToggleHandler<K extends ToggleableFilterKey>(
 export function useFilterToggle(): UseFilterToggleReturn {
   const { filters, setFilters } = useStore();
 
+  // Include (show) toggles
   const toggleType = useCallback(
     (type: ItemType) => {
       createToggleHandler('types', filters.types, setFilters)(type);
@@ -95,6 +114,36 @@ export function useFilterToggle(): UseFilterToggleReturn {
     [filters.owners, setFilters]
   );
 
+  // Exclude (hide) toggles
+  const toggleExcludeType = useCallback(
+    (type: ItemType) => {
+      createToggleHandler('excludeTypes', filters.excludeTypes, setFilters)(type);
+    },
+    [filters.excludeTypes, setFilters]
+  );
+
+  const toggleExcludeStatus = useCallback(
+    (status: string) => {
+      createToggleHandler('excludeStatuses', filters.excludeStatuses, setFilters)(status);
+    },
+    [filters.excludeStatuses, setFilters]
+  );
+
+  const toggleExcludePriority = useCallback(
+    (priority: Priority) => {
+      createToggleHandler('excludePriorities', filters.excludePriorities, setFilters)(priority);
+    },
+    [filters.excludePriorities, setFilters]
+  );
+
+  const toggleExcludeOwner = useCallback(
+    (ownerId: string) => {
+      createToggleHandler('excludeOwners', filters.excludeOwners, setFilters)(ownerId);
+    },
+    [filters.excludeOwners, setFilters]
+  );
+
+  // Status group toggles
   const toggleStatusGroup = useCallback(
     (groupStatuses: string[]) => {
       const current = filters.statuses;
@@ -120,12 +169,42 @@ export function useFilterToggle(): UseFilterToggleReturn {
     [filters.statuses, setFilters]
   );
 
+  const toggleExcludeStatusGroup = useCallback(
+    (groupStatuses: string[]) => {
+      const current = filters.excludeStatuses;
+
+      // Check if ALL statuses in the group are currently excluded
+      const allExcluded = groupStatuses.every(s => current.includes(s));
+
+      if (allExcluded) {
+        // Remove all statuses from exclude list
+        const groupSet = new Set(groupStatuses);
+        setFilters({ excludeStatuses: current.filter(s => !groupSet.has(s)) });
+      } else {
+        // Add all statuses to exclude list (avoiding duplicates)
+        const newStatuses = [...current];
+        for (const status of groupStatuses) {
+          if (!newStatuses.includes(status)) {
+            newStatuses.push(status);
+          }
+        }
+        setFilters({ excludeStatuses: newStatuses });
+      }
+    },
+    [filters.excludeStatuses, setFilters]
+  );
+
   return {
     toggleType,
+    toggleExcludeType,
     toggleStatus,
+    toggleExcludeStatus,
     togglePriority,
+    toggleExcludePriority,
     toggleOwner,
+    toggleExcludeOwner,
     toggleStatusGroup,
+    toggleExcludeStatusGroup,
   };
 }
 

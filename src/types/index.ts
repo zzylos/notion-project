@@ -70,21 +70,31 @@ export type FilterMode = 'show' | 'hide';
 /**
  * Filter state for filtering work items.
  * Multiple filters are combined with AND logic.
+ * Include arrays select which items to show (empty = all).
+ * Exclude arrays remove items from the result (applied after include).
  */
 export interface FilterState {
-  /** Filter by item type (empty = all types) */
+  /** Filter by item type - only show these types (empty = all types) */
   types: SharedItemType[];
-  /** Filter by status (empty = all statuses) */
+  /** Exclude these types - always hide regardless of other filters */
+  excludeTypes: SharedItemType[];
+  /** Filter by status - only show these statuses (empty = all statuses) */
   statuses: SharedItemStatus[];
-  /** Filter by priority (empty = all priorities) */
+  /** Exclude these statuses - always hide regardless of other filters */
+  excludeStatuses: SharedItemStatus[];
+  /** Filter by priority - only show these priorities (empty = all priorities) */
   priorities: SharedPriority[];
-  /** Filter by owner IDs (empty = all owners) */
+  /** Exclude these priorities - always hide regardless of other filters */
+  excludePriorities: SharedPriority[];
+  /** Filter by owner IDs - only show these owners (empty = all owners) */
   owners: string[];
+  /** Exclude these owner IDs - always hide regardless of other filters */
+  excludeOwners: string[];
   /** Text search across title, description, and tags */
   searchQuery: string;
   /** Show only items owned by the current user */
   showOnlyMyItems: boolean;
-  /** Filter mode: 'show' keeps matching items, 'hide' removes matching items */
+  /** @deprecated Use include/exclude arrays instead. Legacy filter mode for backwards compatibility. */
   filterMode: FilterMode;
   /** Optional date range filter */
   dateRange?: {
