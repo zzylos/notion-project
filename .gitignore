@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Shared module build artifacts
+shared/*.js
+shared/*.js.map
+shared/*.d.ts
+shared/*.d.ts.map
+
 # Environment variables (contains secrets)
 .env
 .env.local
