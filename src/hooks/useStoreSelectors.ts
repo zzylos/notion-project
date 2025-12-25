@@ -13,48 +13,63 @@ import { useShallow } from 'zustand/shallow';
 /**
  * Hook to get filtered items with stable reference.
  * Only recomputes when items or filters change.
- * Note: We subscribe to items and filters to trigger re-renders when they change,
- * then call getFilteredItems() which computes the filtered result.
+ *
+ * Uses a single subscription with useShallow to bundle all dependencies,
+ * preventing multiple subscriptions and unnecessary re-renders.
  */
 export function useFilteredItems(): WorkItem[] {
-  const getFilteredItems = useStore(state => state.getFilteredItems);
-  // Subscribe to items and filters to trigger re-renders when they change
-  useStore(state => state.items);
-  useStore(useShallow(state => state.filters));
+  const { getFilteredItems, items, filters } = useStore(
+    useShallow(state => ({
+      getFilteredItems: state.getFilteredItems,
+      items: state.items,
+      filters: state.filters,
+    }))
+  );
 
-  return getFilteredItems();
+  return useMemo(() => getFilteredItems(), [getFilteredItems, items, filters]);
 }
 
 /**
  * Hook to get tree nodes with stable reference.
  * Only recomputes when filtered items, expanded state, or selection changes.
- * Note: We subscribe to relevant state to trigger re-renders when they change,
- * then call getTreeNodes() which computes the tree structure.
+ *
+ * Uses a single subscription with useShallow to bundle all dependencies,
+ * preventing multiple subscriptions and unnecessary re-renders.
  */
 export function useTreeNodes(): TreeNode[] {
-  const getTreeNodes = useStore(state => state.getTreeNodes);
-  // Subscribe to state that affects tree nodes to trigger re-renders
-  useStore(state => state.items);
-  useStore(useShallow(state => state.filters));
-  useStore(state => state.expandedIds);
-  useStore(state => state.selectedItemId);
-  useStore(state => state.focusedItemId);
+  const { getTreeNodes, items, filters, expandedIds, selectedItemId, focusedItemId } = useStore(
+    useShallow(state => ({
+      getTreeNodes: state.getTreeNodes,
+      items: state.items,
+      filters: state.filters,
+      expandedIds: state.expandedIds,
+      selectedItemId: state.selectedItemId,
+      focusedItemId: state.focusedItemId,
+    }))
+  );
 
-  return getTreeNodes();
+  return useMemo(
+    () => getTreeNodes(),
+    [getTreeNodes, items, filters, expandedIds, selectedItemId, focusedItemId]
+  );
 }
 
 /**
  * Hook to get dashboard stats with stable reference.
  * Only recomputes when items change.
- * Note: We subscribe to items to trigger re-renders when they change,
- * then call getStats() which computes the statistics.
+ *
+ * Uses a single subscription with useShallow to bundle all dependencies,
+ * preventing multiple subscriptions and unnecessary re-renders.
  */
 export function useStats(): DashboardStats {
-  const getStats = useStore(state => state.getStats);
-  // Subscribe to items to trigger re-renders when they change
-  useStore(state => state.items);
+  const { getStats, items } = useStore(
+    useShallow(state => ({
+      getStats: state.getStats,
+      items: state.items,
+    }))
+  );
 
-  return getStats();
+  return useMemo(() => getStats(), [getStats, items]);
 }
 
 /**
@@ -121,14 +136,20 @@ export function useItem(itemId: string | null): WorkItem | undefined {
 
 /**
  * Hook to get the path from root to a specific item.
- * Note: We subscribe to items to trigger re-renders when they change,
- * then call getItemPath() which traverses the item hierarchy.
+ *
+ * Uses a single subscription with useShallow to bundle all dependencies,
+ * preventing multiple subscriptions and unnecessary re-renders.
  */
 export function useItemPath(itemId: string | null): WorkItem[] {
-  const getItemPath = useStore(state => state.getItemPath);
-  // Subscribe to items to trigger re-renders when they change
-  useStore(state => state.items);
+  const { getItemPath, items } = useStore(
+    useShallow(state => ({
+      getItemPath: state.getItemPath,
+      items: state.items,
+    }))
+  );
 
-  if (!itemId) return [];
-  return getItemPath(itemId);
+  return useMemo(() => {
+    if (!itemId) return [];
+    return getItemPath(itemId);
+  }, [getItemPath, items, itemId]);
 }

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getCache } from '../services/cache.js';
 import { getNotion } from '../services/notion.js';
 import { mutationRateLimiter } from '../middleware/rateLimit.js';
+import { logger } from '../utils/logger.js';
 import type { ApiResponse, FetchItemsResponse } from '../types/index.js';
 
 // Extended response type for cached responses
@@ -12,12 +13,15 @@ interface CachedApiResponse<T> extends ApiResponse<T> {
 
 const router = Router();
 
-// Flag to track if refresh callback is registered
-let refreshCallbackRegistered = false;
+// Track which cache key has a registered callback
+// This allows re-registration when database configuration changes
+let registeredCacheKey: string | null = null;
 
 /**
  * Register the refresh callback for the cache.
  * This enables stale-while-revalidate behavior.
+ *
+ * Re-registers the callback if the cache key changes (e.g., database config changes).
  */
 function ensureRefreshCallbackRegistered(): string {
   const cache = getCache();
@@ -27,15 +31,16 @@ function ensureRefreshCallbackRegistered(): string {
   const dbIds = notion.getDatabaseIds();
   const cacheKey = cache.generateKey(dbIds);
 
-  if (!refreshCallbackRegistered) {
+  // Register callback if not registered or if cache key changed
+  if (registeredCacheKey !== cacheKey) {
     // Register the refresh callback for background updates
     cache.registerRefreshCallback(cacheKey, async () => {
-      console.info('[API] Executing refresh callback...');
+      logger.api.info('Executing refresh callback...');
       const result = await notion.fetchAllItems();
       return result.items;
     });
-    refreshCallbackRegistered = true;
-    console.info('[API] Refresh callback registered for stale-while-revalidate');
+    registeredCacheKey = cacheKey;
+    logger.api.info('Refresh callback registered for stale-while-revalidate');
   }
 
   return cacheKey;
@@ -64,8 +69,8 @@ router.get('/', async (_req: Request, res: Response) => {
       const status = cached.isStale ? 'STALE' : 'HIT';
       const refreshing = cache.isRefreshing(cacheKey);
 
-      console.info(
-        `[API] Cache ${status} for items (age: ${Math.round(cacheAge / 1000)}s)` +
+      logger.api.info(
+        `Cache ${status} for items (age: ${Math.round(cacheAge / 1000)}s)` +
           (refreshing ? ' [refreshing in background]' : '')
       );
 
@@ -81,7 +86,7 @@ router.get('/', async (_req: Request, res: Response) => {
       return;
     }
 
-    console.info('[API] Cache MISS - fetching from Notion...');
+    logger.api.info('Cache MISS - fetching from Notion...');
 
     // Fetch from Notion
     const result = await notion.fetchAllItems();
@@ -101,7 +106,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
     res.json(response);
   } catch (error) {
-    console.error('[API] Error fetching items:', error);
+    logger.api.error('Error fetching items:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -119,7 +124,7 @@ router.post('/refresh', async (_req: Request, res: Response) => {
     const cache = getCache();
     const cacheKey = ensureRefreshCallbackRegistered();
 
-    console.info('[API] Force refresh requested');
+    logger.api.info('Force refresh requested');
 
     const items = await cache.forceRefresh(cacheKey);
 
@@ -139,7 +144,7 @@ router.post('/refresh', async (_req: Request, res: Response) => {
     };
     res.json(response);
   } catch (error) {
-    console.error('[API] Error refreshing items:', error);
+    logger.api.error('Error refreshing items:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -163,7 +168,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     };
     res.json(response);
   } catch (error) {
-    console.error('[API] Error fetching item:', error);
+    logger.api.error('Error fetching item:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -216,7 +221,7 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
     };
     res.json(response);
   } catch (error) {
-    console.error('[API] Error updating status:', error);
+    logger.api.error('Error updating status:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -256,7 +261,7 @@ router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Res
     };
     res.json(response);
   } catch (error) {
-    console.error('[API] Error updating progress:', error);
+    logger.api.error('Error updating progress:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
