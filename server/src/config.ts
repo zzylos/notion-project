@@ -1,5 +1,13 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import type { NotionConfig, PropertyMappings, DatabaseConfig, ItemType } from './types/index.js';
+
+// Load .env from root directory (parent of server/)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, '../..');
+dotenv.config({ path: path.join(rootDir, '.env') });
 
 /**
  * Server configuration loaded from environment variables
@@ -124,8 +132,8 @@ export function loadConfig(): ServerConfig {
   const apiKey = getEnvVar('NOTION_API_KEY');
   if (!apiKey) {
     throw new Error(
-      'NOTION_API_KEY environment variable is required. ' +
-        'Set it in .env file or as an environment variable.'
+      'NOTION_API_KEY (or VITE_NOTION_API_KEY) environment variable is required. ' +
+        'Set it in the root .env file or as an environment variable.'
     );
   }
 
@@ -133,7 +141,7 @@ export function loadConfig(): ServerConfig {
   if (databases.length === 0) {
     throw new Error(
       'At least one database ID is required. ' +
-        'Set NOTION_DB_MISSION, NOTION_DB_PROBLEM, etc. in .env file.'
+        'Set NOTION_DB_MISSION (or VITE_NOTION_DB_MISSION), etc. in the root .env file.'
     );
   }
 

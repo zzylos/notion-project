@@ -104,27 +104,32 @@ When refresh cooldown is active:
 For production deployments, use the backend API mode instead of direct browser-to-Notion calls:
 
 ```bash
-# Frontend .env
+# Root .env (used by both frontend and backend)
 VITE_USE_BACKEND_API=true
 VITE_API_URL=http://localhost:3001  # Or your production backend URL
 
-# Backend server/.env
+# Notion credentials (shared by frontend and backend)
+# Backend reads both VITE_* and non-prefixed versions
+VITE_NOTION_API_KEY=secret_xxx
+VITE_NOTION_DB_MISSION=xxx
+VITE_NOTION_DB_PROBLEM=xxx
+VITE_NOTION_DB_SOLUTION=xxx
+VITE_NOTION_DB_PROJECT=xxx
+VITE_NOTION_DB_DESIGN=xxx
+
+# Property mappings (optional)
+VITE_MAPPING_TITLE=Name
+VITE_MAPPING_STATUS=Status
+# ... other mappings
+
+# Backend-specific settings
 PORT=3001                           # Server port (default: 3001)
 CORS_ORIGIN=http://localhost:5173   # Frontend URL for CORS
-NOTION_API_KEY=secret_xxx
-NOTION_DB_MISSION=xxx
-NOTION_DB_PROBLEM=xxx
-NOTION_DB_SOLUTION=xxx
-NOTION_DB_PROJECT=xxx
-NOTION_DB_DESIGN=xxx
-# Property mappings (optional)
-MAPPING_TITLE=Name
-MAPPING_STATUS=Status
-# ... other mappings
-# Cache settings
 CACHE_TTL_SECONDS=300               # Cache TTL (default: 5 minutes)
 CACHE_CHECK_PERIOD=60               # Cache check interval (default: 1 minute)
 ```
+
+**Note:** The backend server reads the root `.env` file (not `server/.env`). It supports both `VITE_*` prefixed variables (for sharing with frontend) and non-prefixed versions.
 
 **Benefits:**
 
