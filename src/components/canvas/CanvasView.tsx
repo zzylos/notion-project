@@ -93,33 +93,38 @@ function buildConnectedIds(
 
 /**
  * Filter orphan items from the list
- * @param focusedPathIds - IDs of items in the focused path that should be exempt from orphan hiding
- *                         and should not count as "parents" for orphan calculation
+ * @param addedByFocusIds - IDs of items that were ADDED to the visible set due to focusing
+ *                          (i.e., not in the original filtered set). These items:
+ *                          1. Are exempt from being considered orphans
+ *                          2. Don't count as "parents" for orphan calculation
+ *                          Items already in the filtered set continue to count as parents.
  */
 function filterOrphans(
   items: WorkItem[],
   hideOrphanItems: boolean,
   focusMode: boolean,
-  focusedPathIds: Set<string> = new Set()
+  addedByFocusIds: Set<string> = new Set()
 ): { filtered: WorkItem[]; orphanCount: number } {
   const itemIds = new Set(items.map(i => i.id));
   const itemsWithChildren = new Set<string>();
 
   for (const item of items) {
-    // Don't count focused path items as parents for orphan calculation
+    // Don't count added-by-focus items as parents for orphan calculation
     // This prevents other items from suddenly becoming non-orphans when ancestors are added
-    if (item.parentId && itemIds.has(item.parentId) && !focusedPathIds.has(item.parentId)) {
+    // Items already in the filtered set continue to count as parents
+    if (item.parentId && itemIds.has(item.parentId) && !addedByFocusIds.has(item.parentId)) {
       itemsWithChildren.add(item.parentId);
     }
   }
 
   const orphans = items.filter(item => {
-    // Items in the focused path are never orphans
-    if (focusedPathIds.has(item.id)) {
+    // Items added by focus are never orphans
+    if (addedByFocusIds.has(item.id)) {
       return false;
     }
-    // Only count non-focused-path parents as "real" parents
-    const hasParentInSet = item.parentId && itemIds.has(item.parentId) && !focusedPathIds.has(item.parentId);
+    // Only count non-added-by-focus parents as "real" parents
+    const hasParentInSet =
+      item.parentId && itemIds.has(item.parentId) && !addedByFocusIds.has(item.parentId);
     const hasChildren = itemsWithChildren.has(item.id);
     return !hasParentInSet && !hasChildren;
   });
@@ -197,14 +202,27 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     return buildConnectedIds(selectedItemId, items);
   }, [selectedItemId, items]);
 
-  // Calculate the focused path IDs (from focusedItemId in store, set by expandToItem)
-  // These items bypass filters and should not affect orphan calculation for other items
-  const focusedPathIds = useMemo(() => {
+  // Calculate which items were ADDED due to focusing (not already in filtered set)
+  // Only these should be excluded from orphan calculation - items already visible
+  // should continue to count as parents for their children
+  const addedByFocusIds = useMemo(() => {
     if (!focusedItemId) return new Set<string>();
+
+    // Get all items in the focused path (focused item + ancestors)
     const pathIds = new Set<string>();
     collectAncestors(focusedItemId, items, pathIds);
-    return pathIds;
-  }, [focusedItemId, items]);
+
+    // Only include items that are NOT in the base filtered set
+    // Items already visible should continue counting as parents
+    const filteredIds = new Set(allFilteredItems.map(i => i.id));
+    const addedIds = new Set<string>();
+    for (const id of pathIds) {
+      if (!filteredIds.has(id)) {
+        addedIds.add(id);
+      }
+    }
+    return addedIds;
+  }, [focusedItemId, items, allFilteredItems]);
 
   // Calculate which items are orphans and determine final filtered items
   // Use anchorConnectedItemIds for determining which items to show (stable set)
@@ -225,10 +243,23 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       }
     }
 
-    // Pass focusedPathIds to prevent focused ancestors from affecting orphan calculation
-    const { filtered, orphanCount } = filterOrphans(baseItems, hideOrphanItems, focusMode, focusedPathIds);
+    // Pass addedByFocusIds to prevent newly-added focused ancestors from affecting orphan calculation
+    // Items already in the filtered set continue to count as parents for their children
+    const { filtered, orphanCount } = filterOrphans(
+      baseItems,
+      hideOrphanItems,
+      focusMode,
+      addedByFocusIds
+    );
     return { itemsAfterOrphanFilter: filtered, orphanCount };
-  }, [allFilteredItems, hideOrphanItems, focusMode, anchorConnectedItemIds, items, focusedPathIds]);
+  }, [
+    allFilteredItems,
+    hideOrphanItems,
+    focusMode,
+    anchorConnectedItemIds,
+    items,
+    addedByFocusIds,
+  ]);
 
   // Apply item limit for performance (bypass when in focus mode to ensure all connected items are visible)
   const { limitedItems, totalCount, isLimited } = useItemLimit(itemsAfterOrphanFilter);
@@ -237,16 +268,16 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const filteredItems = focusMode && focusModeAnchorId ? itemsAfterOrphanFilter : limitedItems;
   const showLimitBanner = focusMode && focusModeAnchorId ? false : isLimited;
 
-  // Track the "core" data key excluding focused path items
+  // Track the "core" data key excluding items added by focusing
   // This prevents layout reset when only focused path ancestors are added
   const coreDataKey = useMemo(
     () =>
       filteredItems
-        .filter(i => !focusedPathIds.has(i.id))
+        .filter(i => !addedByFocusIds.has(i.id))
         .map(i => i.id)
         .sort()
         .join(','),
-    [filteredItems, focusedPathIds]
+    [filteredItems, addedByFocusIds]
   );
 
   // Track full data key for adding new nodes
