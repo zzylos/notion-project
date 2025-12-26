@@ -15,19 +15,16 @@ import { logger } from '../../utils/logger';
 export class NotionPropertyMapper {
   private debugMode: boolean;
   private loggedDatabases = new Set<string>();
-  // Track property types for each database (needed for correct update format)
-  private propertyTypes: Map<string, Map<string, string>> = new Map();
 
   constructor(debugMode = false) {
     this.debugMode = debugMode;
   }
 
   /**
-   * Clear logged databases and property types (useful when config changes)
+   * Clear logged databases (useful when config changes)
    */
   clearLoggedDatabases(): void {
     this.loggedDatabases.clear();
-    this.propertyTypes.clear();
   }
 
   /**
@@ -138,24 +135,12 @@ export class NotionPropertyMapper {
   }
 
   /**
-   * Log property names once per database for debugging and track property types.
-   * Property types are always tracked (needed for correct update format),
-   * but logging only happens in debug mode.
+   * Log property names once per database for debugging
    */
   logPropertyNames(databaseType: string, props: Record<string, NotionPropertyValue>): void {
-    const dbKey = databaseType;
-
-    // Always track property types for correct update format
-    if (!this.propertyTypes.has(dbKey)) {
-      const typeMap = new Map<string, string>();
-      for (const [name, value] of Object.entries(props)) {
-        typeMap.set(name.toLowerCase(), value.type);
-      }
-      this.propertyTypes.set(dbKey, typeMap);
-    }
-
-    // Only log once per database in debug mode
     if (!this.debugMode) return;
+
+    const dbKey = databaseType;
     if (this.loggedDatabases.has(dbKey)) return;
     this.loggedDatabases.add(dbKey);
 
@@ -167,21 +152,6 @@ export class NotionPropertyMapper {
 
     logger.info('Notion', `[Debug] ${databaseType.toUpperCase()} database properties:`);
     logger.table('Notion', propertyInfo);
-  }
-
-  /**
-   * Get the detected property type for a given property name.
-   * Returns 'status' or 'select' if found, null otherwise.
-   */
-  getPropertyType(propertyName: string): 'status' | 'select' | null {
-    const lowerName = propertyName.toLowerCase();
-    for (const typeMap of this.propertyTypes.values()) {
-      const type = typeMap.get(lowerName);
-      if (type === 'status' || type === 'select') {
-        return type;
-      }
-    }
-    return null;
   }
 
   /**
