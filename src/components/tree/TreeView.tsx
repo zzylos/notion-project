@@ -1,4 +1,4 @@
-import { useMemo, useCallback, memo } from 'react';
+import { useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import TreeNode from './TreeNode';
 import { useStore } from '../../store/useStore';
@@ -21,7 +21,11 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
     expandedIds,
     isLoading,
     disableItemLimit,
+    focusedItemId,
   } = useStore();
+
+  // Ref for the scrollable container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Get full tree for display
   // Note: expandedIds is needed in deps to trigger re-render when nodes are expanded/collapsed.
@@ -111,6 +115,19 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   // Check if all expandable items are actually expanded
   const isAllExpanded = expandableIds.length > 0 && expandableIds.every(id => expandedIds.has(id));
 
+  // Scroll to focused item when focusedItemId changes
+  useEffect(() => {
+    if (!focusedItemId || !scrollContainerRef.current) return;
+
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      const focusedElement = scrollContainerRef.current?.querySelector('[data-focused="true"]');
+      if (focusedElement) {
+        focusedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }, [focusedItemId]);
+
   if (isLoading) {
     return <LoadingState message="Loading opportunity tree..." size="lg" className="h-64" />;
   }
@@ -161,7 +178,7 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
       </div>
 
       {/* Tree content */}
-      <div className="flex-1 overflow-auto p-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-4">
         <div className="space-y-0.5">
           {treeNodes.map(node => (
             <TreeNode key={node.item.id} node={node} onNodeClick={handleNodeClick} />

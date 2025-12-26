@@ -130,7 +130,13 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = memo(({ node, onNodeClick }) 
   );
 
   return (
-    <div className="select-none" role="treeitem" aria-selected={isSelected} aria-level={level + 1}>
+    <div
+      className="select-none"
+      role="treeitem"
+      aria-selected={isSelected}
+      aria-level={level + 1}
+      data-focused={isHighlighted || undefined}
+    >
       <div
         className={getRowClassName(isSelected, isHighlighted)}
         style={{ marginLeft: `${indentPx}px` }}
