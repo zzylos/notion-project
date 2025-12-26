@@ -154,13 +154,39 @@ router.post('/refresh', async (_req: Request, res: Response) => {
 });
 
 /**
+ * Validate that an ID parameter is a valid non-empty string.
+ * Returns the trimmed ID or null if invalid.
+ */
+function validateIdParam(id: string | undefined): string | null {
+  if (!id || typeof id !== 'string') {
+    return null;
+  }
+  const trimmed = id.trim();
+  // Notion IDs are UUIDs (32 hex chars with or without dashes)
+  if (trimmed.length === 0 || trimmed.length > 50) {
+    return null;
+  }
+  return trimmed;
+}
+
+/**
  * GET /api/items/:id
  * Fetch a single item by ID
  */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
+    const itemId = validateIdParam(req.params.id);
+    if (!itemId) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Invalid item ID: ID must be a non-empty string',
+      };
+      res.status(400).json(response);
+      return;
+    }
+
     const notion = getNotion();
-    const item = await notion.fetchItem(req.params.id);
+    const item = await notion.fetchItem(itemId);
 
     const response: ApiResponse<typeof item> = {
       success: true,
@@ -183,6 +209,17 @@ router.get('/:id', async (req: Request, res: Response) => {
  */
 router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Response) => {
   try {
+    // Validate item ID
+    const itemId = validateIdParam(req.params.id);
+    if (!itemId) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Invalid item ID: ID must be a non-empty string',
+      };
+      res.status(400).json(response);
+      return;
+    }
+
     const { status } = req.body;
 
     // Validate status input
@@ -210,7 +247,7 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
     const cache = getCache();
     const cacheKey = ensureRefreshCallbackRegistered();
 
-    await notion.updateItemStatus(req.params.id, trimmedStatus);
+    await notion.updateItemStatus(itemId, trimmedStatus);
 
     // Invalidate only the items cache (not all cache entries)
     cache.delete(cacheKey);
@@ -236,6 +273,17 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
  */
 router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Response) => {
   try {
+    // Validate item ID
+    const itemId = validateIdParam(req.params.id);
+    if (!itemId) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Invalid item ID: ID must be a non-empty string',
+      };
+      res.status(400).json(response);
+      return;
+    }
+
     const { progress } = req.body;
     if (typeof progress !== 'number' || progress < 0 || progress > 100) {
       const response: ApiResponse<never> = {
@@ -250,7 +298,7 @@ router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Res
     const cache = getCache();
     const cacheKey = ensureRefreshCallbackRegistered();
 
-    await notion.updateItemProgress(req.params.id, progress);
+    await notion.updateItemProgress(itemId, progress);
 
     // Invalidate only the items cache (not all cache entries)
     cache.delete(cacheKey);

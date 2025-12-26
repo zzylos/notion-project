@@ -29,6 +29,19 @@ export class NotionDataTransformer {
     defaultMappings?: PropertyMappings,
     dbConfig?: DatabaseConfig
   ): WorkItem {
+    // Validate page structure
+    if (!page || typeof page !== 'object') {
+      throw new Error('Invalid Notion page: page object is null or undefined');
+    }
+
+    if (!page.properties || typeof page.properties !== 'object') {
+      throw new Error(`Invalid Notion page: missing properties for page ${page.id || 'unknown'}`);
+    }
+
+    if (!page.id) {
+      throw new Error('Invalid Notion page: missing page ID');
+    }
+
     const mappings = this.propertyMapper.getMappings(defaultMappings, dbConfig);
     const props = page.properties;
 
@@ -113,9 +126,32 @@ export class NotionDataTransformer {
     defaultMappings?: PropertyMappings,
     dbConfig?: DatabaseConfig
   ): WorkItem[] {
-    return pages
-      .filter(page => 'properties' in page)
-      .map(page => this.pageToWorkItem(page, itemType, defaultMappings, dbConfig));
+    if (!Array.isArray(pages)) {
+      logger.warn('Notion', 'transformPages received non-array input, returning empty array');
+      return [];
+    }
+
+    const validItems: WorkItem[] = [];
+    for (const page of pages) {
+      // Skip pages without required structure
+      if (!page || typeof page !== 'object' || !('properties' in page)) {
+        continue;
+      }
+
+      try {
+        const item = this.pageToWorkItem(page, itemType, defaultMappings, dbConfig);
+        validItems.push(item);
+      } catch (error) {
+        // Log warning but continue processing other pages
+        const pageId = page.id || 'unknown';
+        logger.warn(
+          'Notion',
+          `Failed to transform page ${pageId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    return validItems;
   }
 }
 

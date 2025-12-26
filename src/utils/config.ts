@@ -222,36 +222,47 @@ export function migrateConfig(config: NotionConfig | null): MigratedConfig {
     return { apiKey: '', databases, mappings: { ...DEFAULT_PROPERTY_MAPPINGS } };
   }
 
+  // Validate config is an object
+  if (typeof config !== 'object') {
+    logger.warn('Config', 'Invalid config object, using defaults');
+    return { apiKey: '', databases, mappings: { ...DEFAULT_PROPERTY_MAPPINGS } };
+  }
+
   // If we have the new format
-  if (config.databases && config.databases.length > 0) {
-    config.databases.forEach(db => {
-      databases[db.type] = db.databaseId;
-    });
+  if (config.databases && Array.isArray(config.databases) && config.databases.length > 0) {
+    for (const db of config.databases) {
+      // Validate each database entry
+      if (db && typeof db.type === 'string' && typeof db.databaseId === 'string') {
+        if (db.type in databases) {
+          databases[db.type as ItemType] = db.databaseId;
+        }
+      }
+    }
     return {
-      apiKey: config.apiKey,
+      apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
       databases,
       mappings: config.defaultMappings || { ...DEFAULT_PROPERTY_MAPPINGS },
     };
   }
 
   // Legacy format - put the single database ID in project
-  if (config.databaseId) {
+  if (config.databaseId && typeof config.databaseId === 'string') {
     databases.project = config.databaseId;
   }
 
   return {
-    apiKey: config.apiKey,
+    apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
     databases,
     mappings: config.mappings
       ? {
-          title: config.mappings.title,
-          status: config.mappings.status,
-          priority: config.mappings.priority,
-          owner: config.mappings.owner,
-          parent: config.mappings.parent,
-          progress: config.mappings.progress,
-          dueDate: config.mappings.dueDate,
-          tags: config.mappings.tags,
+          title: config.mappings.title || DEFAULT_PROPERTY_MAPPINGS.title,
+          status: config.mappings.status || DEFAULT_PROPERTY_MAPPINGS.status,
+          priority: config.mappings.priority || DEFAULT_PROPERTY_MAPPINGS.priority,
+          owner: config.mappings.owner || DEFAULT_PROPERTY_MAPPINGS.owner,
+          parent: config.mappings.parent || DEFAULT_PROPERTY_MAPPINGS.parent,
+          progress: config.mappings.progress || DEFAULT_PROPERTY_MAPPINGS.progress,
+          dueDate: config.mappings.dueDate || DEFAULT_PROPERTY_MAPPINGS.dueDate,
+          tags: config.mappings.tags || DEFAULT_PROPERTY_MAPPINGS.tags,
         }
       : { ...DEFAULT_PROPERTY_MAPPINGS },
   };

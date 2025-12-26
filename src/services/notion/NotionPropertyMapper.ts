@@ -161,17 +161,26 @@ export class NotionPropertyMapper {
     const mapped = this.findProperty(props, mappingName);
     if (mapped) {
       if (mapped.type === 'title' && mapped.title) {
-        return mapped.title.map(t => t.plain_text).join('');
+        return mapped.title
+          .filter(t => t && typeof t.plain_text === 'string')
+          .map(t => t.plain_text)
+          .join('');
       }
       if (mapped.type === 'rich_text' && mapped.rich_text) {
-        return mapped.rich_text.map(t => t.plain_text).join('');
+        return mapped.rich_text
+          .filter(t => t && typeof t.plain_text === 'string')
+          .map(t => t.plain_text)
+          .join('');
       }
     }
 
     // Fallback: find ANY title property
     for (const value of Object.values(props)) {
       if (value.type === 'title' && value.title && value.title.length > 0) {
-        return value.title.map(t => t.plain_text).join('');
+        return value.title
+          .filter(t => t && typeof t.plain_text === 'string')
+          .map(t => t.plain_text)
+          .join('');
       }
     }
 
@@ -237,12 +246,14 @@ export class NotionPropertyMapper {
   extractPeople(props: Record<string, NotionPropertyValue>, mappingName: string): Owner[] {
     const prop = this.findProperty(props, mappingName);
     if (!prop || prop.type !== 'people' || !prop.people) return [];
-    return prop.people.map(p => ({
-      id: p.id,
-      name: p.name || 'Unknown',
-      email: p.person?.email || '',
-      avatar: p.avatar_url,
-    }));
+    return prop.people
+      .filter(p => p && p.id)
+      .map(p => ({
+        id: p.id,
+        name: typeof p.name === 'string' && p.name.length > 0 ? p.name : 'Unknown',
+        email: p.person?.email || '',
+        avatar: p.avatar_url,
+      }));
   }
 
   /**
@@ -250,6 +261,11 @@ export class NotionPropertyMapper {
    * Notion sometimes returns IDs with or without dashes depending on context.
    */
   normalizeUuid(id: string): string {
+    // Validate input
+    if (!id || typeof id !== 'string') {
+      return '';
+    }
+
     // Remove any existing dashes and convert to lowercase
     const clean = id.replace(/-/g, '').toLowerCase();
 
@@ -267,7 +283,10 @@ export class NotionPropertyMapper {
   extractRelation(props: Record<string, NotionPropertyValue>, mappingName: string): string[] {
     const prop = this.findProperty(props, mappingName, 'relation');
     if (!prop || prop.type !== 'relation' || !prop.relation) return [];
-    return prop.relation.map(r => this.normalizeUuid(r.id));
+    return prop.relation
+      .filter(r => r && r.id && typeof r.id === 'string')
+      .map(r => this.normalizeUuid(r.id))
+      .filter(id => id.length > 0);
   }
 
   /**

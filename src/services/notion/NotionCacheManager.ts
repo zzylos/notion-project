@@ -89,22 +89,48 @@ export class NotionCacheManager {
       const metadataStr = localStorage.getItem(CACHE_METADATA_KEY);
       if (!metadataStr) return;
 
-      const metadata: CacheMetadata = JSON.parse(metadataStr);
+      let metadata: CacheMetadata;
+      try {
+        const parsed = JSON.parse(metadataStr);
+        // Validate parsed metadata structure
+        if (!parsed || !Array.isArray(parsed.keys)) {
+          logger.warn('Notion', 'Invalid cache metadata structure, skipping load');
+          return;
+        }
+        metadata = parsed;
+      } catch (parseError) {
+        logger.warn('Notion', 'Failed to parse cache metadata, clearing:', parseError);
+        localStorage.removeItem(CACHE_METADATA_KEY);
+        return;
+      }
+
       const now = Date.now();
 
       for (const key of metadata.keys) {
         const cachedStr = localStorage.getItem(CACHE_KEY_PREFIX + key);
         if (!cachedStr) continue;
 
-        const cached = JSON.parse(cachedStr);
-        // Check if persistent cache is still valid
-        if (now - cached.timestamp < PERSISTENT_CACHE_TIMEOUT) {
-          this.cache.set(key, cached);
-          if (this.debugMode) {
-            logger.info('Notion', `Loaded ${cached.items.length} items from persistent cache`);
+        try {
+          const cached = JSON.parse(cachedStr);
+          // Validate cached data structure
+          if (!cached || !Array.isArray(cached.items) || typeof cached.timestamp !== 'number') {
+            logger.warn('Notion', `Invalid cache entry for key ${key}, removing`);
+            localStorage.removeItem(CACHE_KEY_PREFIX + key);
+            continue;
           }
-        } else {
-          // Clean up expired cache
+
+          // Check if persistent cache is still valid
+          if (now - cached.timestamp < PERSISTENT_CACHE_TIMEOUT) {
+            this.cache.set(key, cached);
+            if (this.debugMode) {
+              logger.info('Notion', `Loaded ${cached.items.length} items from persistent cache`);
+            }
+          } else {
+            // Clean up expired cache
+            localStorage.removeItem(CACHE_KEY_PREFIX + key);
+          }
+        } catch (parseError) {
+          logger.warn('Notion', `Failed to parse cache entry for key ${key}, removing:`, parseError);
           localStorage.removeItem(CACHE_KEY_PREFIX + key);
         }
       }
@@ -123,9 +149,20 @@ export class NotionCacheManager {
 
       // Update metadata
       const metadataStr = localStorage.getItem(CACHE_METADATA_KEY);
-      const metadata: CacheMetadata = metadataStr
-        ? JSON.parse(metadataStr)
-        : { keys: [], lastCleanup: Date.now() };
+      let metadata: CacheMetadata = { keys: [], lastCleanup: Date.now() };
+
+      if (metadataStr) {
+        try {
+          const parsed = JSON.parse(metadataStr);
+          // Validate parsed metadata structure
+          if (parsed && Array.isArray(parsed.keys)) {
+            metadata = parsed;
+          }
+        } catch (parseError) {
+          // If metadata is corrupted, reset it
+          logger.warn('Notion', 'Corrupted cache metadata, resetting:', parseError);
+        }
+      }
 
       if (!metadata.keys.includes(cacheKey)) {
         metadata.keys.push(cacheKey);
@@ -148,9 +185,16 @@ export class NotionCacheManager {
     try {
       const metadataStr = localStorage.getItem(CACHE_METADATA_KEY);
       if (metadataStr) {
-        const metadata: CacheMetadata = JSON.parse(metadataStr);
-        for (const key of metadata.keys) {
-          localStorage.removeItem(CACHE_KEY_PREFIX + key);
+        try {
+          const metadata = JSON.parse(metadataStr);
+          if (metadata && Array.isArray(metadata.keys)) {
+            for (const key of metadata.keys) {
+              localStorage.removeItem(CACHE_KEY_PREFIX + key);
+            }
+          }
+        } catch (parseError) {
+          // If we can't parse metadata, just try to remove common keys
+          logger.warn('Notion', 'Failed to parse cache metadata during clear:', parseError);
         }
       }
       localStorage.removeItem(CACHE_METADATA_KEY);

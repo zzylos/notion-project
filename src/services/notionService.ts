@@ -181,7 +181,13 @@ class NotionService {
       throw new Error(this.parseNotionError(response.status, errorText));
     }
 
-    return response.json();
+    try {
+      return await response.json();
+    } catch (parseError) {
+      throw new Error(
+        'Failed to parse Notion API response: Invalid JSON. The API may be experiencing issues.'
+      );
+    }
   }
 
   private async fetchPage(
