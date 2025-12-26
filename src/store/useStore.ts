@@ -114,6 +114,34 @@ function itemMatchesIncludeFilters(item: WorkItem, filters: FilterState): boolea
 }
 
 /**
+ * Collect all ancestor IDs from a starting item up to root.
+ * Used to ensure focused items and their ancestors bypass filters.
+ */
+function collectAncestorIds(
+  startId: string | undefined,
+  items: Map<string, WorkItem>
+): Set<string> {
+  const ancestors = new Set<string>();
+  let currentId = startId;
+
+  // Safety: limit iterations to prevent infinite loops from circular references
+  let iterations = 0;
+  const MAX_ITERATIONS = 100;
+
+  while (currentId && iterations < MAX_ITERATIONS) {
+    if (ancestors.has(currentId)) {
+      // Circular reference detected
+      break;
+    }
+    ancestors.add(currentId);
+    currentId = items.get(currentId)?.parentId;
+    iterations++;
+  }
+
+  return ancestors;
+}
+
+/**
  * Check if an item matches any exclude filter (hide these).
  * Returns true if item should be EXCLUDED (hidden).
  */
@@ -271,8 +299,14 @@ export const useStore = create<StoreState>()(
 
       getFilteredItems: (): WorkItem[] => {
         const state = get();
-        const { filters } = state;
-        const allItems = Array.from(state.items.values());
+        const { filters, focusedItemId, items } = state;
+        const allItems = Array.from(items.values());
+
+        // Collect focused item and all its ancestors - these bypass filters
+        // This ensures the tree path to the focused item remains visible
+        const focusedPathIds = focusedItemId
+          ? collectAncestorIds(focusedItemId, items)
+          : new Set<string>();
 
         // Check if any include filters are active
         const hasIncludeFilters =
@@ -289,6 +323,11 @@ export const useStore = create<StoreState>()(
           filters.excludeOwners.length > 0;
 
         return allItems.filter(item => {
+          // Items in the focused path always bypass filters to maintain tree structure
+          if (focusedPathIds.has(item.id)) {
+            return true;
+          }
+
           // Search query is always applied first
           if (filters.searchQuery) {
             const query = filters.searchQuery.toLowerCase();
