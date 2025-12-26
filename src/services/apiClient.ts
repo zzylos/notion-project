@@ -59,7 +59,16 @@ class ApiClient {
         credentials: 'include',
       });
 
-      const data = (await response.json()) as ApiResponse<T>;
+      let data: ApiResponse<T>;
+      try {
+        data = (await response.json()) as ApiResponse<T>;
+      } catch (parseError) {
+        throw new ApiError(
+          `Failed to parse API response: Invalid JSON from ${endpoint}`,
+          endpoint,
+          { statusCode: response.status }
+        );
+      }
 
       if (!response.ok) {
         throw new ApiError(data.error || `HTTP error ${response.status}`, endpoint, {
