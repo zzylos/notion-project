@@ -183,7 +183,7 @@ class NotionService {
 
     try {
       return await response.json();
-    } catch (parseError) {
+    } catch {
       throw new Error(
         'Failed to parse Notion API response: Invalid JSON. The API may be experiencing issues.'
       );
@@ -517,14 +517,25 @@ class NotionService {
     }
 
     const mappings = this.propertyMapper.getMappings(this.config.defaultMappings);
+    const statusPropertyName = mappings.status;
+
+    // Detect the property type (status vs select) for correct Notion API format
+    const propertyType = this.propertyMapper.getPropertyType(statusPropertyName);
+
+    // Build the correct update format based on property type
+    let propertyValue: { status?: { name: string }; select?: { name: string } };
+    if (propertyType === 'status') {
+      propertyValue = { status: { name: status } };
+    } else {
+      // Default to select format (works for most cases)
+      propertyValue = { select: { name: status } };
+    }
 
     await this.notionFetch(`/pages/${pageId}`, {
       method: 'PATCH',
       body: JSON.stringify({
         properties: {
-          [mappings.status]: {
-            select: { name: status },
-          },
+          [statusPropertyName]: propertyValue,
         },
       }),
     });
