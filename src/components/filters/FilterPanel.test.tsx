@@ -119,33 +119,46 @@ describe('FilterPanel', () => {
     });
   });
 
-  describe('Filter mode toggle', () => {
-    it('should show filter mode toggle when filters are active', async () => {
+  describe('Type filter exclusion', () => {
+    it('should show filter summary when filters are active', async () => {
       const { setFilters } = useStore.getState();
       setFilters({ types: ['mission'] });
 
       render(<FilterPanel />);
 
-      // Filter mode toggle should be visible
-      expect(screen.getByText(/show|hide/i)).toBeInTheDocument();
+      // Active filters bar should show "Showing: 1 types"
+      expect(screen.getByText(/showing/i)).toBeInTheDocument();
     });
 
-    it('should toggle between show and hide modes', async () => {
-      const { setFilters } = useStore.getState();
-      setFilters({ types: ['mission'] });
-
+    it('should cycle through show → hide → clear states when clicking type filters', async () => {
       const user = userEvent.setup();
       render(<FilterPanel />);
 
-      // Initial mode should be 'show'
-      expect(useStore.getState().filters.filterMode).toBe('show');
+      // Find the mission button and click it
+      const missionButton = screen.getByRole('button', { name: /mission/i });
 
-      // Find the mode toggle button - it's labeled with "Show" or "Hide"
-      const toggleButton = screen.getByRole('button', { name: /show|hide/i });
-      await user.click(toggleButton);
-
+      // First click: neutral → included (show)
+      await user.click(missionButton);
       await waitFor(() => {
-        expect(useStore.getState().filters.filterMode).toBe('hide');
+        const state = useStore.getState();
+        expect(state.filters.types).toContain('mission');
+        expect(state.filters.excludeTypes).not.toContain('mission');
+      });
+
+      // Second click: included → excluded (hide)
+      await user.click(missionButton);
+      await waitFor(() => {
+        const state = useStore.getState();
+        expect(state.filters.types).not.toContain('mission');
+        expect(state.filters.excludeTypes).toContain('mission');
+      });
+
+      // Third click: excluded → neutral (clear)
+      await user.click(missionButton);
+      await waitFor(() => {
+        const state = useStore.getState();
+        expect(state.filters.types).not.toContain('mission');
+        expect(state.filters.excludeTypes).not.toContain('mission');
       });
     });
   });

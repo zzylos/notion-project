@@ -308,6 +308,12 @@ export const useStore = create<StoreState>()(
           ? collectAncestorIds(focusedItemId, items)
           : new Set<string>();
 
+        // Safely access exclude arrays (may be undefined in legacy filter state)
+        const excludeTypes = filters.excludeTypes ?? [];
+        const excludeStatuses = filters.excludeStatuses ?? [];
+        const excludePriorities = filters.excludePriorities ?? [];
+        const excludeOwners = filters.excludeOwners ?? [];
+
         // Check if any include filters are active
         const hasIncludeFilters =
           filters.types.length > 0 ||
@@ -317,10 +323,13 @@ export const useStore = create<StoreState>()(
 
         // Check if any exclude filters are active
         const hasExcludeFilters =
-          filters.excludeTypes.length > 0 ||
-          filters.excludeStatuses.length > 0 ||
-          filters.excludePriorities.length > 0 ||
-          filters.excludeOwners.length > 0;
+          excludeTypes.length > 0 ||
+          excludeStatuses.length > 0 ||
+          excludePriorities.length > 0 ||
+          excludeOwners.length > 0;
+
+        // Legacy filterMode: 'hide' support - convert to exclude filters logic
+        const isHideMode = filters.filterMode === 'hide';
 
         return allItems.filter(item => {
           // Items in the focused path always bypass filters to maintain tree structure
@@ -344,7 +353,16 @@ export const useStore = create<StoreState>()(
             return false;
           }
 
-          // Step 2: Check include filters - if include filters are set, item must match
+          // Step 2: Handle legacy filterMode: 'hide' - include filters act as exclude
+          if (isHideMode && hasIncludeFilters) {
+            // In hide mode, if item matches any include filter, hide it
+            if (itemMatchesIncludeFilters(item, filters)) {
+              return false;
+            }
+            return true;
+          }
+
+          // Step 3: Check include filters - if include filters are set, item must match
           if (hasIncludeFilters && !itemMatchesIncludeFilters(item, filters)) {
             return false;
           }
