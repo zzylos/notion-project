@@ -93,43 +93,34 @@ function buildConnectedIds(
 
 /**
  * Filter orphan items from the list
- * @param addedByFocusIds - IDs of items that were ADDED to the visible set due to focusing
- *                          (i.e., not in the original filtered set). These items:
- *                          1. Are exempt from being considered orphans
- *                          2. Don't count as "parents" for orphan calculation
- *                          Items already in the filtered set continue to count as parents.
+ * @param connectedIds - IDs of items connected to the anchor in focus mode.
+ *                       These items are never considered orphans.
  */
 function filterOrphans(
   items: WorkItem[],
   hideOrphanItems: boolean,
-  focusMode: boolean,
-  addedByFocusIds: Set<string> = new Set()
+  connectedIds: Set<string> | null = null
 ): { filtered: WorkItem[]; orphanCount: number } {
   const itemIds = new Set(items.map(i => i.id));
   const itemsWithChildren = new Set<string>();
 
   for (const item of items) {
-    // Don't count added-by-focus items as parents for orphan calculation
-    // This prevents other items from suddenly becoming non-orphans when ancestors are added
-    // Items already in the filtered set continue to count as parents
-    if (item.parentId && itemIds.has(item.parentId) && !addedByFocusIds.has(item.parentId)) {
+    if (item.parentId && itemIds.has(item.parentId)) {
       itemsWithChildren.add(item.parentId);
     }
   }
 
   const orphans = items.filter(item => {
-    // Items added by focus are never orphans
-    if (addedByFocusIds.has(item.id)) {
+    // Connected items in focus mode are never orphans
+    if (connectedIds?.has(item.id)) {
       return false;
     }
-    // Only count non-added-by-focus parents as "real" parents
-    const hasParentInSet =
-      item.parentId && itemIds.has(item.parentId) && !addedByFocusIds.has(item.parentId);
+    const hasParentInSet = item.parentId && itemIds.has(item.parentId);
     const hasChildren = itemsWithChildren.has(item.id);
     return !hasParentInSet && !hasChildren;
   });
 
-  if (hideOrphanItems && !focusMode) {
+  if (hideOrphanItems) {
     const orphanIds = new Set(orphans.map(o => o.id));
     return {
       filtered: items.filter(item => !orphanIds.has(item.id)),
@@ -158,7 +149,6 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     hideOrphanItems,
     setHideOrphanItems,
     items,
-    focusedItemId,
   } = useStore();
   const allFilteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
@@ -202,28 +192,6 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     return buildConnectedIds(selectedItemId, items);
   }, [selectedItemId, items]);
 
-  // Calculate which items were ADDED due to focusing (not already in filtered set)
-  // Only these should be excluded from orphan calculation - items already visible
-  // should continue to count as parents for their children
-  const addedByFocusIds = useMemo(() => {
-    if (!focusedItemId) return new Set<string>();
-
-    // Get all items in the focused path (focused item + ancestors)
-    const pathIds = new Set<string>();
-    collectAncestors(focusedItemId, items, pathIds);
-
-    // Only include items that are NOT in the base filtered set
-    // Items already visible should continue counting as parents
-    const filteredIds = new Set(allFilteredItems.map(i => i.id));
-    const addedIds = new Set<string>();
-    for (const id of pathIds) {
-      if (!filteredIds.has(id)) {
-        addedIds.add(id);
-      }
-    }
-    return addedIds;
-  }, [focusedItemId, items, allFilteredItems]);
-
   // Calculate which items are orphans and determine final filtered items
   // Use anchorConnectedItemIds for determining which items to show (stable set)
   const { itemsAfterOrphanFilter, orphanCount } = useMemo(() => {
@@ -243,23 +211,15 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
       }
     }
 
-    // Pass addedByFocusIds to prevent newly-added focused ancestors from affecting orphan calculation
-    // Items already in the filtered set continue to count as parents for their children
+    // Pass connected IDs so they're never considered orphans in focus mode
+    // This ensures connected items stay visible even when hideOrphanItems is true
     const { filtered, orphanCount } = filterOrphans(
       baseItems,
       hideOrphanItems,
-      focusMode,
-      addedByFocusIds
+      focusMode ? anchorConnectedItemIds : null
     );
     return { itemsAfterOrphanFilter: filtered, orphanCount };
-  }, [
-    allFilteredItems,
-    hideOrphanItems,
-    focusMode,
-    anchorConnectedItemIds,
-    items,
-    addedByFocusIds,
-  ]);
+  }, [allFilteredItems, hideOrphanItems, focusMode, anchorConnectedItemIds, items]);
 
   // Apply item limit for performance (bypass when in focus mode to ensure all connected items are visible)
   const { limitedItems, totalCount, isLimited } = useItemLimit(itemsAfterOrphanFilter);
@@ -268,20 +228,8 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const filteredItems = focusMode && focusModeAnchorId ? itemsAfterOrphanFilter : limitedItems;
   const showLimitBanner = focusMode && focusModeAnchorId ? false : isLimited;
 
-  // Track the "core" data key excluding items added by focusing
-  // This prevents layout reset when only focused path ancestors are added
-  const coreDataKey = useMemo(
-    () =>
-      filteredItems
-        .filter(i => !addedByFocusIds.has(i.id))
-        .map(i => i.id)
-        .sort()
-        .join(','),
-    [filteredItems, addedByFocusIds]
-  );
-
-  // Track full data key for adding new nodes
-  const fullDataKey = useMemo(
+  // Track data key for detecting when items change
+  const dataKey = useMemo(
     () =>
       filteredItems
         .map(i => i.id)
@@ -290,8 +238,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     [filteredItems]
   );
 
-  const prevCoreDataKeyRef = useRef<string | null>(null);
-  const prevFullDataKeyRef = useRef<string | null>(null);
+  const prevDataKeyRef = useRef<string | null>(null);
   const isInitialMountRef = useRef(true);
 
   // Calculate layout based on current data
@@ -309,35 +256,18 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   useEffect(() => {
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
-      prevCoreDataKeyRef.current = coreDataKey;
-      prevFullDataKeyRef.current = fullDataKey;
+      prevDataKeyRef.current = dataKey;
       return;
     }
 
-    // Full layout reset when core items change (not just focused path)
-    if (prevCoreDataKeyRef.current !== coreDataKey) {
+    if (prevDataKeyRef.current !== dataKey) {
       const newLayout = calculateLayout(filteredItems, selectedItemId);
       setNodes(newLayout.nodes);
       setEdges(newLayout.edges);
-      prevCoreDataKeyRef.current = coreDataKey;
-      prevFullDataKeyRef.current = fullDataKey;
-    } else if (prevFullDataKeyRef.current !== fullDataKey) {
-      // Only focused path items changed - add them without resetting positions
-      // Merge new nodes with existing positions
-      const newLayout = calculateLayout(filteredItems, selectedItemId);
-      setNodes(currentNodes => {
-        const existingPositions = new Map(currentNodes.map(n => [n.id, n.position]));
-        return newLayout.nodes.map(node => ({
-          ...node,
-          // Preserve existing position if available
-          position: existingPositions.get(node.id) ?? node.position,
-        }));
-      });
-      setEdges(newLayout.edges);
-      prevFullDataKeyRef.current = fullDataKey;
+      prevDataKeyRef.current = dataKey;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coreDataKey, fullDataKey, filteredItems, selectedItemId]);
+  }, [dataKey, filteredItems, selectedItemId]);
 
   // Update node and edge selection/connection state without resetting positions
   // Use selectedConnectedItemIds for highlighting (changes with selection)
