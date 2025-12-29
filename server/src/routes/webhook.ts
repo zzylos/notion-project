@@ -8,6 +8,12 @@ import type { ApiResponse } from '../types/index.js';
 const router = Router();
 
 /**
+ * Whether we are in setup mode (no token configured yet).
+ * Once a token is received via verification or set via API, this becomes false.
+ */
+let isSetupMode = !process.env.NOTION_WEBHOOK_SECRET;
+
+/**
  * Webhook verification token received from Notion during subscription setup.
  * This should be set via environment variable after initial verification.
  */
@@ -85,12 +91,24 @@ function isWebhookEvent(body: unknown): body is NotionWebhookEvent {
 }
 
 /**
- * Validate webhook signature using HMAC-SHA256
+ * Validate webhook signature using HMAC-SHA256.
+ * SECURITY: Rejects all requests if no token is configured (unless in setup mode).
  */
 function validateSignature(payload: string, signature: string | undefined): boolean {
   if (!verificationToken) {
-    logger.webhook.warn('No verification token configured, skipping signature validation');
-    return true; // Allow if no token configured (for initial setup)
+    // Only allow unsigned requests in setup mode (no token ever configured)
+    if (isSetupMode) {
+      logger.webhook.warn(
+        'No verification token configured - in setup mode, signature validation skipped'
+      );
+      logger.webhook.warn(
+        'SECURITY: Configure NOTION_WEBHOOK_SECRET after receiving verification token'
+      );
+      return true;
+    }
+    // Token was configured but is now missing - reject request
+    logger.webhook.error('Verification token not configured - rejecting request');
+    return false;
   }
 
   if (!signature) {
@@ -103,7 +121,16 @@ function validateSignature(payload: string, signature: string | undefined): bool
       .update(payload)
       .digest('hex')}`;
 
-    return timingSafeEqual(Buffer.from(calculatedSignature), Buffer.from(signature));
+    // Use timing-safe comparison to prevent timing attacks
+    const sigBuffer = Buffer.from(signature);
+    const calcBuffer = Buffer.from(calculatedSignature);
+
+    // Ensure buffers are same length before comparison
+    if (sigBuffer.length !== calcBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(sigBuffer, calcBuffer);
   } catch (error) {
     logger.webhook.error('Signature validation error:', error);
     return false;
@@ -112,20 +139,35 @@ function validateSignature(payload: string, signature: string | undefined): bool
 
 /**
  * Normalize a Notion UUID to consistent format (with dashes).
+ * Logs warnings for invalid UUIDs.
  */
 function normalizeUuid(id: string): string {
   if (!id || typeof id !== 'string') {
+    logger.webhook.warn('normalizeUuid received invalid input:', typeof id);
     return '';
   }
+
   const clean = id.replace(/-/g, '').toLowerCase();
-  if (clean.length !== 32) return id;
+
+  if (clean.length !== 32) {
+    logger.webhook.warn(`Invalid UUID length (${clean.length} chars, expected 32): ${id}`);
+    return id;
+  }
+
+  // Validate hex characters
+  if (!/^[0-9a-f]+$/.test(clean)) {
+    logger.webhook.warn(`Invalid UUID format (non-hex characters): ${id}`);
+    return id;
+  }
+
   return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
 }
 
 /**
- * Handle page update events by fetching fresh data from Notion
+ * Handle page update events by fetching fresh data from Notion.
+ * Returns success/failure status for better observability.
  */
-async function handlePageUpdate(pageId: string): Promise<void> {
+async function handlePageUpdate(pageId: string): Promise<{ success: boolean; error?: string }> {
   const store = getDataStore();
   const notion = getNotion();
 
@@ -133,12 +175,17 @@ async function handlePageUpdate(pageId: string): Promise<void> {
     const normalizedId = normalizeUuid(pageId);
     const existingItem = store.get(normalizedId);
     const itemType = existingItem?.type || 'project';
+
+    logger.webhook.debug(`Fetching page ${pageId} (type: ${itemType})`);
     const updatedItem = await notion.fetchItem(pageId, itemType);
 
     store.upsert(updatedItem);
     logger.webhook.info(`Updated item: ${updatedItem.id} (${updatedItem.title})`);
+    return { success: true };
   } catch (error) {
-    logger.webhook.error(`Failed to fetch page ${pageId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.webhook.error(`Failed to fetch page ${pageId}: ${errorMessage}`);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -157,9 +204,12 @@ function handlePageDelete(pageId: string): void {
 }
 
 /**
- * Process a webhook event asynchronously
+ * Process a webhook event asynchronously.
+ * Returns processing result for observability.
  */
-async function processWebhookEvent(event: NotionWebhookEvent): Promise<void> {
+async function processWebhookEvent(
+  event: NotionWebhookEvent
+): Promise<{ handled: boolean; success: boolean; error?: string }> {
   const { type, entity } = event;
 
   // Handle page update events
@@ -171,24 +221,25 @@ async function processWebhookEvent(event: NotionWebhookEvent): Promise<void> {
     'page.moved',
   ];
   if (updateEvents.includes(type) && entity.type === 'page') {
-    await handlePageUpdate(entity.id);
-    return;
+    const result = await handlePageUpdate(entity.id);
+    return { handled: true, success: result.success, error: result.error };
   }
 
   // Handle page deletion
   if (type === 'page.deleted' && entity.type === 'page') {
     handlePageDelete(entity.id);
-    return;
+    return { handled: true, success: true };
   }
 
   // Handle database schema changes
   if (type === 'data_source.schema_updated' || type === 'database.schema_updated') {
     logger.webhook.info(`Database schema updated: ${entity.id}`);
-    return;
+    return { handled: true, success: true };
   }
 
   // Log other events
   logger.webhook.debug(`Unhandled event type: ${type}`);
+  return { handled: false, success: true };
 }
 
 /**
@@ -199,6 +250,8 @@ function handleVerificationRequest(token: string, res: Response): void {
   logger.webhook.info(`NOTION_WEBHOOK_SECRET=${token}`);
 
   verificationToken = token;
+  // Exit setup mode - from now on, signature validation is required
+  isSetupMode = false;
 
   const response: ApiResponse<{ received: boolean; message: string }> = {
     success: true,
@@ -248,9 +301,16 @@ router.post('/', async (req: Request, res: Response) => {
 
   // Process event asynchronously
   try {
-    await processWebhookEvent(event);
+    const result = await processWebhookEvent(event);
+    if (!result.success) {
+      logger.webhook.warn(`Event ${event.type} processed with errors: ${result.error}`);
+    }
+    if (!result.handled) {
+      logger.webhook.debug(`Event ${event.type} was not handled (no matching handler)`);
+    }
   } catch (error) {
-    logger.webhook.error(`Error processing event ${event.type}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.webhook.error(`Unexpected error processing event ${event.type}: ${errorMessage}`);
   }
 });
 
@@ -282,9 +342,23 @@ router.get('/status', (_req: Request, res: Response) => {
 /**
  * POST /api/webhook/set-token
  *
- * Manually set the verification token (alternative to env var)
+ * Manually set the verification token (alternative to env var).
+ * SECURITY: Only available in development mode or if ALLOW_MANUAL_TOKEN_SET is true.
  */
 router.post('/set-token', (req: Request, res: Response) => {
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const allowManualSet = process.env.ALLOW_MANUAL_TOKEN_SET === 'true';
+
+  if (!isDevelopment && !allowManualSet) {
+    logger.webhook.warn('Attempted to set token in production without ALLOW_MANUAL_TOKEN_SET=true');
+    res.status(403).json({
+      success: false,
+      error:
+        'Token configuration via API is disabled in production. Set NOTION_WEBHOOK_SECRET environment variable instead.',
+    });
+    return;
+  }
+
   const { token } = req.body;
 
   if (!token || typeof token !== 'string') {
@@ -292,7 +366,15 @@ router.post('/set-token', (req: Request, res: Response) => {
     return;
   }
 
+  // Validate token format (should be a reasonable length string)
+  if (token.length < 10 || token.length > 500) {
+    res.status(400).json({ success: false, error: 'Invalid token format' });
+    return;
+  }
+
   verificationToken = token;
+  // Exit setup mode - from now on, signature validation is required
+  isSetupMode = false;
   logger.webhook.info('Verification token set manually');
 
   res.json({ success: true, data: { configured: true } });

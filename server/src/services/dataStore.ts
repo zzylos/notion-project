@@ -87,11 +87,20 @@ class DataStore {
         if (!parent.children.includes(item.id)) {
           parent.children.push(item.id);
         }
+      } else {
+        // Parent doesn't exist in store - log for visibility
+        // This can happen if parent is in a database that wasn't fetched yet
+        // or if parent was deleted
+        logger.store.warn(
+          `Orphaned relationship: item "${item.title}" (${item.id}) references missing parent ${item.parentId}`
+        );
       }
     }
 
-    // Preserve existing children if not provided
-    if (existing?.children && !item.children?.length) {
+    // Preserve existing children if new item doesn't have children data.
+    // Items from Notion API come with children: [] by default (relationships built separately),
+    // so we preserve existing children when the new item has no/empty children.
+    if (existing?.children?.length && !item.children?.length) {
       item.children = existing.children;
     }
 

@@ -201,10 +201,25 @@ class NotionService {
   }
 
   /**
-   * Get the detected property type for a given property name
+   * Get the detected property type for a given property name.
+   * @param propertyName The property name to look up
+   * @param dbType Optional database type to search in first (more accurate)
    */
-  private getPropertyType(propertyName: string): 'status' | 'select' | null {
+  private getPropertyType(propertyName: string, dbType?: ItemType): 'status' | 'select' | null {
     const lowerName = propertyName.toLowerCase();
+
+    // If database type is specified, check that database first
+    if (dbType) {
+      const typeMap = this.propertyTypes.get(dbType);
+      if (typeMap) {
+        const type = typeMap.get(lowerName);
+        if (type === 'status' || type === 'select') {
+          return type;
+        }
+      }
+    }
+
+    // Fallback: search all databases (for backwards compatibility)
     for (const typeMap of this.propertyTypes.values()) {
       const type = typeMap.get(lowerName);
       if (type === 'status' || type === 'select') {
@@ -326,14 +341,24 @@ class NotionService {
   private normalizeUuid(id: string): string {
     // Validate input
     if (!id || typeof id !== 'string') {
+      logger.notion.warn('normalizeUuid received invalid input:', typeof id);
       return '';
     }
 
     // Remove any existing dashes and convert to lowercase
     const clean = id.replace(/-/g, '').toLowerCase();
 
-    // If it's not a valid UUID length, return as-is
-    if (clean.length !== 32) return id;
+    // If it's not a valid UUID length, log warning and return as-is
+    if (clean.length !== 32) {
+      logger.notion.warn(`Invalid UUID length (${clean.length} chars, expected 32): ${id}`);
+      return id;
+    }
+
+    // Validate that it only contains valid hex characters
+    if (!/^[0-9a-f]+$/.test(clean)) {
+      logger.notion.warn(`Invalid UUID format (non-hex characters): ${id}`);
+      return id;
+    }
 
     // Insert dashes in standard UUID positions: 8-4-4-4-12
     return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
@@ -453,6 +478,30 @@ class NotionService {
   }
 
   /**
+   * Validate that a response looks like a valid Notion query response
+   */
+  private validateQueryResponse(response: unknown): response is NotionQueryResponse {
+    if (!response || typeof response !== 'object') {
+      return false;
+    }
+
+    const resp = response as Record<string, unknown>;
+
+    // Check required fields
+    if (!Array.isArray(resp.results)) {
+      logger.notion.warn('Invalid Notion response: results is not an array');
+      return false;
+    }
+
+    if (typeof resp.has_more !== 'boolean') {
+      logger.notion.warn('Invalid Notion response: has_more is not a boolean');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Fetch a single page of results
    */
   private async fetchPage(databaseId: string, cursor?: string): Promise<NotionQueryResponse> {
@@ -461,10 +510,17 @@ class NotionService {
       body.start_cursor = cursor;
     }
 
-    return this.notionFetch<NotionQueryResponse>(`/databases/${databaseId}/query`, {
+    const response = await this.notionFetch<unknown>(`/databases/${databaseId}/query`, {
       method: 'POST',
       body: JSON.stringify(body),
     });
+
+    // Validate response structure
+    if (!this.validateQueryResponse(response)) {
+      throw new Error('Invalid response structure from Notion API');
+    }
+
+    return response;
   }
 
   /**
@@ -574,13 +630,16 @@ class NotionService {
   /**
    * Update item status
    * Automatically uses correct Notion API format (select vs status property type)
+   * @param pageId The Notion page ID
+   * @param status The new status value
+   * @param itemType Optional item type to look up correct property type
    */
-  async updateItemStatus(pageId: string, status: ItemStatus): Promise<void> {
+  async updateItemStatus(pageId: string, status: ItemStatus, itemType?: ItemType): Promise<void> {
     const mappings = this.getMappings();
     const statusPropertyName = mappings.status;
 
-    // Detect the property type (status vs select)
-    const propertyType = this.getPropertyType(statusPropertyName);
+    // Detect the property type (status vs select) - prefer specific database type
+    const propertyType = this.getPropertyType(statusPropertyName, itemType);
 
     // Build the correct update format based on property type
     let propertyValue: Record<string, unknown>;
