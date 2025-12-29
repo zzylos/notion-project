@@ -62,9 +62,16 @@ describe('Webhook Routes', () => {
     vi.mocked(getDataStore).mockReturnValue(mockStore as never);
     vi.mocked(getNotion).mockReturnValue(mockNotion as never);
 
-    // Create test app
+    // Create test app with raw body capture (like the main server)
     app = express();
-    app.use(express.json());
+    app.use(
+      express.json({
+        verify: (req, _res, buf) => {
+          // Store raw body buffer on request for signature verification
+          (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+        },
+      })
+    );
     app.use('/api/webhook', webhookRouter);
   });
 
@@ -418,8 +425,15 @@ describe('UUID Normalization', () => {
 
     vi.mocked(getDataStore).mockReturnValue(mockStore as never);
 
+    // Create test app with raw body capture (like the main server)
     app = express();
-    app.use(express.json());
+    app.use(
+      express.json({
+        verify: (req, _res, buf) => {
+          (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+        },
+      })
+    );
     app.use('/api/webhook', webhookRouter);
   });
 

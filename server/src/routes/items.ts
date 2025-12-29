@@ -8,6 +8,30 @@ import type { ApiResponse, FetchItemsResponse } from '../types/index.js';
 const router = Router();
 
 /**
+ * Normalize a Notion UUID to consistent format (with dashes).
+ * This ensures lookups work regardless of whether the ID has dashes or not.
+ */
+function normalizeUuid(id: string): string {
+  if (!id || typeof id !== 'string') {
+    return '';
+  }
+
+  const clean = id.replace(/-/g, '').toLowerCase();
+
+  if (clean.length !== 32) {
+    // Not a valid UUID length, return as-is
+    return id;
+  }
+
+  // Validate hex characters
+  if (!/^[0-9a-f]+$/.test(clean)) {
+    return id;
+  }
+
+  return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
+}
+
+/**
  * GET /api/items
  * Fetch all items from the in-memory store
  *
@@ -91,7 +115,8 @@ router.post('/sync', async (_req: Request, res: Response) => {
 
 /**
  * Validate that an ID parameter is a valid non-empty string.
- * Returns the trimmed ID or null if invalid.
+ * Returns the normalized UUID or null if invalid.
+ * Normalizes IDs to ensure consistent lookup (with dashes).
  */
 function validateIdParam(id: string | undefined): string | null {
   if (!id || typeof id !== 'string') {
@@ -102,7 +127,8 @@ function validateIdParam(id: string | undefined): string | null {
   if (trimmed.length === 0 || trimmed.length > 50) {
     return null;
   }
-  return trimmed;
+  // Normalize the UUID to ensure consistent format for lookups
+  return normalizeUuid(trimmed);
 }
 
 /**
@@ -199,15 +225,27 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
       return;
     }
 
-    // Update in Notion
+    // Capture the updatedAt before the API call to detect concurrent updates
+    const preUpdateTimestamp = existingItem.updatedAt;
+
+    // Update in Notion first - if this fails, we don't touch the store
     await notion.updateItemStatus(existingItem.notionPageId || itemId, trimmedStatus);
 
-    // Update local store immediately (webhook will also update, but this is faster)
-    store.upsert({
-      ...existingItem,
-      status: trimmedStatus,
-      updatedAt: new Date().toISOString(),
-    });
+    // Update local store for faster UI feedback, but only if no webhook updated it concurrently
+    const currentItem = store.get(itemId);
+    if (currentItem && currentItem.updatedAt === preUpdateTimestamp) {
+      // No concurrent update occurred, safe to update
+      store.upsert({
+        ...currentItem,
+        status: trimmedStatus,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      // A webhook updated the item concurrently - let the webhook's data take precedence
+      logger.api.debug(
+        `Skipping local store update for ${itemId} - item was updated concurrently by webhook`
+      );
+    }
 
     const response: ApiResponse<{ updated: boolean }> = {
       success: true,
@@ -264,15 +302,27 @@ router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Res
       return;
     }
 
-    // Update in Notion
+    // Capture the updatedAt before the API call to detect concurrent updates
+    const preUpdateTimestamp = existingItem.updatedAt;
+
+    // Update in Notion first - if this fails, we don't touch the store
     await notion.updateItemProgress(existingItem.notionPageId || itemId, progress);
 
-    // Update local store immediately
-    store.upsert({
-      ...existingItem,
-      progress,
-      updatedAt: new Date().toISOString(),
-    });
+    // Update local store for faster UI feedback, but only if no webhook updated it concurrently
+    const currentItem = store.get(itemId);
+    if (currentItem && currentItem.updatedAt === preUpdateTimestamp) {
+      // No concurrent update occurred, safe to update
+      store.upsert({
+        ...currentItem,
+        progress,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      // A webhook updated the item concurrently - let the webhook's data take precedence
+      logger.api.debug(
+        `Skipping local store update for ${itemId} - item was updated concurrently by webhook`
+      );
+    }
 
     const response: ApiResponse<{ updated: boolean }> = {
       success: true,
