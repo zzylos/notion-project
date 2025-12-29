@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, lazy, Suspense } from 'react';
 import { useStore } from './store/useStore';
-import { useNotionData, useCooldownTimer, useFullscreen } from './hooks';
+import { useNotionData, useFullscreen } from './hooks';
 import Header from './components/common/Header';
 import FilterPanel from './components/filters/FilterPanel';
 import TreeView from './components/tree/TreeView';
@@ -9,12 +9,12 @@ import NotionConfigModal from './components/common/NotionConfigModal';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LoadingState from './components/ui/LoadingState';
 import {
-  EnvConfigIndicator,
   LoadingProgressBar,
   FailedDatabasesWarning,
   StatsToggle,
 } from './components/common/StatusIndicators';
-import { getMergedConfig, hasEnvConfig } from './utils/config';
+import OrphanToggle from './components/common/OrphanToggle';
+import { getMergedConfig } from './utils/config';
 import {
   PanelRightClose,
   PanelRight,
@@ -27,7 +27,6 @@ import {
 // Lazy load heavy view components for better initial load performance
 const CanvasView = lazy(() => import('./components/canvas/CanvasView'));
 const KanbanView = lazy(() => import('./components/views/KanbanView'));
-const ListView = lazy(() => import('./components/views/ListView'));
 const TimelineView = lazy(() => import('./components/views/TimelineView'));
 
 function App() {
@@ -35,13 +34,10 @@ function App() {
 
   // Merge environment config with stored config (env takes precedence)
   const effectiveConfig = useMemo(() => getMergedConfig(notionConfig), [notionConfig]);
-  const usingEnvConfig = hasEnvConfig();
 
-  // Use custom hooks for data loading and cooldown management
-  const { isUsingDemoData, loadingProgress, failedDatabases, clearFailedDatabases, refreshData } =
+  // Use custom hook for data loading
+  const { loadingProgress, failedDatabases, clearFailedDatabases } =
     useNotionData(effectiveConfig);
-
-  const { remainingMs: refreshCooldownRemaining, checkAndStartCooldown } = useCooldownTimer();
 
   // Fullscreen support for the main content area
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -52,19 +48,7 @@ function App() {
   const [showDetailPanel, setShowDetailPanel] = useState(true);
   const [showStats, setShowStats] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [modalKey, setModalKey] = useState(0);
-
-  const handleRefresh = async () => {
-    // Check if refresh is allowed based on cooldown
-    if (!checkAndStartCooldown()) {
-      return; // Still in cooldown
-    }
-
-    setIsRefreshing(true);
-    await refreshData();
-    setIsRefreshing(false);
-  };
 
   const handleCloseDetail = () => {
     setSelectedItem(null);
@@ -91,12 +75,6 @@ function App() {
             <KanbanView />
           </Suspense>
         );
-      case 'list':
-        return (
-          <Suspense fallback={lazyFallback}>
-            <ListView />
-          </Suspense>
-        );
       case 'timeline':
         return (
           <Suspense fallback={lazyFallback}>
@@ -119,14 +97,7 @@ function App() {
             setModalKey(k => k + 1);
             setShowSettings(true);
           }}
-          onRefresh={handleRefresh}
-          isRefreshing={isRefreshing || isLoading}
-          refreshCooldownRemaining={refreshCooldownRemaining}
-          isUsingDemoData={isUsingDemoData}
         />
-
-        {/* Environment config indicator */}
-        {usingEnvConfig && <EnvConfigIndicator />}
 
         {/* Loading Progress Bar */}
         {isLoading && <LoadingProgressBar progress={loadingProgress} />}
@@ -162,17 +133,23 @@ function App() {
         <div className="flex-1 overflow-auto relative">
           <ErrorBoundary>{renderMainView()}</ErrorBoundary>
 
-          {/* Fullscreen toggle button - shown for non-canvas views (canvas has its own) */}
-          {viewMode !== 'canvas' && (
-            <button
-              onClick={toggleFullscreen}
-              className="fixed bottom-4 left-4 z-40 flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-            >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
-            </button>
-          )}
+          {/* Floating controls - bottom left corner */}
+          <div className="fixed bottom-4 left-4 z-40 flex gap-2">
+            {/* Orphan toggle - shown for all views */}
+            <OrphanToggle />
+
+            {/* Fullscreen toggle button - shown for non-canvas views (canvas has its own) */}
+            {viewMode !== 'canvas' && (
+              <button
+                onClick={toggleFullscreen}
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              >
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Detail panel toggle button (mobile only) */}

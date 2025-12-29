@@ -108,7 +108,7 @@ export const DEFAULT_CORS_PROXY = 'https://corsproxy.io/?';
 /**
  * Available view modes
  */
-export const VIEW_MODES: ViewMode[] = ['tree', 'canvas', 'kanban', 'list', 'timeline'];
+export const VIEW_MODES: ViewMode[] = ['tree', 'canvas', 'kanban', 'timeline'];
 
 /**
  * Item type order for consistent display
@@ -122,13 +122,17 @@ export const PRIORITY_ORDER: Priority[] = ['P0', 'P1', 'P2', 'P3'];
 
 /**
  * Status groups for combining similar statuses in the filter UI.
- * The display label maps to an array of status strings that should be grouped together.
- * When a group is selected, all underlying statuses are added to the filter.
+ * Simplified to 3 main categories: Not Started, In Progress, Done.
  */
 export const STATUS_GROUPS: Record<string, string[]> = {
   'Not Started': ['Not started', 'Not Started', '1-Not started', 'Backlog', 'To Do', 'New'],
-  'In Progress': ['In progress', 'In Progress', '6-Project in progress', 'Active', 'Doing', 'WIP'],
-  Planning: [
+  'In Progress': [
+    'In progress',
+    'In Progress',
+    '6-Project in progress',
+    'Active',
+    'Doing',
+    'WIP',
     'Planning',
     '2-Analysis/Research',
     '3-Solutioning',
@@ -137,8 +141,12 @@ export const STATUS_GROUPS: Record<string, string[]> = {
     'Analysis',
     'Research',
     'Solutioning',
+    'Blocked',
+    'blocked',
+    'On Hold',
+    'Waiting',
+    'Paused',
   ],
-  Blocked: ['Blocked', 'blocked', 'On Hold', 'Waiting', 'Paused'],
   Done: [
     'Done',
     '8-Closed',
@@ -148,8 +156,12 @@ export const STATUS_GROUPS: Record<string, string[]> = {
     'Closed',
     'Resolved',
     'Shipped',
+    'Canceled',
+    'Cancelled',
+    'Duplicate',
+    "Won't Do",
+    'Wontfix',
   ],
-  Canceled: ['Canceled', 'Cancelled', 'Duplicate', "Won't Do", 'Wontfix'],
 } as const;
 
 /**

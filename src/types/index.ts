@@ -110,9 +110,8 @@ export interface FilterState {
  * - canvas: React Flow node-based visualization
  * - kanban: Board view grouped by status
  * - timeline: Chronological view by due date
- * - list: Virtualized table view
  */
-export type ViewMode = 'tree' | 'canvas' | 'kanban' | 'timeline' | 'list';
+export type ViewMode = 'tree' | 'canvas' | 'kanban' | 'timeline';
 
 /**
  * Application state interface.

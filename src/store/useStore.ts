@@ -24,6 +24,7 @@ interface StoreState {
   expandedIds: Set<string>;
   viewMode: ViewMode;
   hideOrphanItems: boolean;
+  showOnlyOrphans: boolean;
   disableItemLimit: boolean;
 
   // Filters
@@ -51,6 +52,8 @@ interface StoreState {
 
   setViewMode: (mode: ViewMode) => void;
   setHideOrphanItems: (hide: boolean) => void;
+  setShowOnlyOrphans: (show: boolean) => void;
+  toggleOrphanMode: () => void;
   setDisableItemLimit: (disable: boolean) => void;
   setFilters: (filters: Partial<FilterState>) => void;
   resetFilters: () => void;
@@ -63,6 +66,7 @@ interface StoreState {
   // Computed values (not really computed in Zustand, but helper methods)
   getTreeNodes: () => TreeNode[];
   getFilteredItems: () => WorkItem[];
+  getOrphanCount: () => number;
   getStats: () => DashboardStats;
   getItemPath: (id: string) => WorkItem[];
 }
@@ -142,6 +146,34 @@ function collectAncestorIds(
 }
 
 /**
+ * Check if an item is an orphan (no parent and no children in the item set).
+ */
+function isOrphanItem(item: WorkItem, items: Map<string, WorkItem>): boolean {
+  // Has a parent that exists in our item set = not an orphan
+  if (item.parentId && items.has(item.parentId)) {
+    return false;
+  }
+
+  // Has children = not an orphan
+  if (item.children && item.children.length > 0) {
+    // Check if any children exist in our item set
+    const hasValidChildren = item.children.some(childId => items.has(childId));
+    if (hasValidChildren) {
+      return false;
+    }
+  }
+
+  // Check if this item is a parent of any other item
+  for (const otherItem of items.values()) {
+    if (otherItem.parentId === item.id) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Check if an item matches any exclude filter (hide these).
  * Returns true if item should be EXCLUDED (hidden).
  */
@@ -182,7 +214,8 @@ export const useStore = create<StoreState>()(
       focusedItemId: null,
       expandedIds: new Set(),
       viewMode: 'tree',
-      hideOrphanItems: false,
+      hideOrphanItems: true,
+      showOnlyOrphans: false,
       disableItemLimit: false,
       filters: defaultFilters,
       isLoading: false,
@@ -258,8 +291,15 @@ export const useStore = create<StoreState>()(
       // View mode
       setViewMode: (mode: ViewMode) => set({ viewMode: mode }),
 
-      // Orphan filter (for canvas view)
+      // Orphan filter (global)
       setHideOrphanItems: (hide: boolean) => set({ hideOrphanItems: hide }),
+      setShowOnlyOrphans: (show: boolean) => set({ showOnlyOrphans: show }),
+      toggleOrphanMode: () =>
+        set(state => ({
+          showOnlyOrphans: !state.showOnlyOrphans,
+          // When showing only orphans, we need to unhide them first
+          hideOrphanItems: state.showOnlyOrphans ? true : false,
+        })),
 
       // Item limit toggle (for performance with large datasets)
       setDisableItemLimit: (disable: boolean) => set({ disableItemLimit: disable }),
@@ -299,7 +339,7 @@ export const useStore = create<StoreState>()(
 
       getFilteredItems: (): WorkItem[] => {
         const state = get();
-        const { filters, focusedItemId, items } = state;
+        const { filters, focusedItemId, items, hideOrphanItems, showOnlyOrphans } = state;
         const allItems = Array.from(items.values());
 
         // Collect focused item and all its ancestors - these bypass filters
@@ -367,8 +407,31 @@ export const useStore = create<StoreState>()(
             return false;
           }
 
+          // Step 4: Orphan filtering (global)
+          const orphan = isOrphanItem(item, items);
+          if (showOnlyOrphans) {
+            // When showing only orphans, exclude non-orphans
+            return orphan;
+          }
+          if (hideOrphanItems && orphan) {
+            // When hiding orphans, exclude orphans
+            return false;
+          }
+
           return true;
         });
+      },
+
+      getOrphanCount: (): number => {
+        const state = get();
+        const items = state.items;
+        let count = 0;
+        for (const item of items.values()) {
+          if (isOrphanItem(item, items)) {
+            count++;
+          }
+        }
+        return count;
       },
 
       getStats: (): DashboardStats => {
@@ -452,6 +515,7 @@ export const useStore = create<StoreState>()(
         expandedIds: Array.from(state.expandedIds),
         viewMode: state.viewMode,
         hideOrphanItems: state.hideOrphanItems,
+        showOnlyOrphans: state.showOnlyOrphans,
         disableItemLimit: state.disableItemLimit,
         filters: state.filters,
         notionConfig: state.notionConfig,

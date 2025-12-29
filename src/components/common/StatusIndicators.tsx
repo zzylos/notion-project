@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Loader2, AlertTriangle, X, FileCode, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, AlertTriangle, X, ChevronUp, ChevronDown } from 'lucide-react';
 import StatsOverview from './StatsOverview';
 
 interface LoadingProgress {
@@ -11,22 +11,6 @@ interface FailedDatabase {
   type: string;
   error: string;
 }
-
-/**
- * Environment configuration indicator
- */
-export const EnvConfigIndicator: React.FC = memo(() => (
-  <div className="bg-green-50 border-b border-green-200 px-4 py-1.5">
-    <div className="flex items-center gap-2 text-xs text-green-700">
-      <FileCode className="w-3.5 h-3.5" />
-      <span>
-        Using configuration from <code className="px-1 py-0.5 bg-green-100 rounded">.env</code> file
-      </span>
-    </div>
-  </div>
-));
-
-EnvConfigIndicator.displayName = 'EnvConfigIndicator';
 
 /**
  * Loading progress bar with shimmer animation
