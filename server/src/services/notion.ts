@@ -13,6 +13,7 @@ import type {
 } from '../types/index.js';
 import { PROPERTY_ALIASES, NOTION_API } from '../../../shared/index.js';
 import { logger } from '../utils/logger.js';
+import { normalizeUuid } from '../utils/uuid.js';
 
 const NOTION_API_BASE = NOTION_API.BASE_URL;
 
@@ -346,36 +347,6 @@ class NotionService {
       }));
   }
 
-  /**
-   * Normalize a Notion UUID to consistent format (with dashes).
-   * Notion sometimes returns IDs with or without dashes depending on context.
-   */
-  private normalizeUuid(id: string): string {
-    // Validate input
-    if (!id || typeof id !== 'string') {
-      logger.notion.warn('normalizeUuid received invalid input:', typeof id);
-      return '';
-    }
-
-    // Remove any existing dashes and convert to lowercase
-    const clean = id.replace(/-/g, '').toLowerCase();
-
-    // If it's not a valid UUID length, log warning and return as-is
-    if (clean.length !== 32) {
-      logger.notion.warn(`Invalid UUID length (${clean.length} chars, expected 32): ${id}`);
-      return id;
-    }
-
-    // Validate that it only contains valid hex characters
-    if (!/^[0-9a-f]+$/.test(clean)) {
-      logger.notion.warn(`Invalid UUID format (non-hex characters): ${id}`);
-      return id;
-    }
-
-    // Insert dashes in standard UUID positions: 8-4-4-4-12
-    return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
-  }
-
   private extractRelation(
     props: Record<string, NotionPropertyValue>,
     mappingName: string
@@ -384,7 +355,7 @@ class NotionService {
     if (!prop || prop.type !== 'relation' || !prop.relation) return [];
     return prop.relation
       .filter(r => r && r.id && typeof r.id === 'string')
-      .map(r => this.normalizeUuid(r.id))
+      .map(r => normalizeUuid(r.id))
       .filter(id => id.length > 0);
   }
 
@@ -466,7 +437,7 @@ class NotionService {
     const tags = this.extractMultiSelect(props, mappings.tags);
 
     // Normalize the page ID to ensure consistent format for parent-child matching
-    const normalizedId = this.normalizeUuid(page.id);
+    const normalizedId = normalizeUuid(page.id);
 
     return {
       id: normalizedId,
@@ -636,10 +607,10 @@ class NotionService {
    */
   getItemTypeByDatabaseId(parentDatabaseId: string): ItemType | undefined {
     // Normalize the database ID for comparison
-    const normalizedId = this.normalizeUuid(parentDatabaseId);
+    const normalizedId = normalizeUuid(parentDatabaseId);
 
     for (const dbConfig of this.config.databases) {
-      const configId = this.normalizeUuid(dbConfig.databaseId);
+      const configId = normalizeUuid(dbConfig.databaseId);
       if (configId === normalizedId) {
         return dbConfig.type;
       }

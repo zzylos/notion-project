@@ -108,20 +108,20 @@ Status labels are automatically imported from your Notion database. The app inte
 
 ### Performance Optimizations
 
-- **Dual-layer caching** - 5-minute memory cache + 24-hour localStorage cache
-- **Stale-while-revalidate** - Returns cached data instantly while refreshing in background
+- **Dual-layer caching** (direct mode) - 5-minute memory cache + 24-hour localStorage cache
+- **Real-time webhook sync** (backend mode) - Data updated instantly via Notion webhooks
 - **Progressive loading** - See items as they load with progress bar
 - **Virtualized lists** - Smooth scrolling for thousands of items
 - **Force refresh** - Clear cache and reload data when needed
 
-### Backend API Mode (Production)
+### Backend API Mode with Webhooks (Production)
 
 For production deployments, use the optional backend API server:
 
 - **Secure API key handling** - Keys stay on the server, not in the browser
-- **Server-side caching** - Shared cache across all users with stale-while-revalidate
+- **Real-time updates** - Notion webhooks push changes instantly (no polling)
 - **No CORS proxy needed** - Direct server-to-Notion communication
-- **Better rate limiting** - Control API calls at the server level
+- **Persistent data store** - In-memory store with webhook-driven updates
 
 ## User Scenarios
 
@@ -316,13 +316,18 @@ server/                 # Backend API server (optional)
 │   ├── config.ts       # Server configuration loader
 │   ├── routes/
 │   │   ├── items.ts    # Items API endpoints
-│   │   └── cache.ts    # Cache management endpoints
+│   │   └── webhook.ts  # Notion webhook handler
 │   ├── services/
 │   │   ├── notion.ts   # Server-side Notion API service
-│   │   └── cache.ts    # Stale-while-revalidate cache
+│   │   └── dataStore.ts # Persistent in-memory data store
+│   ├── middleware/
+│   │   └── rateLimit.ts # Rate limiting middleware
+│   ├── utils/
+│   │   ├── logger.ts   # Server logging utility
+│   │   └── uuid.ts     # UUID normalization utility
 │   └── types/          # TypeScript types
 ├── package.json        # Server dependencies
-└── .env.example        # Server environment template
+└── vitest.config.ts    # Backend test configuration
 
 scripts/
 └── test-notion-connection.js   # API credential validation script
@@ -406,83 +411,156 @@ For databases with 500+ items:
 - Use filters to reduce the number of visible items
 - Drag nodes to reorganize as needed
 
-## Backend API Mode (Recommended for Production)
+## Backend API Mode with Webhooks (Recommended for Production)
 
-For production deployments, use the backend API mode instead of direct browser-to-Notion calls. This keeps your API key secure on the server.
+For production deployments, use the backend API mode instead of direct browser-to-Notion calls. This provides:
+
+- **Secure API key handling** - Keys stay on the server, not in the browser
+- **Real-time updates** - Notion webhooks push changes instantly to your server
+- **No CORS proxy needed** - Direct server-to-Notion communication
+- **Persistent data store** - In-memory store updated via webhooks (no polling)
 
 ### Architecture
 
 ```
-┌─────────────┐     ┌─────────────────┐     ┌─────────────┐
-│   Browser   │────▶│  Backend API    │────▶│  Notion API │
-│  (Frontend) │     │   (Express)     │     │             │
-└─────────────┘     └────────┬────────┘     └─────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  Server Cache   │
-                    │ (Stale-While-   │
-                    │   Revalidate)   │
-                    └─────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     SERVER STARTUP                          │
+│  Fetch all items from all databases (once)                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   PERSISTENT DATA STORE                     │
+│  In-memory Map (no TTL, updated via webhooks in real-time)  │
+└─────────────────────────────────────────────────────────────┘
+          │                                    │
+          ▼                                    ▼
+    ┌──────────────┐                ┌─────────────────────┐
+    │ GET /api/    │                │ POST /api/webhook   │
+    │  /items      │◀───────────────│  (from Notion)      │
+    │  /store/     │   Updates      │ with HMAC signature │
+    │  stats       │   store        │ validation          │
+    └──────────────┘                └─────────────────────┘
+          │
+          ▼
+    ┌──────────────┐
+    │   Browser    │
+    │  (Frontend)  │
+    └──────────────┘
 ```
 
 ### Setting Up Backend Mode
 
-1. **Configure the backend server** (`server/.env`):
+1. **Configure the root `.env` file** (used by both frontend and backend):
 
 ```bash
 # Copy the example file
-cp server/.env.example server/.env
+cp .env.example .env
 
 # Edit with your Notion credentials
-NOTION_API_KEY=secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-NOTION_DB_MISSION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-NOTION_DB_PROBLEM=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-# ... add other database IDs
+VITE_NOTION_API_KEY=secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_NOTION_DB_MISSION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_PROBLEM=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_SOLUTION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_PROJECT=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_DESIGN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
-# Cache settings
-CACHE_TTL_SECONDS=300  # 5 minutes (default)
-```
-
-2. **Configure the frontend** (`.env`):
-
-```bash
 # Enable backend API mode
 VITE_USE_BACKEND_API=true
 VITE_API_URL=http://localhost:3001  # or your production URL
+
+# Backend-specific settings
+PORT=3001
+CORS_ORIGIN=http://localhost:5173
+
+# Webhook secret (set after webhook verification - see below)
+# NOTION_WEBHOOK_SECRET=secret_xxxxx
 ```
 
-3. **Start both servers**:
+2. **Start both servers**:
 
 ```bash
 npm run dev:full
 ```
 
+3. **Set up Notion webhooks** (see next section for details)
+
+### Setting Up Notion Webhooks
+
+Notion webhooks enable real-time data synchronization. When a page is created, updated, or deleted in Notion, your server is notified instantly.
+
+#### Step 1: Create Webhook Subscription
+
+1. Go to [Notion Integrations](https://www.notion.so/profile/integrations)
+2. Select your integration
+3. Navigate to the **Webhooks** tab
+4. Click **+ Create subscription**
+5. Enter your webhook URL: `https://your-server.com/api/webhook`
+6. Subscribe to these events:
+   - `page.content_updated`
+   - `page.created`
+   - `page.deleted`
+   - `page.moved`
+
+#### Step 2: Receive Verification Token
+
+When you create the subscription, Notion sends a POST request to your webhook URL containing a `verification_token`. Check your server logs:
+
+```
+[Webhook] Received verification token. Configure NOTION_WEBHOOK_SECRET:
+[Webhook] NOTION_WEBHOOK_SECRET=secret_xxxxx
+```
+
+#### Step 3: Configure Environment
+
+Add the token to your `.env` file:
+
+```bash
+NOTION_WEBHOOK_SECRET=secret_xxxxx
+```
+
+Restart the server to load the new secret.
+
+#### Step 4: Verify in Notion UI
+
+Paste the token in the Notion verification modal to activate the subscription.
+
+### Webhook Events Handled
+
+| Event Type                | Action                         |
+| ------------------------- | ------------------------------ |
+| `page.content_updated`    | Refetch page, update store     |
+| `page.created`            | Fetch new page, add to store   |
+| `page.deleted`            | Remove from store              |
+| `page.moved`              | Refetch to get new parent      |
+| `page.undeleted`          | Refetch and add back to store  |
+| `database.schema_updated` | Logged (manual sync if needed) |
+
 ### Backend API Endpoints
 
-| Endpoint                  | Method | Description                                          |
-| ------------------------- | ------ | ---------------------------------------------------- |
-| `/api/items`              | GET    | Fetch all items (cached with stale-while-revalidate) |
-| `/api/items/refresh`      | POST   | Force refresh the cache                              |
-| `/api/items/:id`          | GET    | Fetch single item                                    |
-| `/api/items/:id/status`   | PATCH  | Update item status                                   |
-| `/api/items/:id/progress` | PATCH  | Update item progress                                 |
-| `/api/cache/invalidate`   | POST   | Clear server cache                                   |
-| `/api/cache/stats`        | GET    | Get cache statistics                                 |
-| `/api/health`             | GET    | Health check                                         |
+| Endpoint                  | Method | Description                          |
+| ------------------------- | ------ | ------------------------------------ |
+| `/api/items`              | GET    | Fetch all items from in-memory store |
+| `/api/items/sync`         | POST   | Force full re-sync from Notion       |
+| `/api/items/:id`          | GET    | Fetch single item from store         |
+| `/api/items/:id/status`   | PATCH  | Update item status                   |
+| `/api/items/:id/progress` | PATCH  | Update item progress                 |
+| `/api/webhook`            | POST   | Receive Notion webhook events        |
+| `/api/webhook/status`     | GET    | Check webhook configuration status   |
+| `/api/webhook/set-token`  | POST   | Manually set verification token      |
+| `/api/store/stats`        | GET    | Get store statistics                 |
+| `/api/health`             | GET    | Health check                         |
 
-### Stale-While-Revalidate Caching
+### Webhook Security
 
-The server implements a stale-while-revalidate caching strategy:
+The server validates webhook signatures using HMAC-SHA256:
 
-1. **Fresh cache (< TTL)**: Returns cached data immediately
-2. **Stale cache (> TTL)**: Returns cached data immediately AND triggers background refresh
-3. **No cache**: Fetches from Notion and caches the result
+- Notion includes `X-Notion-Signature` header with each request
+- Server computes expected signature using `NOTION_WEBHOOK_SECRET`
+- Requests with invalid signatures are rejected (401)
+- Uses timing-safe comparison to prevent timing attacks
 
-This ensures:
-
-- **Fast responses**: Users always get data instantly (even if slightly stale)
-- **Fresh data**: Background refreshes keep the cache up-to-date
-- **Resilience**: If Notion is temporarily unavailable, stale data is still served
+**Setup mode**: Before the first token is configured, the server accepts unsigned requests to allow initial verification. Once a token is set, signature validation becomes mandatory.
 
 ### Production Deployment
 
@@ -497,6 +575,13 @@ npm run start:server
 ```
 
 Update your frontend's `VITE_API_URL` to point to your production backend URL.
+
+**Important for webhooks**: Your server must be publicly accessible for Notion to send webhook events. Use a service like ngrok for local development:
+
+```bash
+ngrok http 3001
+# Use the ngrok URL when setting up the webhook subscription
+```
 
 ## Configuration Options
 

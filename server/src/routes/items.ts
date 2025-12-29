@@ -3,33 +3,10 @@ import { getDataStore } from '../services/dataStore.js';
 import { getNotion } from '../services/notion.js';
 import { mutationRateLimiter } from '../middleware/rateLimit.js';
 import { logger } from '../utils/logger.js';
+import { normalizeUuid } from '../utils/uuid.js';
 import type { ApiResponse, FetchItemsResponse } from '../types/index.js';
 
 const router = Router();
-
-/**
- * Normalize a Notion UUID to consistent format (with dashes).
- * This ensures lookups work regardless of whether the ID has dashes or not.
- */
-function normalizeUuid(id: string): string {
-  if (!id || typeof id !== 'string') {
-    return '';
-  }
-
-  const clean = id.replace(/-/g, '').toLowerCase();
-
-  if (clean.length !== 32) {
-    // Not a valid UUID length, return as-is
-    return id;
-  }
-
-  // Validate hex characters
-  if (!/^[0-9a-f]+$/.test(clean)) {
-    return id;
-  }
-
-  return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
-}
 
 /**
  * GET /api/items
@@ -229,7 +206,12 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
     const preUpdateTimestamp = existingItem.updatedAt;
 
     // Update in Notion first - if this fails, we don't touch the store
-    await notion.updateItemStatus(existingItem.notionPageId || itemId, trimmedStatus);
+    // Pass the item type to ensure correct property type detection (status vs select)
+    await notion.updateItemStatus(
+      existingItem.notionPageId || itemId,
+      trimmedStatus,
+      existingItem.type
+    );
 
     // Update local store for faster UI feedback, but only if no webhook updated it concurrently
     const currentItem = store.get(itemId);
