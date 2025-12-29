@@ -125,8 +125,7 @@ VITE_MAPPING_STATUS=Status
 # Backend-specific settings
 PORT=3001                           # Server port (default: 3001)
 CORS_ORIGIN=http://localhost:5173   # Frontend URL for CORS
-CACHE_TTL_SECONDS=300               # Cache TTL (default: 5 minutes)
-CACHE_CHECK_PERIOD=60               # Cache check interval (default: 1 minute)
+NOTION_WEBHOOK_SECRET=secret_xxx    # Webhook verification token (from Notion)
 ```
 
 **Note:** The backend server reads the root `.env` file (not `server/.env`). It supports both `VITE_*` prefixed variables (for sharing with frontend) and non-prefixed versions.
@@ -134,41 +133,99 @@ CACHE_CHECK_PERIOD=60               # Cache check interval (default: 1 minute)
 **Benefits:**
 
 - API key stays on the server (more secure)
-- Server-side caching with stale-while-revalidate pattern
+- Real-time updates via Notion webhooks
 - No CORS proxy needed
-- Better rate limiting control
+- Data synced automatically when pages change in Notion
 
 **Architecture:**
 
 ```
-Browser → Backend API Server → Notion API
-              ↓
-         Server Cache
-    (Stale-While-Revalidate)
+┌─────────────────────────────────────────────────────────────┐
+│                     SERVER STARTUP                          │
+│  Fetch all items from all databases (once)                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       DATA STORE                            │
+│  Persistent in-memory Map (no TTL, updated via webhooks)    │
+└─────────────────────────────────────────────────────────────┘
+          │                                    │
+          ▼                                    ▼
+    ┌──────────┐                    ┌─────────────────────┐
+    │ GET /api │                    │ POST /api/webhook   │
+    │  /items  │                    │  (from Notion)      │
+    └──────────┘                    └─────────────────────┘
 ```
 
-**Stale-While-Revalidate Caching:**
+**Webhook-Based Real-Time Updates:**
 
-When cache TTL expires:
+The server uses Notion Integration Webhooks for real-time data synchronization:
 
-1. Returns stale data immediately to the client
-2. Triggers background refresh from Notion
-3. Updates cache when fresh data arrives
+1. On startup, fetches all items from all configured databases once
+2. Stores items in persistent in-memory DataStore (no expiration)
+3. Receives webhook events from Notion when pages change
+4. Updates local store immediately upon webhook events
 
-This ensures fast responses while keeping data fresh.
+**Handled Webhook Events:**
+
+| Event Type                | Action                         |
+| ------------------------- | ------------------------------ |
+| `page.content_updated`    | Refetch page, update store     |
+| `page.created`            | Fetch new page, add to store   |
+| `page.deleted`            | Remove from store              |
+| `page.moved`              | Refetch to get new parent      |
+| `page.undeleted`          | Refetch and add back to store  |
+| `database.schema_updated` | Logged (manual sync if needed) |
 
 **Backend API Endpoints:**
 
-| Endpoint                  | Method | Description                                   |
-| ------------------------- | ------ | --------------------------------------------- |
-| `/api/items`              | GET    | Fetch all items (stale-while-revalidate)      |
-| `/api/items/refresh`      | POST   | Force refresh cache (waits for completion)    |
-| `/api/items/:id`          | GET    | Fetch single item                             |
-| `/api/items/:id/status`   | PATCH  | Update item status                            |
-| `/api/items/:id/progress` | PATCH  | Update item progress                          |
-| `/api/cache/invalidate`   | POST   | Clear server cache                            |
-| `/api/cache/stats`        | GET    | Get cache statistics (includes stale metrics) |
-| `/api/health`             | GET    | Health check                                  |
+| Endpoint                  | Method | Description                          |
+| ------------------------- | ------ | ------------------------------------ |
+| `/api/items`              | GET    | Fetch all items from in-memory store |
+| `/api/items/sync`         | POST   | Force full re-sync from Notion       |
+| `/api/items/:id`          | GET    | Fetch single item from store         |
+| `/api/items/:id/status`   | PATCH  | Update item status                   |
+| `/api/items/:id/progress` | PATCH  | Update item progress                 |
+| `/api/webhook`            | POST   | Receive Notion webhook events        |
+| `/api/webhook/status`     | GET    | Check webhook configuration status   |
+| `/api/webhook/set-token`  | POST   | Manually set verification token      |
+| `/api/store/stats`        | GET    | Get store statistics                 |
+| `/api/health`             | GET    | Health check                         |
+
+### Webhook Setup
+
+To enable real-time updates from Notion:
+
+1. **Create webhook subscription** in your [Notion integration settings](https://www.notion.so/profile/integrations):
+   - Navigate to your integration → **Webhooks** tab
+   - Click **+ Create subscription**
+   - Enter your webhook URL: `https://your-server.com/api/webhook`
+   - Subscribe to events: `page.content_updated`, `page.created`, `page.deleted`, `page.moved`
+
+2. **Receive verification token**: When you create the subscription, Notion sends a POST request to your webhook URL containing a `verification_token`. Check your server logs:
+
+   ```
+   [Webhook] NOTION_WEBHOOK_SECRET=secret_xxxxx
+   ```
+
+3. **Configure environment**: Add the token to your `.env` file:
+
+   ```bash
+   NOTION_WEBHOOK_SECRET=secret_xxxxx
+   ```
+
+4. **Verify in Notion UI**: Paste the token in the Notion verification modal to activate the subscription.
+
+**Webhook Payload Validation:**
+
+The server validates webhook signatures using HMAC-SHA256:
+
+- Notion includes `X-Notion-Signature` header with each request
+- Server computes expected signature using `NOTION_WEBHOOK_SECRET`
+- Requests with invalid signatures are rejected (401)
+
+**Note:** If `NOTION_WEBHOOK_SECRET` is not configured, signature validation is skipped (useful for initial setup).
 
 ## Architecture
 
@@ -218,13 +275,14 @@ The `shared/` directory contains code shared between frontend and backend:
 - **Multi-database support**: Fetches from up to 5 databases (Objectives, Problems, Solutions, Projects, Deliverables)
 - **Two operation modes**:
   - **Direct mode** (default): Uses CORS proxy (`corsproxy.io`) for browser-based API calls
-  - **Backend mode** (`VITE_USE_BACKEND_API=true`): Calls your own backend server
-- **Dual-layer caching** (both modes):
+  - **Backend mode** (`VITE_USE_BACKEND_API=true`): Calls your own backend server with webhook support
+- **Client-side caching** (direct mode):
   - Memory cache (5 minutes) - for quick navigation
   - Persistent localStorage cache (24 hours) - survives page reloads for faster startup
-- **Server-side caching** (backend mode only):
-  - Configurable TTL (default: 5 minutes)
-  - Cache invalidation via API
+- **Server-side data store** (backend mode):
+  - Persistent in-memory store (no expiration)
+  - Real-time updates via Notion webhooks
+  - Full re-sync available via `/api/items/sync`
 - Progressive loading with callback for large databases
 - Type is determined by which database an item comes from
 
@@ -232,43 +290,43 @@ The `shared/` directory contains code shared between frontend and backend:
 
 ### Core Application
 
-| File                     | Purpose                                     |
-| ------------------------ | ------------------------------------------- |
-| `src/App.tsx`            | Main app, view switching, collapsible stats |
-| `src/main.tsx`           | Vite entry point                            |
-| `src/constants.ts`       | Application-wide constants                  |
-| `src/store/useStore.ts`  | Zustand state management                    |
-| `src/types/index.ts`     | TypeScript type definitions (re-exports)    |
-| `src/types/notion.ts`    | Notion API-specific types                   |
+| File                    | Purpose                                     |
+| ----------------------- | ------------------------------------------- |
+| `src/App.tsx`           | Main app, view switching, collapsible stats |
+| `src/main.tsx`          | Vite entry point                            |
+| `src/constants.ts`      | Application-wide constants                  |
+| `src/store/useStore.ts` | Zustand state management                    |
+| `src/types/index.ts`    | TypeScript type definitions (re-exports)    |
+| `src/types/notion.ts`   | Notion API-specific types                   |
 
 ### Shared (Client/Server)
 
-| File                   | Purpose                                                        |
-| ---------------------- | -------------------------------------------------------------- |
-| `shared/types.ts`      | Core types (WorkItem, NotionConfig) - single source of truth   |
-| `shared/constants.ts`  | Shared constants (PROPERTY_ALIASES, DEFAULT_PROPERTY_MAPPINGS) |
+| File                  | Purpose                                                        |
+| --------------------- | -------------------------------------------------------------- |
+| `shared/types.ts`     | Core types (WorkItem, NotionConfig) - single source of truth   |
+| `shared/constants.ts` | Shared constants (PROPERTY_ALIASES, DEFAULT_PROPERTY_MAPPINGS) |
 
 ### Services
 
-| File                                       | Purpose                                    |
-| ------------------------------------------ | ------------------------------------------ |
-| `src/services/notionService.ts`            | Multi-database Notion API integration      |
-| `src/services/apiClient.ts`                | Backend API client (for backend mode)      |
-| `src/services/notion/NotionCacheManager.ts`     | Client-side caching logic             |
-| `src/services/notion/NotionDataTransformer.ts`  | Data transformation from Notion       |
-| `src/services/notion/NotionPropertyMapper.ts`   | Property mapping and alias resolution |
+| File                                           | Purpose                               |
+| ---------------------------------------------- | ------------------------------------- |
+| `src/services/notionService.ts`                | Multi-database Notion API integration |
+| `src/services/apiClient.ts`                    | Backend API client (for backend mode) |
+| `src/services/notion/NotionCacheManager.ts`    | Client-side caching logic             |
+| `src/services/notion/NotionDataTransformer.ts` | Data transformation from Notion       |
+| `src/services/notion/NotionPropertyMapper.ts`  | Property mapping and alias resolution |
 
 ### Hooks
 
-| File                             | Purpose                                        |
-| -------------------------------- | ---------------------------------------------- |
-| `src/hooks/useNotionData.ts`     | Data fetching orchestration with progress      |
-| `src/hooks/useCooldownTimer.ts`  | Refresh rate limiting with countdown           |
-| `src/hooks/useFilterToggle.ts`   | Filter state management helpers                |
-| `src/hooks/useItemLimit.ts`      | Item limit management for performance          |
-| `src/hooks/useStoreSelectors.ts` | Optimized Zustand selectors                    |
-| `src/hooks/useFetch.ts`          | Generic fetch hook with abort support          |
-| `src/hooks/useLocalStorage.ts`   | Persistent localStorage hook                   |
+| File                             | Purpose                                   |
+| -------------------------------- | ----------------------------------------- |
+| `src/hooks/useNotionData.ts`     | Data fetching orchestration with progress |
+| `src/hooks/useCooldownTimer.ts`  | Refresh rate limiting with countdown      |
+| `src/hooks/useFilterToggle.ts`   | Filter state management helpers           |
+| `src/hooks/useItemLimit.ts`      | Item limit management for performance     |
+| `src/hooks/useStoreSelectors.ts` | Optimized Zustand selectors               |
+| `src/hooks/useFetch.ts`          | Generic fetch hook with abort support     |
+| `src/hooks/useLocalStorage.ts`   | Persistent localStorage hook              |
 
 ### Components
 
@@ -291,40 +349,43 @@ The `shared/` directory contains code shared between frontend and backend:
 
 ### Utilities
 
-| File                            | Purpose                                    |
-| ------------------------------- | ------------------------------------------ |
-| `src/utils/colors.ts`           | Color utilities with dynamic status support|
-| `src/utils/config.ts`           | Configuration loading and merging          |
-| `src/utils/errors.ts`           | Error classes and error handling utilities |
-| `src/utils/logger.ts`           | Unified logging utility                    |
-| `src/utils/typeGuards.ts`       | Type guard utilities for runtime checks    |
-| `src/utils/validation.ts`       | Input validation utilities                 |
-| `src/utils/sampleData.ts`       | Demo data for offline use                  |
-| `src/utils/treeBuilder.ts`      | Tree building and path utilities           |
-| `src/utils/layoutCalculator.ts` | Canvas layout calculations                 |
-| `src/utils/dateUtils.ts`        | Date parsing and formatting                |
-| `src/utils/arrayUtils.ts`       | Array manipulation helpers                 |
-| `src/utils/icons.ts`            | Icon utilities for item types              |
+| File                            | Purpose                                     |
+| ------------------------------- | ------------------------------------------- |
+| `src/utils/colors.ts`           | Color utilities with dynamic status support |
+| `src/utils/config.ts`           | Configuration loading and merging           |
+| `src/utils/errors.ts`           | Error classes and error handling utilities  |
+| `src/utils/logger.ts`           | Unified logging utility                     |
+| `src/utils/typeGuards.ts`       | Type guard utilities for runtime checks     |
+| `src/utils/validation.ts`       | Input validation utilities                  |
+| `src/utils/sampleData.ts`       | Demo data for offline use                   |
+| `src/utils/treeBuilder.ts`      | Tree building and path utilities            |
+| `src/utils/layoutCalculator.ts` | Canvas layout calculations                  |
+| `src/utils/dateUtils.ts`        | Date parsing and formatting                 |
+| `src/utils/arrayUtils.ts`       | Array manipulation helpers                  |
+| `src/utils/icons.ts`            | Icon utilities for item types               |
 
 ### Backend Server
 
-| File                               | Purpose                        |
-| ---------------------------------- | ------------------------------ |
-| `server/src/index.ts`              | Backend API server entry point |
-| `server/src/config.ts`             | Server configuration loading   |
-| `server/src/services/notion.ts`    | Server-side Notion API service |
-| `server/src/services/cache.ts`     | Server-side caching service    |
-| `server/src/routes/items.ts`       | Items API endpoints            |
-| `server/src/routes/cache.ts`       | Cache management endpoints     |
-| `server/src/middleware/rateLimit.ts` | Rate limiting middleware     |
-| `server/src/utils/logger.ts`       | Server logging utility         |
+| File                                 | Purpose                         |
+| ------------------------------------ | ------------------------------- |
+| `server/src/index.ts`                | Backend API server entry point  |
+| `server/src/config.ts`               | Server configuration loading    |
+| `server/src/services/notion.ts`      | Server-side Notion API service  |
+| `server/src/services/dataStore.ts`   | Persistent in-memory data store |
+| `server/src/routes/items.ts`         | Items API endpoints             |
+| `server/src/routes/webhook.ts`       | Notion webhook endpoint         |
+| `server/src/middleware/rateLimit.ts` | Rate limiting middleware        |
+| `server/src/utils/logger.ts`         | Server logging utility          |
 
 ### Testing
 
-| File                 | Purpose                     |
-| -------------------- | --------------------------- |
-| `src/test/setup.ts`  | Vitest test setup and mocks |
-| `vitest.config.ts`   | Vitest configuration        |
+| File                                    | Purpose                         |
+| --------------------------------------- | ------------------------------- |
+| `src/test/setup.ts`                     | Vitest test setup and mocks     |
+| `vitest.config.ts`                      | Vitest configuration (frontend) |
+| `server/vitest.config.ts`               | Vitest configuration (backend)  |
+| `server/src/services/dataStore.test.ts` | DataStore service tests         |
+| `server/src/routes/webhook.test.ts`     | Webhook route tests             |
 
 ## Important Patterns
 
@@ -657,6 +718,7 @@ const childMap = buildChildMap(items);
 ```
 
 Features:
+
 - Circular reference detection
 - Depth limiting (prevents stack overflow)
 - Handles orphaned items (parent filtered out)
