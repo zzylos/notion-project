@@ -2,6 +2,9 @@
 
 An interactive visualization tool for HouseSigma that displays work items (objectives, problems, solutions, projects, deliverables) in a hierarchical opportunity tree structure, integrated with Notion.
 
+Project tracker:
+https://www.notion.so/project-can-not-visualize-in-progress-work-with-hierarchy-2cfc2345ab4680a69503f5cbf6ed76bb
+
 ## Features
 
 ### Multiple View Modes
