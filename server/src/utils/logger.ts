@@ -79,6 +79,8 @@ export const logger = {
   notion: createLogger('Notion'),
   server: createLogger('Server'),
   api: createLogger('API'),
+  store: createLogger('Store'),
+  webhook: createLogger('Webhook'),
 };
 
 export default logger;

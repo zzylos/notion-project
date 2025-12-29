@@ -16,8 +16,9 @@ export interface ServerConfig {
   port: number;
   corsOrigin: string;
   notion: NotionConfig;
-  cache: {
-    ttlSeconds: number;
+  webhook: {
+    /** Secret token for validating webhook signatures (from Notion verification) */
+    secret: string | null;
   };
 }
 
@@ -149,7 +150,8 @@ export function loadConfig(): ServerConfig {
   const corsOrigin = getEnvVar('CORS_ORIGIN', 'http://localhost:5173')!;
   validateUrl(corsOrigin, 'CORS_ORIGIN');
 
-  const ttlSeconds = parseIntEnv('CACHE_TTL_SECONDS', 300, 1);
+  // Webhook secret is optional - can be set after initial verification
+  const webhookSecret = getEnvVar('NOTION_WEBHOOK_SECRET') || null;
 
   return {
     port,
@@ -159,8 +161,8 @@ export function loadConfig(): ServerConfig {
       databases,
       defaultMappings: buildPropertyMappings(),
     },
-    cache: {
-      ttlSeconds,
+    webhook: {
+      secret: webhookSecret,
     },
   };
 }

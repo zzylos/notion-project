@@ -3,7 +3,7 @@
  * These constants are used by the Notion API integration across the application.
  */
 
-import type { PropertyMappings } from './types';
+import type { PropertyMappings } from './types.js';
 
 /**
  * Common property name aliases for flexible matching.
