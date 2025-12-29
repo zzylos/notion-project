@@ -16,7 +16,15 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+// Capture raw body for webhook signature validation, then parse JSON
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      // Store raw body buffer on request for signature verification
+      (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+    },
+  })
+);
 
 // Apply rate limiting to API routes (except webhooks which need quick responses)
 app.use('/api/items', apiRateLimiter);

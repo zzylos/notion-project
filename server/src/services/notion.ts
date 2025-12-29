@@ -203,12 +203,16 @@ class NotionService {
   /**
    * Get the detected property type for a given property name.
    * @param propertyName The property name to look up
-   * @param dbType Optional database type to search in first (more accurate)
+   * @param dbType Database type to look up (required for accurate type detection)
+   *
+   * IMPORTANT: Property types can differ between databases (e.g., "Status" might be
+   * a 'status' property in one database and 'select' in another). Always provide
+   * the dbType parameter when possible to avoid incorrect property type detection.
    */
   private getPropertyType(propertyName: string, dbType?: ItemType): 'status' | 'select' | null {
     const lowerName = propertyName.toLowerCase();
 
-    // If database type is specified, check that database first
+    // If database type is specified, only check that database
     if (dbType) {
       const typeMap = this.propertyTypes.get(dbType);
       if (typeMap) {
@@ -217,12 +221,20 @@ class NotionService {
           return type;
         }
       }
+      // Database type specified but property not found - don't fall back to other databases
+      // as this could return incorrect property type
+      return null;
     }
 
-    // Fallback: search all databases (for backwards compatibility)
+    // No database type specified - search all databases but warn about ambiguity
+    // This fallback exists for backwards compatibility but should be avoided
     for (const typeMap of this.propertyTypes.values()) {
       const type = typeMap.get(lowerName);
       if (type === 'status' || type === 'select') {
+        logger.notion.warn(
+          `Property type lookup without database type for "${propertyName}" - ` +
+            `found "${type}" but this may be incorrect if databases have different types`
+        );
         return type;
       }
     }
@@ -618,13 +630,54 @@ class NotionService {
   }
 
   /**
-   * Fetch a single item by ID
-   * @param pageId The Notion page ID
-   * @param type Optional item type (defaults to 'project' if not specified)
+   * Determine item type from a page's parent database ID.
+   * @param parentDatabaseId The database ID from the page's parent field
+   * @returns The item type if the database is configured, undefined otherwise
    */
-  async fetchItem(pageId: string, type: ItemType = 'project'): Promise<WorkItem> {
+  getItemTypeByDatabaseId(parentDatabaseId: string): ItemType | undefined {
+    // Normalize the database ID for comparison
+    const normalizedId = this.normalizeUuid(parentDatabaseId);
+
+    for (const dbConfig of this.config.databases) {
+      const configId = this.normalizeUuid(dbConfig.databaseId);
+      if (configId === normalizedId) {
+        return dbConfig.type;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Fetch a single item by ID.
+   * If type is not provided, attempts to determine it from the page's parent database.
+   * @param pageId The Notion page ID
+   * @param type Optional item type. If not provided, will be inferred from parent database.
+   */
+  async fetchItem(pageId: string, type?: ItemType): Promise<WorkItem> {
     const page = await this.notionFetch<NotionPage>(`/pages/${pageId}`);
-    return this.pageToWorkItem(page, type);
+
+    // Determine item type: use provided type, or infer from parent database
+    let itemType: ItemType = type || 'project';
+
+    if (!type && page.parent) {
+      // Check if parent is a database and try to match it to our config
+      if (page.parent.type === 'database_id' && page.parent.database_id) {
+        const inferredType = this.getItemTypeByDatabaseId(page.parent.database_id);
+        if (inferredType) {
+          itemType = inferredType;
+          logger.notion.debug(
+            `Inferred item type "${itemType}" from parent database for page ${pageId}`
+          );
+        } else {
+          logger.notion.warn(
+            `Could not determine item type for page ${pageId} - ` +
+              `parent database ${page.parent.database_id} not in config. Using default 'project'.`
+          );
+        }
+      }
+    }
+
+    return this.pageToWorkItem(page, itemType);
   }
 
   /**
