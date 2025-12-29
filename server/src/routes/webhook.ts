@@ -166,6 +166,10 @@ function normalizeUuid(id: string): string {
 /**
  * Handle page update events by fetching fresh data from Notion.
  * Returns success/failure status for better observability.
+ *
+ * Type determination logic:
+ * 1. If item exists in store, use its existing type
+ * 2. If item is new, let NotionService infer type from parent database
  */
 async function handlePageUpdate(pageId: string): Promise<{ success: boolean; error?: string }> {
   const store = getDataStore();
@@ -174,13 +178,19 @@ async function handlePageUpdate(pageId: string): Promise<{ success: boolean; err
   try {
     const normalizedId = normalizeUuid(pageId);
     const existingItem = store.get(normalizedId);
-    const itemType = existingItem?.type || 'project';
 
-    logger.webhook.debug(`Fetching page ${pageId} (type: ${itemType})`);
+    // For existing items, use known type. For new items, let fetchItem infer from parent DB.
+    const itemType = existingItem?.type; // undefined for new items triggers inference
+
+    logger.webhook.debug(
+      `Fetching page ${pageId} (type: ${itemType || 'to be inferred from parent database'})`
+    );
     const updatedItem = await notion.fetchItem(pageId, itemType);
 
     store.upsert(updatedItem);
-    logger.webhook.info(`Updated item: ${updatedItem.id} (${updatedItem.title})`);
+    logger.webhook.info(
+      `Updated item: ${updatedItem.id} (${updatedItem.title}, type: ${updatedItem.type})`
+    );
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -265,20 +275,35 @@ function handleVerificationRequest(token: string, res: Response): void {
 }
 
 /**
+ * Extended Request type with raw body buffer for signature verification.
+ * The raw body is captured by the express.json verify function in index.ts.
+ */
+interface RequestWithRawBody extends Request {
+  rawBody?: Buffer;
+}
+
+/**
  * POST /api/webhook
  *
  * Receives webhook events from Notion.
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: RequestWithRawBody, res: Response) => {
   // Handle verification request
   if (isVerificationPayload(req.body)) {
     handleVerificationRequest(req.body.verification_token, res);
     return;
   }
 
-  // Validate signature
-  const rawBody = JSON.stringify(req.body);
+  // Validate signature using the raw body buffer (not JSON.stringify which may differ)
+  // Notion computes HMAC against the exact bytes sent, so we must use the original
+  const rawBody = req.rawBody?.toString('utf8') || JSON.stringify(req.body);
   const signature = req.headers['x-notion-signature'] as string | undefined;
+
+  if (!req.rawBody) {
+    logger.webhook.warn(
+      'Raw body not captured - falling back to JSON.stringify (may cause signature mismatch)'
+    );
+  }
 
   if (!validateSignature(rawBody, signature)) {
     logger.webhook.warn('Invalid webhook signature');

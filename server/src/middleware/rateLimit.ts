@@ -30,8 +30,17 @@ export function createRateLimiter(options: RateLimitOptions) {
   }, 60000);
 
   return (req: Request, res: Response, next: NextFunction) => {
-    // Use IP address as client identifier
-    const clientId = req.ip || req.socket.remoteAddress || 'unknown';
+    // Use IP address as client identifier, with support for proxied requests.
+    // X-Forwarded-For format: "client, proxy1, proxy2" - first IP is the original client
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const forwardedIp =
+      typeof forwardedFor === 'string'
+        ? forwardedFor.split(',')[0]?.trim()
+        : Array.isArray(forwardedFor)
+          ? forwardedFor[0]?.split(',')[0]?.trim()
+          : undefined;
+
+    const clientId = forwardedIp || req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();
 
     let entry = clients.get(clientId);

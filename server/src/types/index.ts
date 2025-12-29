@@ -83,12 +83,25 @@ export interface StoreStats {
 }
 
 // Notion API types
+
+/**
+ * Parent of a Notion page - indicates where the page lives
+ */
+export interface NotionPageParent {
+  type: 'database_id' | 'page_id' | 'workspace' | 'block_id';
+  database_id?: string;
+  page_id?: string;
+  block_id?: string;
+  workspace?: boolean;
+}
+
 export interface NotionPage {
   id: string;
   url: string;
   properties: Record<string, NotionPropertyValue>;
   created_time: string;
   last_edited_time: string;
+  parent?: NotionPageParent;
 }
 
 export interface NotionPropertyValue {
