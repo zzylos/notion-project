@@ -11,12 +11,7 @@ export { default as NotionConfigModal } from './NotionConfigModal';
 export { default as RelationshipItem } from './RelationshipItem';
 export { default as RelationshipList } from './RelationshipList';
 export { default as StatsOverview } from './StatsOverview';
-export {
-  EnvConfigIndicator,
-  LoadingProgressBar,
-  FailedDatabasesWarning,
-  StatsToggle,
-} from './StatusIndicators';
+export { LoadingProgressBar, FailedDatabasesWarning, StatsToggle } from './StatusIndicators';
 
 // Detail panel subcomponents
 export * from './detail';
