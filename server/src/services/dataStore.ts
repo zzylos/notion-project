@@ -100,8 +100,9 @@ class DataStore {
     // Preserve existing children if new item doesn't have children data.
     // Items from Notion API come with children: [] by default (relationships built separately),
     // so we preserve existing children when the new item has no/empty children.
+    // IMPORTANT: Create a copy to avoid shared reference mutations
     if (existing?.children?.length && !item.children?.length) {
-      item.children = existing.children;
+      item.children = [...existing.children];
     }
 
     this.items.set(item.id, item);
