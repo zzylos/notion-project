@@ -1,5 +1,5 @@
 import { Panel } from '@xyflow/react';
-import { RotateCcw, Maximize, Minimize, Eye, EyeOff, Focus } from 'lucide-react';
+import { RotateCcw, Maximize, Minimize, Focus } from 'lucide-react';
 
 interface CanvasControlsProps {
   /** Called when the user clicks the reset layout button */
@@ -8,12 +8,6 @@ interface CanvasControlsProps {
   onToggleFullscreen: () => void;
   /** Whether the canvas is currently in fullscreen mode */
   isFullscreen: boolean;
-  /** Whether orphan items (no parent, no children) are hidden */
-  hideOrphanItems: boolean;
-  /** Called when the user toggles orphan visibility */
-  onToggleOrphanItems: () => void;
-  /** Count of orphan items being hidden */
-  orphanCount: number;
   /** Whether focus mode is enabled (show only connected items) */
   focusMode: boolean;
   /** Called when the user toggles focus mode */
@@ -37,22 +31,14 @@ function getFocusButtonTitle(hasSelection: boolean, focusMode: boolean): string 
   return 'Focus mode: Highlight connected items (parent, children, siblings)';
 }
 
-function getOrphanButtonStyles(hideOrphanItems: boolean): string {
-  if (hideOrphanItems) return 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100';
-  return 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50';
-}
-
 /**
  * CanvasControls provides action buttons for the canvas view,
- * including layout reset, fullscreen toggle, orphan filtering, and focus mode.
+ * including layout reset, fullscreen toggle, and focus mode.
  */
 const CanvasControls: React.FC<CanvasControlsProps> = ({
   onResetLayout,
   onToggleFullscreen,
   isFullscreen,
-  hideOrphanItems,
-  onToggleOrphanItems,
-  orphanCount,
   focusMode,
   onToggleFocusMode,
   hasSelection,
@@ -70,20 +56,6 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
       >
         <Focus size={16} />
         {focusMode ? 'Focus On' : 'Focus'}
-      </button>
-
-      {/* Orphan items toggle */}
-      <button
-        onClick={onToggleOrphanItems}
-        className={`${baseButtonClass} ${getOrphanButtonStyles(hideOrphanItems)}`}
-        title={
-          hideOrphanItems ? 'Show orphan items' : 'Hide orphan items (items with no connections)'
-        }
-        aria-label={hideOrphanItems ? 'Show orphan items' : 'Hide orphan items'}
-        aria-pressed={hideOrphanItems}
-      >
-        {hideOrphanItems ? <EyeOff size={16} /> : <Eye size={16} />}
-        {hideOrphanItems ? `Hidden: ${orphanCount}` : 'Hide Orphans'}
       </button>
 
       <button

@@ -91,46 +91,6 @@ function buildConnectedIds(
   return connected;
 }
 
-/**
- * Filter orphan items from the list
- * @param connectedIds - IDs of items connected to the anchor in focus mode.
- *                       These items are never considered orphans.
- */
-function filterOrphans(
-  items: WorkItem[],
-  hideOrphanItems: boolean,
-  connectedIds: Set<string> | null = null
-): { filtered: WorkItem[]; orphanCount: number } {
-  const itemIds = new Set(items.map(i => i.id));
-  const itemsWithChildren = new Set<string>();
-
-  for (const item of items) {
-    if (item.parentId && itemIds.has(item.parentId)) {
-      itemsWithChildren.add(item.parentId);
-    }
-  }
-
-  const orphans = items.filter(item => {
-    // Connected items in focus mode are never orphans
-    if (connectedIds?.has(item.id)) {
-      return false;
-    }
-    const hasParentInSet = item.parentId && itemIds.has(item.parentId);
-    const hasChildren = itemsWithChildren.has(item.id);
-    return !hasParentInSet && !hasChildren;
-  });
-
-  if (hideOrphanItems) {
-    const orphanIds = new Set(orphans.map(o => o.id));
-    return {
-      filtered: items.filter(item => !orphanIds.has(item.id)),
-      orphanCount: orphans.length,
-    };
-  }
-
-  return { filtered: items, orphanCount: orphans.length };
-}
-
 // Custom node types
 const nodeTypes = {
   workItem: CanvasNode,
@@ -142,14 +102,7 @@ interface CanvasViewProps {
 
 // Inner component that uses React Flow hooks
 const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
-  const {
-    getFilteredItems,
-    setSelectedItem,
-    selectedItemId,
-    hideOrphanItems,
-    setHideOrphanItems,
-    items,
-  } = useStore();
+  const { getFilteredItems, setSelectedItem, selectedItemId, items } = useStore();
   const allFilteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,10 +113,6 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   // Track the item that was selected when focus mode was enabled
   // This keeps the item set stable while navigating within focus mode
   const [focusModeAnchorId, setFocusModeAnchorId] = useState<string | null>(null);
-
-  const handleToggleOrphanItems = useCallback(() => {
-    setHideOrphanItems(!hideOrphanItems);
-  }, [hideOrphanItems, setHideOrphanItems]);
 
   const handleToggleFocusMode = useCallback(() => {
     setFocusMode(prev => {
@@ -192,13 +141,9 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     return buildConnectedIds(selectedItemId, items);
   }, [selectedItemId, items]);
 
-  // Calculate which items are orphans and determine final filtered items
-  // Use anchorConnectedItemIds for determining which items to show (stable set)
-  const { itemsAfterOrphanFilter, orphanCount } = useMemo(() => {
-    let baseItems = allFilteredItems;
-
-    // When focus mode is active, add connected items that are outside the filter
-    // Use the anchor's connected items to keep the item set stable
+  // Calculate final filtered items, adding connected items in focus mode
+  const focusModeItems = useMemo(() => {
+    // When focus mode is active, add connected items that may have been filtered out
     if (focusMode && anchorConnectedItemIds) {
       const filteredIds = new Set(allFilteredItems.map(i => i.id));
       const additionalItems = [...anchorConnectedItemIds]
@@ -207,25 +152,17 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
         .filter((item): item is WorkItem => item !== undefined);
 
       if (additionalItems.length > 0) {
-        baseItems = [...allFilteredItems, ...additionalItems];
+        return [...allFilteredItems, ...additionalItems];
       }
     }
-
-    // Pass connected IDs so they're never considered orphans in focus mode
-    // This ensures connected items stay visible even when hideOrphanItems is true
-    const { filtered, orphanCount } = filterOrphans(
-      baseItems,
-      hideOrphanItems,
-      focusMode ? anchorConnectedItemIds : null
-    );
-    return { itemsAfterOrphanFilter: filtered, orphanCount };
-  }, [allFilteredItems, hideOrphanItems, focusMode, anchorConnectedItemIds, items]);
+    return allFilteredItems;
+  }, [allFilteredItems, focusMode, anchorConnectedItemIds, items]);
 
   // Apply item limit for performance (bypass when in focus mode to ensure all connected items are visible)
-  const { limitedItems, totalCount, isLimited } = useItemLimit(itemsAfterOrphanFilter);
+  const { limitedItems, totalCount, isLimited } = useItemLimit(focusModeItems);
 
   // When focus mode is active, use all items (no limit) to ensure connected items are visible
-  const filteredItems = focusMode && focusModeAnchorId ? itemsAfterOrphanFilter : limitedItems;
+  const filteredItems = focusMode && focusModeAnchorId ? focusModeItems : limitedItems;
   const showLimitBanner = focusMode && focusModeAnchorId ? false : isLimited;
 
   // Track data key for detecting when items change
@@ -393,9 +330,6 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
             onResetLayout={handleResetLayout}
             onToggleFullscreen={toggleFullscreen}
             isFullscreen={isFullscreen}
-            hideOrphanItems={hideOrphanItems}
-            onToggleOrphanItems={handleToggleOrphanItems}
-            orphanCount={orphanCount}
             focusMode={focusMode}
             onToggleFocusMode={handleToggleFocusMode}
             hasSelection={!!selectedItemId}

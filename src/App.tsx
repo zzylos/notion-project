@@ -13,6 +13,7 @@ import {
   FailedDatabasesWarning,
   StatsToggle,
 } from './components/common/StatusIndicators';
+import OrphanToggle from './components/common/OrphanToggle';
 import { getMergedConfig } from './utils/config';
 import {
   PanelRightClose,
@@ -132,17 +133,23 @@ function App() {
         <div className="flex-1 overflow-auto relative">
           <ErrorBoundary>{renderMainView()}</ErrorBoundary>
 
-          {/* Fullscreen toggle button - shown for non-canvas views (canvas has its own) */}
-          {viewMode !== 'canvas' && (
-            <button
-              onClick={toggleFullscreen}
-              className="fixed bottom-4 left-4 z-40 flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-            >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
-            </button>
-          )}
+          {/* Floating controls - bottom left corner */}
+          <div className="fixed bottom-4 left-4 z-40 flex gap-2">
+            {/* Orphan toggle - shown for all views */}
+            <OrphanToggle />
+
+            {/* Fullscreen toggle button - shown for non-canvas views (canvas has its own) */}
+            {viewMode !== 'canvas' && (
+              <button
+                onClick={toggleFullscreen}
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              >
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Detail panel toggle button (mobile only) */}
