@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { getDataStore } from '../services/dataStore.js';
 import { getNotion } from '../services/notion.js';
 import { logger } from '../utils/logger.js';
+import { normalizeUuid } from '../utils/uuid.js';
 import type { ApiResponse } from '../types/index.js';
 
 const router = Router();
@@ -14,6 +15,30 @@ const router = Router();
  */
 const processedEvents = new Map<string, number>();
 const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const IDEMPOTENCY_CLEANUP_INTERVAL_MS = 60 * 1000; // Clean up every 60 seconds
+
+/**
+ * Clean up expired entries from the idempotency cache.
+ * Called both on new events and periodically via interval.
+ */
+function cleanupExpiredEvents(): void {
+  const now = Date.now();
+  let cleanedCount = 0;
+  for (const [key, timestamp] of processedEvents.entries()) {
+    if (now - timestamp > IDEMPOTENCY_TTL_MS) {
+      processedEvents.delete(key);
+      cleanedCount++;
+    }
+  }
+  if (cleanedCount > 0) {
+    logger.webhook.debug(`Cleaned up ${cleanedCount} expired idempotency cache entries`);
+  }
+}
+
+// Start periodic cleanup to prevent memory leaks when webhooks are idle
+const cleanupInterval = setInterval(cleanupExpiredEvents, IDEMPOTENCY_CLEANUP_INTERVAL_MS);
+// Allow Node.js to exit even if interval is running (don't keep process alive)
+cleanupInterval.unref();
 
 /**
  * Generate a unique key for a webhook event for idempotency checking.
@@ -39,13 +64,8 @@ function isEventAlreadyProcessed(event: NotionWebhookEvent): boolean {
   // Mark as processed
   processedEvents.set(key, Date.now());
 
-  // Clean up old entries to prevent memory bloat
-  const now = Date.now();
-  for (const [k, timestamp] of processedEvents.entries()) {
-    if (now - timestamp > IDEMPOTENCY_TTL_MS) {
-      processedEvents.delete(k);
-    }
-  }
+  // Also clean up on event processing (belt and suspenders)
+  cleanupExpiredEvents();
 
   return false;
 }
@@ -209,32 +229,6 @@ function validateSignature(payload: string, signature: string | undefined): bool
     logger.webhook.error('Signature validation error:', error);
     return false;
   }
-}
-
-/**
- * Normalize a Notion UUID to consistent format (with dashes).
- * Logs warnings for invalid UUIDs.
- */
-function normalizeUuid(id: string): string {
-  if (!id || typeof id !== 'string') {
-    logger.webhook.warn('normalizeUuid received invalid input:', typeof id);
-    return '';
-  }
-
-  const clean = id.replace(/-/g, '').toLowerCase();
-
-  if (clean.length !== 32) {
-    logger.webhook.warn(`Invalid UUID length (${clean.length} chars, expected 32): ${id}`);
-    return id;
-  }
-
-  // Validate hex characters
-  if (!/^[0-9a-f]+$/.test(clean)) {
-    logger.webhook.warn(`Invalid UUID format (non-hex characters): ${id}`);
-    return id;
-  }
-
-  return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
 }
 
 /**
