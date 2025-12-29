@@ -22,19 +22,28 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
     isLoading,
     disableItemLimit,
     focusedItemId,
+    hideOrphanItems,
+    showOnlyOrphans,
   } = useStore();
 
   // Ref for the scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Get full tree for display
-  // Note: expandedIds is needed in deps to trigger re-render when nodes are expanded/collapsed.
-  // getTreeNodes() internally reads the latest state, but useMemo needs expandedIds to know when to re-run.
+  // Note: expandedIds, hideOrphanItems, showOnlyOrphans are needed in deps to trigger re-render when these change.
+  // getTreeNodes() internally reads the latest state, but useMemo needs these to know when to re-run.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const allTreeNodes = useMemo(() => getTreeNodes(), [getTreeNodes, expandedIds]);
+  const allTreeNodes = useMemo(
+    () => getTreeNodes(),
+    [getTreeNodes, expandedIds, hideOrphanItems, showOnlyOrphans]
+  );
 
   // Get total item count for limit check
-  const totalFilteredCount = useMemo(() => getFilteredItems().length, [getFilteredItems]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const totalFilteredCount = useMemo(
+    () => getFilteredItems().length,
+    [getFilteredItems, hideOrphanItems, showOnlyOrphans]
+  );
 
   // Determine if we should limit and how many root nodes to show
   // Also computes totalNodes to avoid duplicate traversal
