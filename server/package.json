@@ -1,7 +1,7 @@
 {
   "name": "notion-project-server",
   "version": "1.0.0",
-  "description": "Backend API server for Notion Opportunity Tree with server-side caching",
+  "description": "Backend API server for Notion Opportunity Tree with webhook-based real-time updates",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -23,6 +23,8 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"

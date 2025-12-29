@@ -66,25 +66,20 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
-  cached?: boolean;
-  cacheAge?: number;
 }
 
 export interface FetchItemsResponse {
   items: WorkItem[];
   failedDatabases?: Array<{ type: string; error: string }>;
   orphanedItemsCount?: number;
+  lastUpdated?: string;
 }
 
-export interface CacheStats {
-  entries: number;
-  keys: string[];
-  hitRate: number;
-  hits: number;
-  misses: number;
-  staleHits?: number;
-  backgroundRefreshes?: number;
-  refreshingKeys?: string[];
+export interface StoreStats {
+  totalItems: number;
+  initialized: boolean;
+  lastUpdated: string | null;
+  itemsByType: Record<string, number>;
 }
 
 // Notion API types

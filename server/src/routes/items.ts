@@ -1,107 +1,42 @@
 import { Router, type Request, type Response } from 'express';
-import { getCache } from '../services/cache.js';
+import { getDataStore } from '../services/dataStore.js';
 import { getNotion } from '../services/notion.js';
 import { mutationRateLimiter } from '../middleware/rateLimit.js';
 import { logger } from '../utils/logger.js';
 import type { ApiResponse, FetchItemsResponse } from '../types/index.js';
 
-// Extended response type for cached responses
-interface CachedApiResponse<T> extends ApiResponse<T> {
-  isStale?: boolean;
-  refreshing?: boolean;
-}
-
 const router = Router();
-
-// Track which cache key has a registered callback
-// This allows re-registration when database configuration changes
-let registeredCacheKey: string | null = null;
-
-/**
- * Register the refresh callback for the cache.
- * This enables stale-while-revalidate behavior.
- *
- * Re-registers the callback if the cache key changes (e.g., database config changes).
- */
-function ensureRefreshCallbackRegistered(): string {
-  const cache = getCache();
-  const notion = getNotion();
-
-  // Generate cache key from configured database IDs
-  const dbIds = notion.getDatabaseIds();
-  const cacheKey = cache.generateKey(dbIds);
-
-  // Register callback if not registered or if cache key changed
-  if (registeredCacheKey !== cacheKey) {
-    // Register the refresh callback for background updates
-    cache.registerRefreshCallback(cacheKey, async () => {
-      logger.api.info('Executing refresh callback...');
-      const result = await notion.fetchAllItems();
-      return result.items;
-    });
-    registeredCacheKey = cacheKey;
-    logger.api.info('Refresh callback registered for stale-while-revalidate');
-  }
-
-  return cacheKey;
-}
 
 /**
  * GET /api/items
- * Fetch all items from Notion (with stale-while-revalidate caching)
+ * Fetch all items from the in-memory store
  *
- * Caching behavior:
- * - Fresh cache: Returns cached data immediately
- * - Stale cache: Returns cached data immediately, triggers background refresh
- * - No cache: Fetches from Notion and caches the result
+ * Data is loaded once on server startup and updated via webhooks.
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response) => {
   try {
-    const cache = getCache();
-    const notion = getNotion();
-    const cacheKey = ensureRefreshCallbackRegistered();
+    const store = getDataStore();
 
-    // Check cache first (includes stale-while-revalidate logic)
-    const cached = cache.get(cacheKey);
-
-    if (cached) {
-      const cacheAge = Date.now() - cached.timestamp;
-      const status = cached.isStale ? 'STALE' : 'HIT';
-      const refreshing = cache.isRefreshing(cacheKey);
-
-      logger.api.info(
-        `Cache ${status} for items (age: ${Math.round(cacheAge / 1000)}s)` +
-          (refreshing ? ' [refreshing in background]' : '')
-      );
-
-      const response: CachedApiResponse<FetchItemsResponse> = {
-        success: true,
-        data: { items: cached.items },
-        cached: true,
-        cacheAge,
-        isStale: cached.isStale,
-        refreshing,
+    if (!store.isInitialized()) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Server is still initializing. Please try again in a moment.',
       };
-      res.json(response);
+      res.status(503).json(response);
       return;
     }
 
-    logger.api.info('Cache MISS - fetching from Notion...');
+    const items = store.getAll();
+    const stats = store.getStats();
 
-    // Fetch from Notion
-    const result = await notion.fetchAllItems();
-
-    // Store in cache
-    cache.set(cacheKey, result.items);
+    logger.api.info(`Returning ${items.length} items from store`);
 
     const response: ApiResponse<FetchItemsResponse> = {
       success: true,
       data: {
-        items: result.items,
-        failedDatabases: result.failedDatabases.length > 0 ? result.failedDatabases : undefined,
-        orphanedItemsCount: result.orphanedItemsCount > 0 ? result.orphanedItemsCount : undefined,
+        items,
+        lastUpdated: stats.lastUpdated ?? undefined,
       },
-      cached: false,
     };
 
     res.json(response);
@@ -116,35 +51,36 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 /**
- * POST /api/items/refresh
- * Force refresh the cache (waits for completion)
+ * POST /api/items/sync
+ * Force a full re-sync from Notion (admin operation)
+ *
+ * This fetches all items from all databases and replaces the store.
+ * Use sparingly - webhooks should handle normal updates.
  */
-router.post('/refresh', async (_req: Request, res: Response) => {
+router.post('/sync', async (_req: Request, res: Response) => {
   try {
-    const cache = getCache();
-    const cacheKey = ensureRefreshCallbackRegistered();
+    const store = getDataStore();
+    const notion = getNotion();
 
-    logger.api.info('Force refresh requested');
+    logger.api.info('Full sync requested');
 
-    const items = await cache.forceRefresh(cacheKey);
+    const result = await notion.fetchAllItems();
 
-    if (!items) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Failed to refresh cache',
-      };
-      res.status(500).json(response);
-      return;
-    }
+    // Replace all items in store
+    store.initialize(result.items);
 
     const response: ApiResponse<FetchItemsResponse> = {
       success: true,
-      data: { items },
-      cached: false,
+      data: {
+        items: result.items,
+        failedDatabases: result.failedDatabases.length > 0 ? result.failedDatabases : undefined,
+        orphanedItemsCount: result.orphanedItemsCount > 0 ? result.orphanedItemsCount : undefined,
+      },
     };
+
     res.json(response);
   } catch (error) {
-    logger.api.error('Error refreshing items:', error);
+    logger.api.error('Error syncing items:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -171,9 +107,9 @@ function validateIdParam(id: string | undefined): string | null {
 
 /**
  * GET /api/items/:id
- * Fetch a single item by ID
+ * Fetch a single item by ID from the store
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response) => {
   try {
     const itemId = validateIdParam(req.params.id);
     if (!itemId) {
@@ -185,8 +121,17 @@ router.get('/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const notion = getNotion();
-    const item = await notion.fetchItem(itemId);
+    const store = getDataStore();
+    const item = store.get(itemId);
+
+    if (!item) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Item not found',
+      };
+      res.status(404).json(response);
+      return;
+    }
 
     const response: ApiResponse<typeof item> = {
       success: true,
@@ -205,11 +150,10 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 /**
  * PATCH /api/items/:id/status
- * Update item status
+ * Update item status in Notion and local store
  */
 router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Response) => {
   try {
-    // Validate item ID
     const itemId = validateIdParam(req.params.id);
     if (!itemId) {
       const response: ApiResponse<never> = {
@@ -222,7 +166,6 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
 
     const { status } = req.body;
 
-    // Validate status input
     if (!status || typeof status !== 'string') {
       const response: ApiResponse<never> = {
         success: false,
@@ -232,7 +175,6 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
       return;
     }
 
-    // Validate max length to prevent abuse
     const trimmedStatus = status.trim();
     if (trimmedStatus.length === 0 || trimmedStatus.length > 100) {
       const response: ApiResponse<never> = {
@@ -243,14 +185,29 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
       return;
     }
 
+    const store = getDataStore();
     const notion = getNotion();
-    const cache = getCache();
-    const cacheKey = ensureRefreshCallbackRegistered();
 
-    await notion.updateItemStatus(itemId, trimmedStatus);
+    // Get existing item
+    const existingItem = store.get(itemId);
+    if (!existingItem) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Item not found',
+      };
+      res.status(404).json(response);
+      return;
+    }
 
-    // Invalidate only the items cache (not all cache entries)
-    cache.delete(cacheKey);
+    // Update in Notion
+    await notion.updateItemStatus(existingItem.notionPageId || itemId, trimmedStatus);
+
+    // Update local store immediately (webhook will also update, but this is faster)
+    store.upsert({
+      ...existingItem,
+      status: trimmedStatus,
+      updatedAt: new Date().toISOString(),
+    });
 
     const response: ApiResponse<{ updated: boolean }> = {
       success: true,
@@ -269,11 +226,10 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
 
 /**
  * PATCH /api/items/:id/progress
- * Update item progress
+ * Update item progress in Notion and local store
  */
 router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Response) => {
   try {
-    // Validate item ID
     const itemId = validateIdParam(req.params.id);
     if (!itemId) {
       const response: ApiResponse<never> = {
@@ -294,14 +250,29 @@ router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Res
       return;
     }
 
+    const store = getDataStore();
     const notion = getNotion();
-    const cache = getCache();
-    const cacheKey = ensureRefreshCallbackRegistered();
 
-    await notion.updateItemProgress(itemId, progress);
+    // Get existing item
+    const existingItem = store.get(itemId);
+    if (!existingItem) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Item not found',
+      };
+      res.status(404).json(response);
+      return;
+    }
 
-    // Invalidate only the items cache (not all cache entries)
-    cache.delete(cacheKey);
+    // Update in Notion
+    await notion.updateItemProgress(existingItem.notionPageId || itemId, progress);
+
+    // Update local store immediately
+    store.upsert({
+      ...existingItem,
+      progress,
+      updatedAt: new Date().toISOString(),
+    });
 
     const response: ApiResponse<{ updated: boolean }> = {
       success: true,
