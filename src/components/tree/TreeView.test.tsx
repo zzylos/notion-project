@@ -69,6 +69,9 @@ describe('TreeView', () => {
       expandedIds: new Set(),
       isLoading: false,
       disableItemLimit: false,
+      // Disable orphan filtering so standalone test items are visible
+      hideOrphanItems: false,
+      showOnlyOrphans: false,
       filters: {
         types: [],
         excludeTypes: [],

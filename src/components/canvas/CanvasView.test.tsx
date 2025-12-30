@@ -57,9 +57,6 @@ vi.mock('./CanvasControls', () => ({
     onResetLayout: () => void;
     onToggleFullscreen: () => void;
     isFullscreen: boolean;
-    hideOrphanItems: boolean;
-    onToggleOrphanItems: () => void;
-    orphanCount: number;
     focusMode: boolean;
     onToggleFocusMode: () => void;
     hasSelection: boolean;
@@ -70,9 +67,6 @@ vi.mock('./CanvasControls', () => ({
       </button>
       <button data-testid="toggle-fullscreen" onClick={props.onToggleFullscreen}>
         {props.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-      </button>
-      <button data-testid="toggle-orphans" onClick={props.onToggleOrphanItems}>
-        {props.hideOrphanItems ? 'Show Orphans' : 'Hide Orphans'} ({props.orphanCount})
       </button>
       <button data-testid="toggle-focus" onClick={props.onToggleFocusMode}>
         {props.focusMode ? 'Exit Focus' : 'Focus Mode'}
@@ -107,13 +101,19 @@ describe('CanvasView', () => {
     useStore.setState({
       items: new Map(),
       selectedItemId: null,
+      // Disable orphan filtering so standalone test items are visible
       hideOrphanItems: false,
+      showOnlyOrphans: false,
       expandedIds: new Set(),
       filters: {
         types: [],
+        excludeTypes: [],
         statuses: [],
+        excludeStatuses: [],
         priorities: [],
+        excludePriorities: [],
         owners: [],
+        excludeOwners: [],
         searchQuery: '',
         showOnlyMyItems: false,
         filterMode: 'show',
@@ -156,18 +156,6 @@ describe('CanvasView', () => {
     fireEvent.click(screen.getByTestId('react-flow'));
 
     expect(handleSelect).toHaveBeenCalled();
-  });
-
-  it('toggles orphan items visibility', () => {
-    render(<CanvasView />);
-
-    const toggleButton = screen.getByTestId('toggle-orphans');
-    expect(toggleButton).toHaveTextContent('Hide Orphans');
-
-    fireEvent.click(toggleButton);
-
-    // Check store state was updated
-    expect(useStore.getState().hideOrphanItems).toBe(true);
   });
 
   it('toggles focus mode', () => {
@@ -226,28 +214,6 @@ describe('CanvasView', () => {
     render(<CanvasView />);
     // The component should calculate connected items (parent and siblings)
     expect(screen.getByTestId('react-flow')).toBeInTheDocument();
-  });
-
-  it('identifies orphan items correctly', () => {
-    // An orphan has no parent in the set AND no children
-    const orphan = createTestItem({ id: 'orphan', title: 'Orphan Item' });
-    const parent = createTestItem({ id: 'parent', title: 'Parent' });
-    const child = createTestItem({ id: 'child', title: 'Child', parentId: 'parent' });
-
-    parent.children = ['child'];
-
-    const items = new Map<string, WorkItem>([
-      [orphan.id, orphan],
-      [parent.id, parent],
-      [child.id, child],
-    ]);
-
-    useStore.setState({ items });
-
-    render(<CanvasView />);
-
-    // Check that orphan count is shown in the toggle button
-    expect(screen.getByTestId('toggle-orphans')).toHaveTextContent('(1)');
   });
 
   it('handles reset layout action', () => {
