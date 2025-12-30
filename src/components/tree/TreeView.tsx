@@ -30,18 +30,18 @@ const TreeView: React.FC<TreeViewProps> = memo(({ onNodeSelect }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Get full tree for display
-  // Note: expandedIds, hideOrphanItems, showOnlyOrphans are needed in deps to trigger re-render when these change.
-  // getTreeNodes() internally reads the latest state, but useMemo needs these to know when to re-run.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Note: expandedIds, hideOrphanItems, showOnlyOrphans trigger re-render when these change.
+  // getTreeNodes() internally reads the latest state, but useMemo needs these deps to know when to re-run.
   const allTreeNodes = useMemo(
     () => getTreeNodes(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- These deps trigger re-computation when store state changes
     [getTreeNodes, expandedIds, hideOrphanItems, showOnlyOrphans]
   );
 
   // Get total item count for limit check
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const totalFilteredCount = useMemo(
     () => getFilteredItems().length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- These deps trigger re-computation when store state changes
     [getFilteredItems, hideOrphanItems, showOnlyOrphans]
   );
 
