@@ -174,6 +174,35 @@ function isOrphanItem(item: WorkItem, items: Map<string, WorkItem>): boolean {
 }
 
 /**
+ * Check if an item matches a search query.
+ * Searches across title, description, and tags.
+ */
+function itemMatchesSearch(item: WorkItem, query: string): boolean {
+  if (!query) return true;
+  const normalizedQuery = query.toLowerCase();
+  const titleMatch = item.title.toLowerCase().includes(normalizedQuery);
+  const descMatch = item.description?.toLowerCase().includes(normalizedQuery);
+  const tagMatch = item.tags?.some(tag => tag.toLowerCase().includes(normalizedQuery));
+  return titleMatch || !!descMatch || !!tagMatch;
+}
+
+/**
+ * Apply orphan filtering logic to an item.
+ * Returns true if item should be INCLUDED after orphan filtering.
+ */
+function applyOrphanFilter(
+  item: WorkItem,
+  items: Map<string, WorkItem>,
+  showOnlyOrphans: boolean,
+  hideOrphanItems: boolean
+): boolean {
+  const orphan = isOrphanItem(item, items);
+  if (showOnlyOrphans) return orphan;
+  if (hideOrphanItems && orphan) return false;
+  return true;
+}
+
+/**
  * Check if an item matches any exclude filter (hide these).
  * Returns true if item should be EXCLUDED (hidden).
  */
@@ -378,14 +407,8 @@ export const useStore = create<StoreState>()(
           }
 
           // Search query is always applied first
-          if (filters.searchQuery) {
-            const query = filters.searchQuery.toLowerCase();
-            const titleMatch = item.title.toLowerCase().includes(query);
-            const descMatch = item.description?.toLowerCase().includes(query);
-            const tagMatch = item.tags?.some(tag => tag.toLowerCase().includes(query));
-            if (!titleMatch && !descMatch && !tagMatch) {
-              return false;
-            }
+          if (!itemMatchesSearch(item, filters.searchQuery)) {
+            return false;
           }
 
           // Step 1: Check exclude filters - if item matches any exclude, hide it
@@ -395,11 +418,7 @@ export const useStore = create<StoreState>()(
 
           // Step 2: Handle legacy filterMode: 'hide' - include filters act as exclude
           if (isHideMode && hasIncludeFilters) {
-            // In hide mode, if item matches any include filter, hide it
-            if (itemMatchesIncludeFilters(item, filters)) {
-              return false;
-            }
-            return true;
+            return !itemMatchesIncludeFilters(item, filters);
           }
 
           // Step 3: Check include filters - if include filters are set, item must match
@@ -408,17 +427,7 @@ export const useStore = create<StoreState>()(
           }
 
           // Step 4: Orphan filtering (global)
-          const orphan = isOrphanItem(item, items);
-          if (showOnlyOrphans) {
-            // When showing only orphans, exclude non-orphans
-            return orphan;
-          }
-          if (hideOrphanItems && orphan) {
-            // When hiding orphans, exclude orphans
-            return false;
-          }
-
-          return true;
+          return applyOrphanFilter(item, items, showOnlyOrphans, hideOrphanItems);
         });
       },
 

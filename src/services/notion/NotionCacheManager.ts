@@ -82,6 +82,38 @@ export class NotionCacheManager {
   }
 
   /**
+   * Process a single cache entry from localStorage.
+   * Returns the parsed entry if valid and not expired, null otherwise.
+   */
+  private processCacheEntry(key: string, now: number): CacheEntry | null {
+    const cachedStr = localStorage.getItem(CACHE_KEY_PREFIX + key);
+    if (!cachedStr) return null;
+
+    try {
+      const cached = JSON.parse(cachedStr);
+
+      // Validate cached data structure
+      if (!cached || !Array.isArray(cached.items) || typeof cached.timestamp !== 'number') {
+        logger.warn('Notion', `Invalid cache entry for key ${key}, removing`);
+        localStorage.removeItem(CACHE_KEY_PREFIX + key);
+        return null;
+      }
+
+      // Check if persistent cache is still valid
+      if (now - cached.timestamp >= PERSISTENT_CACHE_TIMEOUT) {
+        localStorage.removeItem(CACHE_KEY_PREFIX + key);
+        return null;
+      }
+
+      return cached;
+    } catch (parseError) {
+      logger.warn('Notion', `Failed to parse cache entry for key ${key}, removing:`, parseError);
+      localStorage.removeItem(CACHE_KEY_PREFIX + key);
+      return null;
+    }
+  }
+
+  /**
    * Load cached data from localStorage into memory cache
    */
   private loadPersistentCache(): void {
@@ -107,31 +139,12 @@ export class NotionCacheManager {
       const now = Date.now();
 
       for (const key of metadata.keys) {
-        const cachedStr = localStorage.getItem(CACHE_KEY_PREFIX + key);
-        if (!cachedStr) continue;
+        const cached = this.processCacheEntry(key, now);
+        if (!cached) continue;
 
-        try {
-          const cached = JSON.parse(cachedStr);
-          // Validate cached data structure
-          if (!cached || !Array.isArray(cached.items) || typeof cached.timestamp !== 'number') {
-            logger.warn('Notion', `Invalid cache entry for key ${key}, removing`);
-            localStorage.removeItem(CACHE_KEY_PREFIX + key);
-            continue;
-          }
-
-          // Check if persistent cache is still valid
-          if (now - cached.timestamp < PERSISTENT_CACHE_TIMEOUT) {
-            this.cache.set(key, cached);
-            if (this.debugMode) {
-              logger.info('Notion', `Loaded ${cached.items.length} items from persistent cache`);
-            }
-          } else {
-            // Clean up expired cache
-            localStorage.removeItem(CACHE_KEY_PREFIX + key);
-          }
-        } catch (parseError) {
-          logger.warn('Notion', `Failed to parse cache entry for key ${key}, removing:`, parseError);
-          localStorage.removeItem(CACHE_KEY_PREFIX + key);
+        this.cache.set(key, cached);
+        if (this.debugMode) {
+          logger.info('Notion', `Loaded ${cached.items.length} items from persistent cache`);
         }
       }
     } catch (error) {
@@ -184,23 +197,35 @@ export class NotionCacheManager {
   private clearPersistentCache(): void {
     try {
       const metadataStr = localStorage.getItem(CACHE_METADATA_KEY);
-      if (metadataStr) {
-        try {
-          const metadata = JSON.parse(metadataStr);
-          if (metadata && Array.isArray(metadata.keys)) {
-            for (const key of metadata.keys) {
-              localStorage.removeItem(CACHE_KEY_PREFIX + key);
-            }
-          }
-        } catch (parseError) {
-          // If we can't parse metadata, just try to remove common keys
-          logger.warn('Notion', 'Failed to parse cache metadata during clear:', parseError);
-        }
+      if (!metadataStr) {
+        localStorage.removeItem(CACHE_METADATA_KEY);
+        return;
+      }
+
+      const keys = this.parseMetadataKeys(metadataStr);
+      for (const key of keys) {
+        localStorage.removeItem(CACHE_KEY_PREFIX + key);
       }
       localStorage.removeItem(CACHE_METADATA_KEY);
     } catch (error) {
       logger.warn('Notion', 'Failed to clear persistent cache:', error);
     }
+  }
+
+  /**
+   * Safely parse cache metadata keys.
+   * Returns empty array if parsing fails.
+   */
+  private parseMetadataKeys(metadataStr: string): string[] {
+    try {
+      const metadata = JSON.parse(metadataStr);
+      if (metadata && Array.isArray(metadata.keys)) {
+        return metadata.keys;
+      }
+    } catch (parseError) {
+      logger.warn('Notion', 'Failed to parse cache metadata during clear:', parseError);
+    }
+    return [];
   }
 }
 
