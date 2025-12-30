@@ -249,7 +249,6 @@ The server validates webhook signatures using HMAC-SHA256:
 - **Tree View** (`src/components/tree/TreeView.tsx`) - Default hierarchical view
 - **Canvas View** (`src/components/canvas/CanvasView.tsx`) - Node-based visualization with @xyflow/react
 - **Kanban View** (`src/components/views/KanbanView.tsx`) - Board by dynamic status columns
-- **List View** (`src/components/views/ListView.tsx`) - Virtualized table with @tanstack/react-virtual
 - **Timeline View** (`src/components/views/TimelineView.tsx`) - Chronological view by due date
 
 ### Custom Hooks
@@ -347,13 +346,15 @@ The `shared/` directory contains code shared between frontend and backend:
 | `src/components/common/StatsOverview.tsx`     | Collapsible statistics panel               |
 | `src/components/common/Header.tsx`            | App header with controls                   |
 | `src/components/common/ErrorBoundary.tsx`     | Error boundary wrapper                     |
+| `src/components/common/StatusIndicators.tsx`  | Loading progress, failed DB warnings       |
+| `src/components/common/OrphanToggle.tsx`      | Toggle for showing orphan items            |
 | `src/components/canvas/CanvasView.tsx`        | React Flow canvas with hierarchical layout |
 | `src/components/canvas/CanvasNode.tsx`        | Custom node component for canvas           |
 | `src/components/canvas/CanvasControls.tsx`    | Canvas control toolbar                     |
+| `src/components/canvas/CanvasLegend.tsx`      | Legend panel for canvas view               |
 | `src/components/tree/TreeView.tsx`            | Tree view with expand/collapse             |
 | `src/components/tree/TreeNode.tsx`            | Individual tree node component             |
 | `src/components/views/KanbanView.tsx`         | Dynamic status columns from data           |
-| `src/components/views/ListView.tsx`           | Virtualized list view                      |
 | `src/components/views/TimelineView.tsx`       | Timeline view                              |
 | `src/components/filters/FilterPanel.tsx`      | Dynamic filter controls                    |
 
@@ -453,19 +454,6 @@ The Notion service supports progress callbacks:
 ```typescript
 await notionService.fetchAllItems(progress => {
   // progress.loaded, progress.total, progress.items, progress.done, progress.currentDatabase
-});
-```
-
-### Virtualization for Large Lists
-
-List view uses @tanstack/react-virtual for performance with 1000+ items:
-
-```typescript
-const rowVirtualizer = useVirtualizer({
-  count: items.length,
-  getScrollElement: () => parentRef.current,
-  estimateSize: () => 48,
-  overscan: 10,
 });
 ```
 

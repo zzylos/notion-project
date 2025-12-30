@@ -34,13 +34,6 @@ https://www.notion.so/project-can-not-visualize-in-progress-work-with-hierarchy-
 - Click cards to view details
 - Visual item count per column
 
-#### List View
-
-- Spreadsheet-style tabular view of all items
-- Columns: Status, Title, Type, Priority, Owner, Progress
-- Virtualized scrolling for large datasets (1000+ items)
-- Smooth performance with @tanstack/react-virtual
-
 #### Timeline View
 
 - Chronological view of items with due dates
@@ -54,11 +47,11 @@ Connect up to 5 separate Notion databases, each mapped to a specific item type:
 
 | Database         | Type     | Icon            | Description                       |
 | ---------------- | -------- | --------------- | --------------------------------- |
-| **Objectives**   | mission  | Purple target   | High-level goals and objectives   |
+| **Objectives**   | mission  | Violet target   | High-level goals and objectives   |
 | **Problems**     | problem  | Red warning     | Issues and challenges to solve    |
-| **Solutions**    | solution | Amber lightbulb | Proposed solutions and approaches |
-| **Projects**     | project  | Blue folder     | Active projects and initiatives   |
-| **Deliverables** | design   | Green package   | Outputs and deliverables          |
+| **Solutions**    | solution | Blue lightbulb  | Proposed solutions and approaches |
+| **Projects**     | project  | Cyan folder     | Active projects and initiatives   |
+| **Deliverables** | design   | Fuchsia package | Outputs and deliverables          |
 
 Parent relations work **across databases** - a Solution can have a Problem as its parent, a Deliverable can link to a Project, etc.
 
@@ -76,9 +69,9 @@ Status labels are automatically imported from your Notion database. The app inte
 
 - **Objectives** (violet) - Top-level company objectives
 - **Problems** (red) - Issues to be solved
-- **Solutions** (amber) - Proposed solutions to problems
-- **Projects** (blue) - Implementation projects
-- **Deliverables** (green) - Design work and outputs
+- **Solutions** (blue) - Proposed solutions to problems
+- **Projects** (cyan) - Implementation projects
+- **Deliverables** (fuchsia) - Design work and outputs
 
 ### Filtering & Search
 
@@ -267,7 +260,6 @@ Each Notion database should have these properties (configurable in settings):
 - **Tailwind CSS** - Styling
 - **Zustand** - State management
 - **@xyflow/react** - Canvas/node visualization
-- **@tanstack/react-virtual** - List virtualization
 - **Lucide React** - Icons
 - **D3.js** - Data visualization utilities
 - **Vitest** - Testing framework
@@ -288,7 +280,7 @@ src/
 ├── components/
 │   ├── canvas/         # Canvas view (CanvasView, CanvasNode)
 │   ├── tree/           # Tree visualization components
-│   ├── views/          # KanbanView, ListView, TimelineView
+│   ├── views/          # KanbanView, TimelineView
 │   ├── filters/        # Filter panel components
 │   └── common/         # Shared components (Header, DetailPanel, etc.)
 ├── hooks/              # Custom React hooks
@@ -401,7 +393,6 @@ The app includes several optimizations for large databases:
 - Data is cached for 5 minutes
 - Use the refresh button to force-reload data
 - Progressive loading shows items as they arrive
-- List view uses virtualization for smooth scrolling
 
 ### Canvas View Performance
 
