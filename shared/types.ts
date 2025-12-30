@@ -169,3 +169,29 @@ export interface NotionQueryResponse {
   has_more: boolean;
   next_cursor: string | null;
 }
+
+/**
+ * Logger level types.
+ */
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+/**
+ * Logger interface for namespace-specific loggers.
+ * Both client and server loggers implement this interface.
+ */
+export interface NamespaceLogger {
+  /** Log a debug message (typically only in development) */
+  debug(message: string, data?: unknown): void;
+  /** Log an informational message */
+  info(message: string, data?: unknown): void;
+  /** Log a warning message */
+  warn(message: string, data?: unknown): void;
+  /** Log an error message */
+  error(message: string, error?: unknown): void;
+}
+
+/**
+ * Common namespace logger keys used across client and server.
+ * This ensures consistency in log namespaces.
+ */
+export type CommonLoggerNamespace = 'notion' | 'store' | 'cache';

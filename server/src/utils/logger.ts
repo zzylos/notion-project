@@ -5,7 +5,12 @@
  * - Prefixed log messages for easy identification
  * - Conditional debug logging based on environment
  * - Structured output for different log levels
+ *
+ * Implements the shared NamespaceLogger interface for consistency
+ * with the client-side logger.
  */
+
+import type { NamespaceLogger } from '../../../shared/index.js';
 
 interface LoggerOptions {
   /** Enable debug logging (default: only in non-production) */
@@ -26,7 +31,7 @@ function formatMessage(prefix: string, message: string): string {
  *
  * @param prefix - Module name to prefix all log messages
  * @param options - Logger options
- * @returns Logger object with log methods
+ * @returns Logger object with log methods implementing NamespaceLogger interface
  *
  * @example
  * const logger = createLogger('Cache');
@@ -34,7 +39,7 @@ function formatMessage(prefix: string, message: string): string {
  * logger.warn('Cache miss', { key: 'abc' });
  * logger.error('Failed to refresh', error);
  */
-export function createLogger(prefix: string, options: LoggerOptions = {}) {
+export function createLogger(prefix: string, options: LoggerOptions = {}): NamespaceLogger {
   const debugEnabled = options.debug ?? !isProduction;
 
   return {
@@ -42,31 +47,47 @@ export function createLogger(prefix: string, options: LoggerOptions = {}) {
      * Debug level - only in development by default.
      * Uses console.info with [DEBUG] prefix since console.debug is not allowed by ESLint.
      */
-    debug(message: string, ...args: unknown[]): void {
+    debug(message: string, data?: unknown): void {
       if (debugEnabled) {
-        console.info(`[DEBUG] ${formatMessage(prefix, message)}`, ...args);
+        if (data !== undefined) {
+          console.info(`[DEBUG] ${formatMessage(prefix, message)}`, data);
+        } else {
+          console.info(`[DEBUG] ${formatMessage(prefix, message)}`);
+        }
       }
     },
 
     /**
      * Info level - general informational messages
      */
-    info(message: string, ...args: unknown[]): void {
-      console.info(formatMessage(prefix, message), ...args);
+    info(message: string, data?: unknown): void {
+      if (data !== undefined) {
+        console.info(formatMessage(prefix, message), data);
+      } else {
+        console.info(formatMessage(prefix, message));
+      }
     },
 
     /**
      * Warn level - warnings that don't stop execution
      */
-    warn(message: string, ...args: unknown[]): void {
-      console.warn(formatMessage(prefix, message), ...args);
+    warn(message: string, data?: unknown): void {
+      if (data !== undefined) {
+        console.warn(formatMessage(prefix, message), data);
+      } else {
+        console.warn(formatMessage(prefix, message));
+      }
     },
 
     /**
      * Error level - errors that may affect functionality
      */
-    error(message: string, ...args: unknown[]): void {
-      console.error(formatMessage(prefix, message), ...args);
+    error(message: string, error?: unknown): void {
+      if (error !== undefined) {
+        console.error(formatMessage(prefix, message), error);
+      } else {
+        console.error(formatMessage(prefix, message));
+      }
     },
   };
 }

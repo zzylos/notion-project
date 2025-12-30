@@ -3,6 +3,51 @@
  */
 
 /**
+ * Parse Notion API error response and return a user-friendly message.
+ *
+ * @param status - HTTP status code from the response
+ * @param errorText - Raw error text from the response body
+ * @returns A user-friendly error message
+ *
+ * @example
+ * parseNotionError(401, '{"code":"unauthorized"}') // 'Invalid API key. Please check your Notion integration token.'
+ * parseNotionError(404, '{}') // 'Database not found. Please verify the database ID...'
+ */
+export function parseNotionError(status: number, errorText: string): string {
+  let errorCode = '';
+  let errorMessage = '';
+  try {
+    const parsed = JSON.parse(errorText);
+    errorCode = parsed.code || '';
+    errorMessage = parsed.message || '';
+  } catch {
+    errorMessage = errorText;
+  }
+
+  switch (status) {
+    case 401:
+      return 'Invalid API key. Please check your Notion integration token.';
+    case 403:
+      return 'Access denied. Make sure you have shared the database with your integration.';
+    case 404:
+      return 'Database not found. Please verify the database ID and ensure it is shared with your integration.';
+    case 429:
+      return 'Rate limited by Notion API. Please wait a moment and try again.';
+    case 400:
+      if (errorCode === 'validation_error') {
+        return `Invalid request: ${errorMessage}`;
+      }
+      return `Bad request: ${errorMessage || 'Please check your configuration.'}`;
+    case 500:
+    case 502:
+    case 503:
+      return 'Notion API is temporarily unavailable. Please try again later.';
+    default:
+      return `Notion API error (${status}): ${errorMessage || 'Unknown error'}`;
+  }
+}
+
+/**
  * Normalize a Notion UUID to consistent format (with dashes).
  *
  * Notion sometimes returns IDs with or without dashes depending on context.
