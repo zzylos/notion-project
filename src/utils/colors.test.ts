@@ -3,7 +3,6 @@ import {
   getStatusCategory,
   getStatusColors,
   getStatusStyle,
-  getStatusLabel,
   getStatusHexColor,
   getProgressColor,
   getUniqueStatuses,
@@ -155,14 +154,6 @@ describe('colors utility', () => {
       expect(style.isBlocked).toBe(true);
       expect(style.isInProgress).toBe(false);
       expect(style.isCompleted).toBe(false);
-    });
-  });
-
-  describe('getStatusLabel', () => {
-    it('should return the status string as-is', () => {
-      expect(getStatusLabel('In Progress')).toBe('In Progress');
-      expect(getStatusLabel('Custom Status')).toBe('Custom Status');
-      expect(getStatusLabel('Done')).toBe('Done');
     });
   });
 

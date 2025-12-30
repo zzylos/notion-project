@@ -203,6 +203,73 @@ export interface MigratedConfig {
 }
 
 /**
+ * Create default empty database map
+ */
+function createEmptyDatabaseMap(): Record<ItemType, string> {
+  return {
+    mission: '',
+    problem: '',
+    solution: '',
+    project: '',
+    design: '',
+  };
+}
+
+/**
+ * Create default migrated config
+ */
+function createDefaultMigratedConfig(): MigratedConfig {
+  return {
+    apiKey: '',
+    databases: createEmptyDatabaseMap(),
+    mappings: { ...DEFAULT_PROPERTY_MAPPINGS },
+  };
+}
+
+/**
+ * Safely extract API key from config
+ */
+function extractApiKey(config: NotionConfig): string {
+  return typeof config.apiKey === 'string' ? config.apiKey : '';
+}
+
+/**
+ * Migrate legacy mappings format to current format
+ */
+function migrateLegacyMappings(mappings: PropertyMappings & { type: string }): PropertyMappings {
+  return {
+    title: mappings.title || DEFAULT_PROPERTY_MAPPINGS.title,
+    status: mappings.status || DEFAULT_PROPERTY_MAPPINGS.status,
+    priority: mappings.priority || DEFAULT_PROPERTY_MAPPINGS.priority,
+    owner: mappings.owner || DEFAULT_PROPERTY_MAPPINGS.owner,
+    parent: mappings.parent || DEFAULT_PROPERTY_MAPPINGS.parent,
+    progress: mappings.progress || DEFAULT_PROPERTY_MAPPINGS.progress,
+    dueDate: mappings.dueDate || DEFAULT_PROPERTY_MAPPINGS.dueDate,
+    tags: mappings.tags || DEFAULT_PROPERTY_MAPPINGS.tags,
+  };
+}
+
+/**
+ * Check if config uses the new multi-database format
+ */
+function hasNewDatabaseFormat(config: NotionConfig): boolean {
+  return !!(config.databases && Array.isArray(config.databases) && config.databases.length > 0);
+}
+
+/**
+ * Populate database map from config.databases array
+ */
+function populateDatabaseMap(config: NotionConfig, databases: Record<ItemType, string>): void {
+  if (!config.databases) return;
+  for (const db of config.databases) {
+    const isValid = db && typeof db.type === 'string' && typeof db.databaseId === 'string';
+    if (isValid && db.type in databases) {
+      databases[db.type as ItemType] = db.databaseId;
+    }
+  }
+}
+
+/**
  * Convert legacy or current NotionConfig to a UI-friendly format.
  * Handles both old single-database format and new multi-database format.
  *
@@ -210,60 +277,35 @@ export interface MigratedConfig {
  * @returns A UI-friendly format with separate fields for each database type
  */
 export function migrateConfig(config: NotionConfig | null): MigratedConfig {
-  const databases: Record<ItemType, string> = {
-    mission: '',
-    problem: '',
-    solution: '',
-    project: '',
-    design: '',
-  };
-
-  if (!config) {
-    return { apiKey: '', databases, mappings: { ...DEFAULT_PROPERTY_MAPPINGS } };
-  }
-
-  // Validate config is an object
-  if (typeof config !== 'object') {
-    logger.warn('Config', 'Invalid config object, using defaults');
-    return { apiKey: '', databases, mappings: { ...DEFAULT_PROPERTY_MAPPINGS } };
-  }
-
-  // If we have the new format
-  if (config.databases && Array.isArray(config.databases) && config.databases.length > 0) {
-    for (const db of config.databases) {
-      // Validate each database entry
-      if (db && typeof db.type === 'string' && typeof db.databaseId === 'string') {
-        if (db.type in databases) {
-          databases[db.type as ItemType] = db.databaseId;
-        }
-      }
+  if (!config || typeof config !== 'object') {
+    if (config !== null) {
+      logger.warn('Config', 'Invalid config object, using defaults');
     }
+    return createDefaultMigratedConfig();
+  }
+
+  const databases = createEmptyDatabaseMap();
+
+  // Handle new multi-database format
+  if (hasNewDatabaseFormat(config)) {
+    populateDatabaseMap(config, databases);
     return {
-      apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
+      apiKey: extractApiKey(config),
       databases,
       mappings: config.defaultMappings || { ...DEFAULT_PROPERTY_MAPPINGS },
     };
   }
 
-  // Legacy format - put the single database ID in project
+  // Handle legacy single-database format
   if (config.databaseId && typeof config.databaseId === 'string') {
     databases.project = config.databaseId;
   }
 
   return {
-    apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
+    apiKey: extractApiKey(config),
     databases,
     mappings: config.mappings
-      ? {
-          title: config.mappings.title || DEFAULT_PROPERTY_MAPPINGS.title,
-          status: config.mappings.status || DEFAULT_PROPERTY_MAPPINGS.status,
-          priority: config.mappings.priority || DEFAULT_PROPERTY_MAPPINGS.priority,
-          owner: config.mappings.owner || DEFAULT_PROPERTY_MAPPINGS.owner,
-          parent: config.mappings.parent || DEFAULT_PROPERTY_MAPPINGS.parent,
-          progress: config.mappings.progress || DEFAULT_PROPERTY_MAPPINGS.progress,
-          dueDate: config.mappings.dueDate || DEFAULT_PROPERTY_MAPPINGS.dueDate,
-          tags: config.mappings.tags || DEFAULT_PROPERTY_MAPPINGS.tags,
-        }
+      ? migrateLegacyMappings(config.mappings)
       : { ...DEFAULT_PROPERTY_MAPPINGS },
   };
 }

@@ -9,6 +9,7 @@
 import type { NotionPage } from '../../types/notion';
 import type { WorkItem, ItemType, DatabaseConfig, PropertyMappings } from '../../types';
 import { NotionPropertyMapper } from './NotionPropertyMapper';
+import { normalizeUuid } from '../../../shared/utils';
 import { logger } from '../../utils/logger';
 
 export class NotionDataTransformer {
@@ -58,7 +59,7 @@ export class NotionDataTransformer {
     const tags = this.propertyMapper.extractMultiSelect(props, mappings.tags);
 
     // Normalize the page ID to ensure consistent format for parent-child matching
-    const normalizedId = this.propertyMapper.normalizeUuid(page.id);
+    const normalizedId = normalizeUuid(page.id);
 
     return {
       id: normalizedId,

@@ -10,6 +10,7 @@
 import type { NotionPropertyValue } from '../../types/notion';
 import type { Owner, PropertyMappings, DatabaseConfig, ItemStatus, Priority } from '../../types';
 import { PROPERTY_ALIASES } from '../../constants';
+import { normalizeUuid } from '../../../shared/utils';
 import { logger } from '../../utils/logger';
 
 export class NotionPropertyMapper {
@@ -257,26 +258,6 @@ export class NotionPropertyMapper {
   }
 
   /**
-   * Normalize a Notion UUID to consistent format (with dashes).
-   * Notion sometimes returns IDs with or without dashes depending on context.
-   */
-  normalizeUuid(id: string): string {
-    // Validate input
-    if (!id || typeof id !== 'string') {
-      return '';
-    }
-
-    // Remove any existing dashes and convert to lowercase
-    const clean = id.replace(/-/g, '').toLowerCase();
-
-    // If it's not a valid UUID length, return as-is
-    if (clean.length !== 32) return id;
-
-    // Insert dashes in standard UUID positions: 8-4-4-4-12
-    return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
-  }
-
-  /**
    * Extract relation IDs from properties.
    * Normalizes IDs to ensure consistent format for parent-child matching.
    */
@@ -285,7 +266,7 @@ export class NotionPropertyMapper {
     if (!prop || prop.type !== 'relation' || !prop.relation) return [];
     return prop.relation
       .filter(r => r && r.id && typeof r.id === 'string')
-      .map(r => this.normalizeUuid(r.id))
+      .map(r => normalizeUuid(r.id))
       .filter(id => id.length > 0);
   }
 
