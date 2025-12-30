@@ -176,6 +176,7 @@ The server uses Notion Integration Webhooks for real-time data synchronization:
 | `page.deleted`            | Remove from store              |
 | `page.moved`              | Refetch to get new parent      |
 | `page.undeleted`          | Refetch and add back to store  |
+| `page.unlocked`           | Refetch and update store       |
 | `database.schema_updated` | Logged (manual sync if needed) |
 
 **Backend API Endpoints:**
@@ -192,6 +193,13 @@ The server uses Notion Integration Webhooks for real-time data synchronization:
 | `/api/webhook/set-token`  | POST   | Manually set verification token      |
 | `/api/store/stats`        | GET    | Get store statistics                 |
 | `/api/health`             | GET    | Health check                         |
+
+**Rate Limiting:**
+
+| Endpoint                  | Limit     | Description                          |
+| ------------------------- | --------- | ------------------------------------ |
+| `GET /api/items`          | 60/min    | Read operations                      |
+| `PATCH /api/items/:id/*`  | 20/min    | Mutation operations (status/progress)|
 
 ### Webhook Setup
 
@@ -251,6 +259,7 @@ The `src/hooks/` directory contains reusable hooks:
 - `useNotionData.ts` - Data fetching orchestration with progress tracking
 - `useCooldownTimer.ts` - Refresh rate limiting with countdown
 - `useFilterToggle.ts` - Filter state management helpers
+- `useFullscreen.ts` - Fullscreen API integration for canvas view
 - `useItemLimit.ts` - Item limit management for performance
 - `useStoreSelectors.ts` - Optimized Zustand selectors (useFilteredItems, useTreeNodes, useStats, etc.)
 - `useFetch.ts` - Generic fetch hook with abort support
@@ -327,6 +336,7 @@ The `shared/` directory contains code shared between frontend and backend:
 | `src/hooks/useStoreSelectors.ts` | Optimized Zustand selectors               |
 | `src/hooks/useFetch.ts`          | Generic fetch hook with abort support     |
 | `src/hooks/useLocalStorage.ts`   | Persistent localStorage hook              |
+| `src/hooks/useFullscreen.ts`     | Fullscreen API integration                |
 
 ### Components
 
@@ -376,6 +386,7 @@ The `shared/` directory contains code shared between frontend and backend:
 | `server/src/routes/webhook.ts`       | Notion webhook endpoint         |
 | `server/src/middleware/rateLimit.ts` | Rate limiting middleware        |
 | `server/src/utils/logger.ts`         | Server logging utility          |
+| `server/src/utils/uuid.ts`           | UUID normalization utility      |
 
 ### Testing
 
