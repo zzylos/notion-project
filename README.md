@@ -534,6 +534,7 @@ Paste the token in the Notion verification modal to activate the subscription.
 | `page.deleted`            | Remove from store              |
 | `page.moved`              | Refetch to get new parent      |
 | `page.undeleted`          | Refetch and add back to store  |
+| `page.unlocked`           | Refetch and update store       |
 | `database.schema_updated` | Logged (manual sync if needed) |
 
 ### Backend API Endpoints
