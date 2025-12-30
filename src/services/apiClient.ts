@@ -62,7 +62,7 @@ class ApiClient {
       let data: ApiResponse<T>;
       try {
         data = (await response.json()) as ApiResponse<T>;
-      } catch (parseError) {
+      } catch {
         throw new ApiError(
           `Failed to parse API response: Invalid JSON from ${endpoint}`,
           endpoint,
@@ -169,28 +169,29 @@ class ApiClient {
   }
 
   /**
-   * Invalidate the server cache
+   * Invalidate the server cache by triggering a full re-sync from Notion.
+   * This replaces the old cache-based architecture with the new DataStore.
    */
   async invalidateCache(): Promise<void> {
-    const endpoint = '/api/cache/invalidate';
-    const response = await this.request<{ cleared: boolean }>(endpoint, {
+    const endpoint = '/api/items/sync';
+    const response = await this.request<FetchItemsResponse>(endpoint, {
       method: 'POST',
     });
 
     if (!response.success) {
-      throw new ApiError(response.error || 'Failed to invalidate cache', endpoint);
+      throw new ApiError(response.error || 'Failed to sync data from Notion', endpoint);
     }
   }
 
   /**
-   * Get cache statistics
+   * Get store statistics (replaces old cache stats)
    */
   async getCacheStats(): Promise<CacheStats> {
-    const endpoint = '/api/cache/stats';
+    const endpoint = '/api/store/stats';
     const response = await this.request<CacheStats>(endpoint);
 
     if (!response.success || !response.data) {
-      throw new ApiError(response.error || 'Failed to get cache stats', endpoint);
+      throw new ApiError(response.error || 'Failed to get store stats', endpoint);
     }
 
     return response.data;
