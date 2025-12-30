@@ -16,13 +16,23 @@ const createMockItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({
 describe('useStore', () => {
   beforeEach(() => {
     // Reset store state before each test
-    const { setItems, resetFilters, setSelectedItem, setFocusedItem, collapseAll } =
-      useStore.getState();
+    const {
+      setItems,
+      resetFilters,
+      setSelectedItem,
+      setFocusedItem,
+      collapseAll,
+      setHideOrphanItems,
+      setShowOnlyOrphans,
+    } = useStore.getState();
     setItems([]);
     resetFilters();
     setSelectedItem(null);
     setFocusedItem(null);
     collapseAll();
+    // Disable orphan filtering so standalone test items are visible
+    setHideOrphanItems(false);
+    setShowOnlyOrphans(false);
   });
 
   describe('setItems', () => {

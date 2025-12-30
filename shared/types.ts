@@ -94,6 +94,18 @@ export interface NotionConfig {
 }
 
 /**
+ * Notion page parent information.
+ * A page can be a child of a database, another page, a block, or workspace.
+ */
+export interface NotionPageParent {
+  type: 'database_id' | 'page_id' | 'block_id' | 'workspace';
+  database_id?: string;
+  page_id?: string;
+  block_id?: string;
+  workspace?: boolean;
+}
+
+/**
  * Notion API page object.
  */
 export interface NotionPage {
@@ -102,6 +114,7 @@ export interface NotionPage {
   properties: Record<string, NotionPropertyValue>;
   created_time: string;
   last_edited_time: string;
+  parent?: NotionPageParent;
 }
 
 /**
