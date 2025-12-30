@@ -67,7 +67,7 @@ const TypeFilterSection: React.FC<TypeFilterSectionProps> = memo(
             const style = typeColors[type];
 
             let buttonClass = '';
-            let labelContent = typeLabels[type];
+            const labelContent = typeLabels[type];
 
             if (state === 'included') {
               buttonClass = `${style.bg} ${style.text} ${style.border} border`;
@@ -107,9 +107,7 @@ const TypeFilterSection: React.FC<TypeFilterSectionProps> = memo(
           })}
         </div>
         {totalCount > 0 && (
-          <p className="text-xs text-gray-500 mt-2">
-            Click to cycle: show → hide → clear
-          </p>
+          <p className="text-xs text-gray-500 mt-2">Click to cycle: show → hide → clear</p>
         )}
       </CollapsibleSection>
     );

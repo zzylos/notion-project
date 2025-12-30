@@ -251,7 +251,7 @@ export class NotionPropertyMapper {
       .map(p => ({
         id: p.id,
         name: typeof p.name === 'string' && p.name.length > 0 ? p.name : 'Unknown',
-        email: p.person?.email || '',
+        email: p.person?.email,
         avatar: p.avatar_url,
       }));
   }

@@ -26,6 +26,7 @@ export function useFilteredItems(): WorkItem[] {
     }))
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- items and filters trigger re-computation when store state changes
   return useMemo(() => getFilteredItems(), [getFilteredItems, items, filters]);
 }
 
@@ -50,6 +51,7 @@ export function useTreeNodes(): TreeNode[] {
 
   return useMemo(
     () => getTreeNodes(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- These deps trigger re-computation when store state changes
     [getTreeNodes, items, filters, expandedIds, selectedItemId, focusedItemId]
   );
 }
@@ -69,6 +71,7 @@ export function useStats(): DashboardStats {
     }))
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- items triggers re-computation when store state changes
   return useMemo(() => getStats(), [getStats, items]);
 }
 
@@ -151,5 +154,6 @@ export function useItemPath(itemId: string | null): WorkItem[] {
   return useMemo(() => {
     if (!itemId) return [];
     return getItemPath(itemId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- items triggers re-computation when store state changes
   }, [getItemPath, items, itemId]);
 }
