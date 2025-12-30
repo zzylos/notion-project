@@ -36,8 +36,7 @@ function App() {
   const effectiveConfig = useMemo(() => getMergedConfig(notionConfig), [notionConfig]);
 
   // Use custom hook for data loading
-  const { loadingProgress, failedDatabases, clearFailedDatabases } =
-    useNotionData(effectiveConfig);
+  const { loadingProgress, failedDatabases, clearFailedDatabases } = useNotionData(effectiveConfig);
 
   // Fullscreen support for the main content area
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -52,10 +51,6 @@ function App() {
 
   const handleCloseDetail = () => {
     setSelectedItem(null);
-  };
-
-  const handleConnect = () => {
-    // Config is already saved by the modal, the useEffect in useNotionData will trigger reload
   };
 
   // Render the appropriate view based on viewMode
@@ -220,7 +215,6 @@ function App() {
         key={modalKey}
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
-        onConnect={handleConnect}
       />
     </div>
   );

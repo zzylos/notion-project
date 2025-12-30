@@ -6,14 +6,18 @@
  * - Color-coded output for better visual distinction
  * - Structured data logging with console.table
  * - Production-safe (can be easily disabled)
+ * - Pre-configured namespace loggers for common modules
  *
  * @example
  * import { logger } from './utils/logger';
  *
+ * // Using tag-based logging
  * logger.info('Notion', 'Fetching items...');
  * logger.warn('Store', 'Cache miss');
- * logger.error('App', 'Failed to load', error);
- * logger.table('Debug', items);
+ *
+ * // Using namespace loggers (preferred for consistency)
+ * logger.notion.info('Fetching items...');
+ * logger.store.warn('Cache miss');
  */
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
@@ -21,6 +25,16 @@ type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 interface LoggerConfig {
   enabled: boolean;
   minLevel: LogLevel;
+}
+
+/**
+ * Namespace logger interface for pre-configured module loggers.
+ */
+interface NamespaceLogger {
+  info(message: string, data?: unknown): void;
+  warn(message: string, data?: unknown): void;
+  error(message: string, error?: unknown): void;
+  debug(message: string, data?: unknown): void;
 }
 
 const LOG_LEVELS: Record<LogLevel, number> = {
@@ -52,9 +66,50 @@ function formatTag(tag: string): string {
 }
 
 /**
+ * Create a namespace logger for a specific module.
+ * @param tag - The module/component identifier
+ * @returns A logger bound to the specified tag
+ */
+function createNamespaceLogger(tag: string): NamespaceLogger {
+  return {
+    info(message: string, data?: unknown): void {
+      if (!shouldLog('info')) return;
+      console.info(`%c${formatTag(tag)} ${message}`, LOG_COLORS.info, data ?? '');
+    },
+    warn(message: string, data?: unknown): void {
+      if (!shouldLog('warn')) return;
+      console.warn(`${formatTag(tag)} ${message}`, data ?? '');
+    },
+    error(message: string, error?: unknown): void {
+      if (!shouldLog('error')) return;
+      console.error(`${formatTag(tag)} ${message}`, error ?? '');
+    },
+    debug(message: string, data?: unknown): void {
+      if (!shouldLog('debug')) return;
+      console.info(`%c${formatTag(tag)} ${message}`, LOG_COLORS.debug, data ?? '');
+    },
+  };
+}
+
+/**
  * Logger utility with consistent formatting and color-coded output.
+ * Provides both tag-based methods and pre-configured namespace loggers.
  */
 export const logger = {
+  // Pre-configured namespace loggers for common modules
+  /** Logger for Notion service operations */
+  notion: createNamespaceLogger('Notion'),
+  /** Logger for store/state operations */
+  store: createNamespaceLogger('Store'),
+  /** Logger for application-level events */
+  app: createNamespaceLogger('App'),
+  /** Logger for tree builder operations */
+  tree: createNamespaceLogger('TreeBuilder'),
+  /** Logger for cache operations */
+  cache: createNamespaceLogger('Cache'),
+  /** Logger for localStorage operations */
+  localStorage: createNamespaceLogger('LocalStorage'),
+
   /**
    * Log an informational message.
    * @param tag - Component or module identifier (e.g., 'Notion', 'Store')

@@ -15,7 +15,8 @@ import { DEFAULT_PROPERTY_MAPPINGS } from '../../constants';
 interface NotionConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConnect: () => void;
+  /** Optional callback after config changes. Config changes are automatically detected by useNotionData. */
+  onConnect?: () => void;
 }
 
 type ValidationErrors = Record<ItemType, string | null>;
@@ -147,7 +148,7 @@ interface FormSubmitParams {
   apiKey: string;
   mappings: PropertyMappings;
   setNotionConfig: (config: NotionConfig | null) => void;
-  callbacks: { onConnect: () => void; onClose: () => void };
+  callbacks: { onConnect?: () => void; onClose: () => void };
   stateSetters: {
     setError: (error: string | null) => void;
     setValidationErrors: (errors: ValidationErrors) => void;
@@ -186,7 +187,7 @@ function useFormSubmit(params: FormSubmitParams) {
 
       setNotionConfig({ apiKey, databases: databaseConfigs, defaultMappings: mappings });
       setIsConnecting(false);
-      onConnect();
+      onConnect?.();
       onClose();
     },
     [
@@ -233,13 +234,13 @@ const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose, 
     setApiKey('');
     setDatabases({ ...EMPTY_DATABASES });
     setMappings({ ...DEFAULT_PROPERTY_MAPPINGS });
-    onConnect();
+    onConnect?.();
     onClose();
   }, [setNotionConfig, onConnect, onClose]);
 
   const handleUseDemoData = useCallback(() => {
     setNotionConfig(null);
-    onConnect();
+    onConnect?.();
     onClose();
   }, [setNotionConfig, onConnect, onClose]);
 

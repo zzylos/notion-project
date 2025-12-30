@@ -357,4 +357,6 @@ const CanvasView: React.FC<CanvasViewProps> = props => {
   );
 };
 
+CanvasView.displayName = 'CanvasView';
+
 export default CanvasView;

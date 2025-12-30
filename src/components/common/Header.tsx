@@ -1,11 +1,5 @@
-import React from 'react';
-import {
-  TreeDeciduous,
-  LayoutGrid,
-  Calendar,
-  Settings,
-  Network,
-} from 'lucide-react';
+import { memo } from 'react';
+import { TreeDeciduous, LayoutGrid, Calendar, Settings, Network } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { ViewMode } from '../../types';
 
@@ -27,7 +21,7 @@ const viewModeLabels: Record<ViewMode, string> = {
   timeline: 'Timeline',
 };
 
-const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
+const Header: React.FC<HeaderProps> = memo(({ onOpenSettings }) => {
   const { viewMode, setViewMode } = useStore();
 
   return (
@@ -82,6 +76,8 @@ const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
       </div>
     </header>
   );
-};
+});
+
+Header.displayName = 'Header';
 
 export default Header;
