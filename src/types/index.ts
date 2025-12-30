@@ -94,7 +94,11 @@ export interface FilterState {
   searchQuery: string;
   /** Show only items owned by the current user */
   showOnlyMyItems: boolean;
-  /** @deprecated Use include/exclude arrays instead. Legacy filter mode for backwards compatibility. */
+  /**
+   * @deprecated Since v2.0. Use excludeTypes, excludeStatuses, excludePriorities, excludeOwners arrays instead.
+   * Legacy filter mode for backwards compatibility. Will be removed in v3.0.
+   * When set to 'hide', the include arrays (types, statuses, etc.) act as exclude filters.
+   */
   filterMode: FilterMode;
   /** Optional date range filter */
   dateRange?: {

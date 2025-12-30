@@ -52,4 +52,6 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({ item, onClose }) => {
   );
 };
 
+DetailHeader.displayName = 'DetailHeader';
+
 export default DetailHeader;
