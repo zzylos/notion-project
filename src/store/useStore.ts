@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { getStatusCategory } from '../utils/colors';
 import { buildTreeNodes, getItemPath as getItemPathUtil } from '../utils/treeBuilder';
+import { parseDate } from '../utils/dateUtils';
 import {
   itemMatchesIncludeFilters,
   itemMatchesExcludeFilters,
@@ -333,8 +334,11 @@ export const useStore = create<StoreState>()(
             blockedItems++;
           }
 
-          if (item.dueDate && new Date(item.dueDate) < now && category !== 'completed') {
-            overdueItems++;
+          if (item.dueDate && category !== 'completed') {
+            const dueDate = parseDate(item.dueDate);
+            if (dueDate && dueDate < now) {
+              overdueItems++;
+            }
           }
         });
 
