@@ -32,17 +32,6 @@ export function toggleArrayItem<T>(array: T[], item: T): T[] {
 }
 
 /**
- * Checks if an array includes an item (type-safe wrapper).
- *
- * @param array - The array to check
- * @param item - The item to look for
- * @returns True if the item is in the array
- */
-export function includesItem<T>(array: T[], item: T): boolean {
-  return array.includes(item);
-}
-
-/**
  * Removes duplicate items from an array.
  *
  * @param array - The array with potential duplicates

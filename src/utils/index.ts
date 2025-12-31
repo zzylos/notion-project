@@ -44,10 +44,8 @@ export {
   NetworkError,
   ValidationError,
   getHttpErrorMessage,
-  parseApiError,
   shouldRetry,
   withRetry,
-  formatErrorForDisplay,
 } from './errors';
 
 // Icons
@@ -77,10 +75,10 @@ export {
 } from './typeGuards';
 
 // Validation
-export { isValidApiKey, isValidDatabaseId, isValidEmail, isValidNotionUrl } from './validation';
+export { isValidApiKey, isValidDatabaseId, isValidNotionUrl } from './validation';
 
 // Array utilities
-export { toggleArrayItem, includesItem, unique } from './arrayUtils';
+export { toggleArrayItem, unique } from './arrayUtils';
 
 // Tree building utilities
 export { buildTreeNodes, getItemPath, buildChildMap } from './treeBuilder';

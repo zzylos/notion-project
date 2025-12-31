@@ -14,14 +14,5 @@ export { useCooldownTimer } from './useCooldownTimer';
 export type { UseCooldownTimerReturn } from './useCooldownTimer';
 export { useFilterToggle } from './useFilterToggle';
 export type { UseFilterToggleReturn } from './useFilterToggle';
-export {
-  useFilteredItems,
-  useTreeNodes,
-  useStats,
-  useFilterOptions,
-  useItemCountsByType,
-  useItem,
-  useItemPath,
-} from './useStoreSelectors';
 export { useFullscreen } from './useFullscreen';
 export type { UseFullscreenReturn } from './useFullscreen';
