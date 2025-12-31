@@ -5,7 +5,6 @@
  * promoting code reuse and consistent behavior.
  */
 
-export { useFetch } from './useFetch';
 export { useLocalStorage } from './useLocalStorage';
 export { useItemLimit } from './useItemLimit';
 export { useNotionData } from './useNotionData';

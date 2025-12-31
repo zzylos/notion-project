@@ -87,8 +87,6 @@ export interface FilterState {
   excludeOwners: string[];
   /** Text search across title, description, and tags */
   searchQuery: string;
-  /** Show only items owned by the current user */
-  showOnlyMyItems: boolean;
   /**
    * @deprecated Since v2.0. Use excludeTypes, excludeStatuses, excludePriorities, excludeOwners arrays instead.
    * Legacy filter mode for backwards compatibility. Will be removed in v3.0.
