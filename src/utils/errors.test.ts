@@ -5,10 +5,8 @@ import {
   ApiError,
   ValidationError,
   getHttpErrorMessage,
-  parseApiError,
   shouldRetry,
   withRetry,
-  formatErrorForDisplay,
 } from './errors';
 
 describe('AppError', () => {
@@ -87,26 +85,6 @@ describe('getHttpErrorMessage', () => {
   });
 });
 
-describe('parseApiError', () => {
-  it('should parse JSON error response', () => {
-    const response = JSON.stringify({ code: 'NOT_FOUND', message: 'Item not found' });
-    const result = parseApiError(404, response);
-    expect(result.code).toBe('NOT_FOUND');
-    expect(result.message).toBe('Item not found');
-  });
-
-  it('should handle non-JSON response', () => {
-    const result = parseApiError(500, 'Internal Server Error');
-    expect(result.code).toBe('PARSE_ERROR');
-    expect(result.message).toBe('Internal Server Error');
-  });
-
-  it('should use HTTP message as fallback', () => {
-    const result = parseApiError(404, '');
-    expect(result.message).toContain('not found');
-  });
-});
-
 describe('shouldRetry', () => {
   it('should return false for abort errors', () => {
     const abortError = new DOMException('Aborted', 'AbortError');
@@ -174,23 +152,5 @@ describe('withRetry', () => {
 
     await withRetry(operation, { delayMs: 10, onRetry });
     expect(onRetry).toHaveBeenCalledWith(1, expect.any(Error));
-  });
-});
-
-describe('formatErrorForDisplay', () => {
-  it('should format Error with message', () => {
-    const error = new Error('Something went wrong');
-    expect(formatErrorForDisplay(error)).toBe('Something went wrong');
-  });
-
-  it('should include context when provided', () => {
-    const error = new Error('Failed');
-    expect(formatErrorForDisplay(error, 'Loading data')).toBe('Loading data: Failed');
-  });
-
-  it('should handle unknown error types', () => {
-    expect(formatErrorForDisplay(null)).toBe('An unexpected error occurred');
-    expect(formatErrorForDisplay(undefined)).toBe('An unexpected error occurred');
-    expect(formatErrorForDisplay(42)).toBe('An unexpected error occurred');
   });
 });

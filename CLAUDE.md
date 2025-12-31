@@ -300,7 +300,6 @@ The `src/hooks/` directory contains reusable hooks:
 - `useFilterToggle.ts` - Filter state management helpers
 - `useFullscreen.ts` - Fullscreen API integration for canvas view
 - `useItemLimit.ts` - Item limit management for performance
-- `useStoreSelectors.ts` - Optimized Zustand selectors (useFilteredItems, useTreeNodes, useStats, etc.)
 - `useFetch.ts` - Generic fetch hook with abort support
 - `useLocalStorage.ts` - Persistent localStorage hook
 
@@ -366,16 +365,15 @@ The `shared/` directory contains code shared between frontend and backend:
 
 ### Hooks
 
-| File                             | Purpose                                   |
-| -------------------------------- | ----------------------------------------- |
-| `src/hooks/useNotionData.ts`     | Data fetching orchestration with progress |
-| `src/hooks/useCooldownTimer.ts`  | Refresh rate limiting with countdown      |
-| `src/hooks/useFilterToggle.ts`   | Filter state management helpers           |
-| `src/hooks/useItemLimit.ts`      | Item limit management for performance     |
-| `src/hooks/useStoreSelectors.ts` | Optimized Zustand selectors               |
-| `src/hooks/useFetch.ts`          | Generic fetch hook with abort support     |
-| `src/hooks/useLocalStorage.ts`   | Persistent localStorage hook              |
-| `src/hooks/useFullscreen.ts`     | Fullscreen API integration                |
+| File                            | Purpose                                   |
+| ------------------------------- | ----------------------------------------- |
+| `src/hooks/useNotionData.ts`    | Data fetching orchestration with progress |
+| `src/hooks/useCooldownTimer.ts` | Refresh rate limiting with countdown      |
+| `src/hooks/useFilterToggle.ts`  | Filter state management helpers           |
+| `src/hooks/useItemLimit.ts`     | Item limit management for performance     |
+| `src/hooks/useFetch.ts`         | Generic fetch hook with abort support     |
+| `src/hooks/useLocalStorage.ts`  | Persistent localStorage hook              |
+| `src/hooks/useFullscreen.ts`    | Fullscreen API integration                |
 
 ### Components
 
@@ -780,10 +778,9 @@ const relative = getRelativeTime('2024-01-15'); // "in 2 days"
 Array manipulation helpers:
 
 ```typescript
-import { toggleArrayItem, includesItem, unique } from './utils/arrayUtils';
+import { toggleArrayItem, unique } from './utils/arrayUtils';
 
 const newArray = toggleArrayItem(array, item); // Add if missing, remove if present
-const hasItem = includesItem(array, item);
 const uniqueItems = unique(arrayWithDuplicates);
 ```
 

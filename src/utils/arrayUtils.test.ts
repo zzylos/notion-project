@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toggleArrayItem, includesItem, unique } from './arrayUtils';
+import { toggleArrayItem, unique } from './arrayUtils';
 
 describe('arrayUtils', () => {
   describe('toggleArrayItem', () => {
@@ -65,37 +65,6 @@ describe('arrayUtils', () => {
     it('should handle last element removal', () => {
       const result = toggleArrayItem(['a', 'b', 'c'], 'c');
       expect(result).toEqual(['a', 'b']);
-    });
-  });
-
-  describe('includesItem', () => {
-    it('should return true if item is in array', () => {
-      expect(includesItem(['a', 'b', 'c'], 'b')).toBe(true);
-    });
-
-    it('should return false if item is not in array', () => {
-      expect(includesItem(['a', 'b', 'c'], 'd')).toBe(false);
-    });
-
-    it('should work with empty array', () => {
-      expect(includesItem([], 'a')).toBe(false);
-    });
-
-    it('should work with numbers', () => {
-      expect(includesItem([1, 2, 3], 2)).toBe(true);
-      expect(includesItem([1, 2, 3], 4)).toBe(false);
-    });
-
-    it('should use strict equality', () => {
-      expect(includesItem([1, 2, 3], '1' as unknown as number)).toBe(false);
-    });
-
-    it('should find item at first position', () => {
-      expect(includesItem(['a', 'b', 'c'], 'a')).toBe(true);
-    });
-
-    it('should find item at last position', () => {
-      expect(includesItem(['a', 'b', 'c'], 'c')).toBe(true);
     });
   });
 

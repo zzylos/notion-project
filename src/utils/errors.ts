@@ -7,7 +7,7 @@
  * - HTTP error code mappings for user-friendly messages
  */
 
-import { isAbortError, getErrorMessage as extractErrorMessage } from './typeGuards';
+import { isAbortError, getErrorMessage } from './typeGuards';
 
 /**
  * Base class for application-specific errors.
@@ -115,32 +115,6 @@ export function getHttpErrorMessage(statusCode: number, fallback?: string): stri
 }
 
 /**
- * Parse an error from an API response.
- * Attempts to extract error details from JSON response body.
- *
- * @param status - HTTP status code
- * @param responseText - Raw response text
- * @returns Parsed error details
- */
-export function parseApiError(
-  status: number,
-  responseText: string
-): { code: string; message: string } {
-  try {
-    const parsed = JSON.parse(responseText);
-    return {
-      code: parsed.code || parsed.error || 'UNKNOWN',
-      message: parsed.message || parsed.error_description || getHttpErrorMessage(status),
-    };
-  } catch {
-    return {
-      code: 'PARSE_ERROR',
-      message: responseText || getHttpErrorMessage(status),
-    };
-  }
-}
-
-/**
  * Check if an error should trigger a retry.
  * Returns true for network errors and 5xx status codes.
  *
@@ -210,22 +184,9 @@ export async function withRetry<T>(
 }
 
 /**
- * Format an error for display to the user.
- * Provides a consistent format for error messages.
- *
- * @param error - The error to format
- * @param context - Optional context about where the error occurred
- * @returns Formatted error message
- */
-export function formatErrorForDisplay(error: unknown, context?: string): string {
-  const message = extractErrorMessage(error, 'An unexpected error occurred');
-  return context ? `${context}: ${message}` : message;
-}
-
-/**
  * Re-export getErrorMessage from typeGuards for convenience.
  */
-export { extractErrorMessage as getErrorMessage };
+export { getErrorMessage };
 
 /**
  * Re-export isAbortError from typeGuards for convenience.

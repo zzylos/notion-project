@@ -42,17 +42,6 @@ export function isValidDatabaseId(id: string): boolean {
 }
 
 /**
- * Validates an email address format.
- *
- * @param email - The email to validate
- * @returns True if the email format is valid
- */
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-/**
  * Validates that a URL is a valid Notion URL.
  * Checks that the hostname is notion.so or a subdomain of notion.so.
  *
@@ -146,117 +135,6 @@ export function validateApiKey(apiKey: string): { valid: boolean; error?: string
   }
 
   return { valid: true };
-}
-
-/**
- * Validator function type for batch validation.
- */
-export type Validator<T> = (value: T, field: string) => ValidationError | null;
-
-/**
- * Creates a validator that checks for non-empty strings.
- *
- * @param message - Custom error message
- * @returns Validator function
- */
-export function required(message = 'This field is required'): Validator<string> {
-  return (value: string, field: string) => {
-    if (!value || !value.trim()) {
-      return { field, message };
-    }
-    return null;
-  };
-}
-
-/**
- * Creates a validator that checks minimum length.
- *
- * @param minLength - Minimum length
- * @param message - Custom error message
- * @returns Validator function
- */
-export function minLength(minLength: number, message?: string): Validator<string> {
-  return (value: string, field: string) => {
-    if (value && value.trim().length < minLength) {
-      return {
-        field,
-        message: message || `Must be at least ${minLength} characters`,
-      };
-    }
-    return null;
-  };
-}
-
-/**
- * Creates a validator that checks maximum length.
- *
- * @param maxLength - Maximum length
- * @param message - Custom error message
- * @returns Validator function
- */
-export function maxLength(maxLength: number, message?: string): Validator<string> {
-  return (value: string, field: string) => {
-    if (value && value.trim().length > maxLength) {
-      return {
-        field,
-        message: message || `Must be no more than ${maxLength} characters`,
-      };
-    }
-    return null;
-  };
-}
-
-/**
- * Creates a validator that matches a pattern.
- *
- * @param pattern - RegExp pattern to match
- * @param message - Error message for invalid values
- * @returns Validator function
- */
-export function pattern(pattern: RegExp, message: string): Validator<string> {
-  return (value: string, field: string) => {
-    if (value && !pattern.test(value.trim())) {
-      return { field, message };
-    }
-    return null;
-  };
-}
-
-/**
- * Batch validate multiple fields with multiple validators.
- *
- * @param validations - Object mapping field names to [value, validators] tuples
- * @returns ValidationResult with all errors collected
- *
- * @example
- * const result = batchValidate({
- *   apiKey: ['secret_abc', [required(), minLength(50)]],
- *   databaseId: ['abc123', [required(), pattern(/^[a-f0-9]{32}$/i, 'Invalid ID')]],
- * });
- *
- * if (!result.valid) {
- *   console.log(result.errors);
- * }
- */
-export function batchValidate<T extends string = string>(
-  validations: Record<string, [T, Validator<T>[]]>
-): ValidationResult {
-  const errors: ValidationError[] = [];
-
-  for (const [field, [value, validators]] of Object.entries(validations)) {
-    for (const validator of validators) {
-      const error = validator(value, field);
-      if (error) {
-        errors.push(error);
-        break; // Stop at first error for this field
-      }
-    }
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
 }
 
 /**
