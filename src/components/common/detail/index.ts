@@ -7,5 +7,5 @@ export { default as DueDateSection } from './DueDateSection';
 export { default as TagsSection } from './TagsSection';
 export { default as DescriptionSection } from './DescriptionSection';
 export { default as NotionLink } from './NotionLink';
-export { default as EmptyState } from './EmptyState';
+export { default as DetailEmptyState } from './EmptyState';
 export { default as ItemNotFoundState } from './ItemNotFoundState';

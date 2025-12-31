@@ -4,8 +4,10 @@ import { config } from './config.js';
 import { initializeDataStore, getDataStore } from './services/dataStore.js';
 import { initializeNotion, getNotion } from './services/notion.js';
 import { apiRateLimiter } from './middleware/rateLimit.js';
+import { logger } from './utils/logger.js';
 import itemsRouter from './routes/items.js';
 import webhookRouter from './routes/webhook.js';
+import type { RequestWithRawBody } from './types/express.js';
 
 const app = express();
 
@@ -21,7 +23,8 @@ app.use(
   express.json({
     verify: (req, _res, buf) => {
       // Store raw body buffer on request for signature verification
-      (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+      // Type is augmented via types/express.d.ts
+      (req as RequestWithRawBody).rawBody = buf;
     },
   })
 );
@@ -32,19 +35,17 @@ app.use('/api/items', apiRateLimiter);
 // Request logging in development
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, _res, next) => {
-    console.info(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    logger.api.debug(`${req.method} ${req.path}`);
     next();
   });
 }
 
 // Initialize services
-console.info('[Server] Initializing services...');
+logger.server.info('Initializing services...');
 initializeDataStore();
 initializeNotion(config.notion);
-console.info('[Server] Services initialized');
-console.info(
-  `[Server] Configured databases: ${config.notion.databases.map(d => d.type).join(', ')}`
-);
+logger.server.info('Services initialized');
+logger.server.info(`Configured databases: ${config.notion.databases.map(d => d.type).join(', ')}`);
 
 // Routes
 app.use('/api/items', itemsRouter);
@@ -79,7 +80,7 @@ app.get('/api/store/stats', (_req, res) => {
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('[Server] Unhandled error:', err);
+  logger.server.error('Unhandled error:', err);
 
   if (res.headersSent) {
     return;
@@ -96,7 +97,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
  * Throws if initial load fails completely to prevent server from starting with empty data.
  */
 async function loadInitialData(): Promise<void> {
-  console.info('[Server] Fetching initial data from Notion...');
+  logger.server.info('Fetching initial data from Notion...');
 
   const notion = getNotion();
   const store = getDataStore();
@@ -111,17 +112,17 @@ async function loadInitialData(): Promise<void> {
 
   store.initialize(result.items);
 
-  console.info(`[Server] Loaded ${result.items.length} items from Notion`);
+  logger.server.info(`Loaded ${result.items.length} items from Notion`);
 
   if (result.failedDatabases.length > 0) {
-    console.warn('[Server] Some databases failed to load:', result.failedDatabases);
-    console.warn(
-      '[Server] Server will continue with partial data. Use POST /api/items/sync to retry.'
+    logger.server.warn('Some databases failed to load:', result.failedDatabases);
+    logger.server.warn(
+      'Server will continue with partial data. Use POST /api/items/sync to retry.'
     );
   }
 
   if (result.orphanedItemsCount > 0) {
-    console.info(`[Server] ${result.orphanedItemsCount} orphaned items detected`);
+    logger.server.info(`${result.orphanedItemsCount} orphaned items detected`);
   }
 }
 
@@ -129,40 +130,40 @@ async function loadInitialData(): Promise<void> {
 loadInitialData()
   .then(() => {
     const server = app.listen(config.port, () => {
-      console.info(`[Server] Running on http://localhost:${config.port}`);
-      console.info(`[Server] CORS origin: ${config.corsOrigin}`);
-      console.info(`[Server] Webhook endpoint: POST /api/webhook`);
+      logger.server.info(`Running on http://localhost:${config.port}`);
+      logger.server.info(`CORS origin: ${config.corsOrigin}`);
+      logger.server.info('Webhook endpoint: POST /api/webhook');
 
       if (config.webhook.secret) {
-        console.info('[Server] Webhook signature validation: ENABLED');
+        logger.server.info('Webhook signature validation: ENABLED');
       } else {
-        console.warn('[Server] Webhook signature validation: DISABLED (set NOTION_WEBHOOK_SECRET)');
+        logger.server.warn('Webhook signature validation: DISABLED (set NOTION_WEBHOOK_SECRET)');
       }
     });
 
     // Handle server startup errors
     server.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EADDRINUSE') {
-        console.error(`[Server] Port ${config.port} is already in use`);
+        logger.server.error(`Port ${config.port} is already in use`);
       } else if (error.code === 'EACCES') {
-        console.error(`[Server] Port ${config.port} requires elevated privileges`);
+        logger.server.error(`Port ${config.port} requires elevated privileges`);
       } else {
-        console.error('[Server] Failed to start:', error.message);
+        logger.server.error('Failed to start:', error.message);
       }
       process.exit(1);
     });
 
     // Graceful shutdown handlers
     const gracefulShutdown = (signal: string) => {
-      console.info(`[Server] ${signal} received, shutting down gracefully...`);
+      logger.server.info(`${signal} received, shutting down gracefully...`);
       server.close(() => {
-        console.info('[Server] HTTP server closed');
+        logger.server.info('HTTP server closed');
         process.exit(0);
       });
 
       // Force exit after 10 seconds if graceful shutdown fails
       setTimeout(() => {
-        console.error('[Server] Forced shutdown after timeout');
+        logger.server.error('Forced shutdown after timeout');
         process.exit(1);
       }, 10000);
     };
@@ -171,9 +172,9 @@ loadInitialData()
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   })
   .catch((error: Error) => {
-    console.error('[Server] Failed to load initial data:', error.message);
-    console.error(
-      '[Server] Server cannot start without data. Please check your Notion configuration.'
+    logger.server.error('Failed to load initial data:', error.message);
+    logger.server.error(
+      'Server cannot start without data. Please check your Notion configuration.'
     );
     process.exit(1);
   });

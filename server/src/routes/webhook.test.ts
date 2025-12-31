@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createHmac } from 'crypto';
 import express, { type Express } from 'express';
 import request from 'supertest';
+import type { RequestWithRawBody } from '../types/express.js';
 
 // Mock the services before importing the router
 vi.mock('../services/dataStore.js', () => ({
@@ -68,7 +69,7 @@ describe('Webhook Routes', () => {
       express.json({
         verify: (req, _res, buf) => {
           // Store raw body buffer on request for signature verification
-          (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+          (req as RequestWithRawBody).rawBody = buf;
         },
       })
     );
@@ -430,7 +431,7 @@ describe('UUID Normalization', () => {
     app.use(
       express.json({
         verify: (req, _res, buf) => {
-          (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+          (req as RequestWithRawBody).rawBody = buf;
         },
       })
     );

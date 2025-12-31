@@ -14,7 +14,7 @@ import {
   TagsSection,
   DescriptionSection,
   NotionLink,
-  EmptyState,
+  DetailEmptyState,
   ItemNotFoundState,
 } from './detail';
 
@@ -36,7 +36,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ onClose }) => {
     [selectedItemId, getItemPath]
   );
 
-  if (!selectedItemId) return <EmptyState />;
+  if (!selectedItemId) return <DetailEmptyState />;
   if (!item) return <ItemNotFoundState onClose={onClose} />;
 
   const parent = item.parentId ? items.get(item.parentId) : undefined;
