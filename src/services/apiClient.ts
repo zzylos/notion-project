@@ -1,8 +1,8 @@
-import type { WorkItem, ItemStatus } from '../types';
+import type { WorkItem, ItemStatus, FetchItemsResponse } from '../types';
+import { NETWORK } from '../../shared';
 import { ApiError, NetworkError, isAbortError } from '../utils/errors';
 
-/** Default timeout for API requests (30 seconds) */
-const FETCH_TIMEOUT_MS = 30000;
+const FETCH_TIMEOUT_MS = NETWORK.FETCH_TIMEOUT_MS;
 
 /**
  * API response wrapper type
@@ -13,12 +13,6 @@ interface ApiResponse<T> {
   error?: string;
   cached?: boolean;
   cacheAge?: number;
-}
-
-interface FetchItemsResponse {
-  items: WorkItem[];
-  failedDatabases?: Array<{ type: string; error: string }>;
-  orphanedItemsCount?: number;
 }
 
 interface CacheStats {

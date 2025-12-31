@@ -87,3 +87,11 @@ export const CACHE = {
   /** Polling interval for waiting on refresh in milliseconds */
   REFRESH_POLL_INTERVAL_MS: 100,
 } as const;
+
+/**
+ * Network request constants.
+ */
+export const NETWORK = {
+  /** Default timeout for API/fetch requests (30 seconds) */
+  FETCH_TIMEOUT_MS: 30000,
+} as const;

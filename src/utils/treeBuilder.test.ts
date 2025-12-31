@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildTreeNodes, getItemPath, buildChildMap, type TreeBuildState } from './treeBuilder';
+import { buildTreeNodes, getItemPath, type TreeBuildState } from './treeBuilder';
 import type { WorkItem } from '../types';
 
 // Mock the logger to avoid console output in tests
@@ -246,57 +246,5 @@ describe('getItemPath', () => {
     // Should return a valid path without infinite loop
     expect(result.length).toBeGreaterThanOrEqual(1);
     expect(result.length).toBeLessThanOrEqual(3); // At most a -> b -> a (detected)
-  });
-});
-
-describe('buildChildMap', () => {
-  it('should return empty map for empty input', () => {
-    const result = buildChildMap([]);
-    expect(result.size).toBe(0);
-  });
-
-  it('should map root items under undefined key', () => {
-    const items = [
-      createMockItem({ id: 'root1', title: 'Root 1' }),
-      createMockItem({ id: 'root2', title: 'Root 2' }),
-    ];
-    const result = buildChildMap(items);
-
-    expect(result.get(undefined)).toEqual(['root1', 'root2']);
-  });
-
-  it('should map children under parent ID', () => {
-    const items = [
-      createMockItem({ id: 'parent', title: 'Parent' }),
-      createMockItem({ id: 'child1', title: 'Child 1', parentId: 'parent' }),
-      createMockItem({ id: 'child2', title: 'Child 2', parentId: 'parent' }),
-    ];
-    const result = buildChildMap(items);
-
-    expect(result.get('parent')).toEqual(['child1', 'child2']);
-    expect(result.get(undefined)).toEqual(['parent']);
-  });
-
-  it('should handle multiple levels of nesting', () => {
-    const items = [
-      createMockItem({ id: 'gp', title: 'Grandparent' }),
-      createMockItem({ id: 'p', title: 'Parent', parentId: 'gp' }),
-      createMockItem({ id: 'c1', title: 'Child 1', parentId: 'p' }),
-      createMockItem({ id: 'c2', title: 'Child 2', parentId: 'p' }),
-    ];
-    const result = buildChildMap(items);
-
-    expect(result.get(undefined)).toEqual(['gp']);
-    expect(result.get('gp')).toEqual(['p']);
-    expect(result.get('p')).toEqual(['c1', 'c2']);
-    expect(result.has('c1')).toBe(false); // No children
-  });
-
-  it('should handle items with non-existent parents', () => {
-    const items = [createMockItem({ id: 'orphan', title: 'Orphan', parentId: 'missing' })];
-    const result = buildChildMap(items);
-
-    expect(result.get('missing')).toEqual(['orphan']);
-    expect(result.has(undefined)).toBe(false); // No actual root items
   });
 });

@@ -48,29 +48,6 @@ body {
   background: #9ca3af;
 }
 
-/* Tree node animations */
-.tree-node-enter {
-  opacity: 0;
-  transform: translateX(-10px);
-}
-
-.tree-node-enter-active {
-  opacity: 1;
-  transform: translateX(0);
-  transition:
-    opacity 200ms ease-out,
-    transform 200ms ease-out;
-}
-
-.tree-node-exit {
-  opacity: 1;
-}
-
-.tree-node-exit-active {
-  opacity: 0;
-  transition: opacity 150ms ease-in;
-}
-
 /* Pulse animation for in-progress items */
 @keyframes pulse-status {
   0%,

@@ -12,10 +12,3 @@ export const typeIcons: Record<ItemType, React.ComponentType<{ className?: strin
   design: Palette,
   project: FolderKanban,
 };
-
-/**
- * Get the icon component for a given item type.
- */
-export function getTypeIcon(type: ItemType): React.ComponentType<{ className?: string }> {
-  return typeIcons[type];
-}

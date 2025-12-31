@@ -195,3 +195,14 @@ export interface NamespaceLogger {
  * This ensures consistency in log namespaces.
  */
 export type CommonLoggerNamespace = 'notion' | 'store' | 'cache';
+
+/**
+ * Response from fetching all items.
+ * Used by both frontend apiClient and backend items route.
+ */
+export interface FetchItemsResponse {
+  items: WorkItem[];
+  failedDatabases?: Array<{ type: string; error: string }>;
+  orphanedItemsCount?: number;
+  lastUpdated?: string;
+}

@@ -172,24 +172,3 @@ export function getItemPath(id: string, items: Map<string, WorkItem>): WorkItem[
 
   return path;
 }
-
-/**
- * Pre-compute a map of parent ID to child IDs for faster tree building.
- * This can be used to optimize tree building for large datasets.
- *
- * @param items - Array of work items
- * @returns Map of parent ID to array of child IDs
- */
-export function buildChildMap(items: WorkItem[]): Map<string | undefined, string[]> {
-  const childMap = new Map<string | undefined, string[]>();
-
-  for (const item of items) {
-    const parentId = item.parentId;
-    if (!childMap.has(parentId)) {
-      childMap.set(parentId, []);
-    }
-    childMap.get(parentId)!.push(item.id);
-  }
-
-  return childMap;
-}

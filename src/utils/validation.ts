@@ -73,33 +73,6 @@ const API_KEY_CONSTRAINTS = {
 } as const;
 
 /**
- * Validates a Notion API key format.
- * Notion API keys should start with 'secret_' prefix and have reasonable length.
- *
- * @param apiKey - The API key to validate
- * @returns True if the API key format is valid
- *
- * @example
- * isValidApiKey('secret_abc123...')  // true (if length >= 50)
- * isValidApiKey('abc123...')          // false (no prefix)
- * isValidApiKey('')                   // false
- * isValidApiKey('secret_x')           // false (too short)
- */
-export function isValidApiKey(apiKey: string): boolean {
-  if (!apiKey || !apiKey.trim()) return false;
-  const trimmed = apiKey.trim();
-
-  // Must start with secret_ prefix
-  if (!trimmed.startsWith(API_KEY_CONSTRAINTS.PREFIX)) return false;
-
-  // Must have reasonable length
-  if (trimmed.length < API_KEY_CONSTRAINTS.MIN_LENGTH) return false;
-  if (trimmed.length > API_KEY_CONSTRAINTS.MAX_LENGTH) return false;
-
-  return true;
-}
-
-/**
  * Validates API key with detailed error message.
  *
  * @param apiKey - The API key to validate
