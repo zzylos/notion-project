@@ -2,6 +2,78 @@
  * Shared utility functions for both client and server.
  */
 
+import type { WorkItem } from './types.js';
+
+/**
+ * Orphaned item information for logging/debugging.
+ */
+export interface OrphanedItem {
+  id: string;
+  title: string;
+  parentId: string;
+}
+
+/**
+ * Options for buildRelationships function.
+ */
+export interface BuildRelationshipsOptions {
+  /**
+   * Callback when orphaned items are found.
+   * Called with the list of orphaned items for logging purposes.
+   */
+  onOrphanedItems?: (items: OrphanedItem[]) => void;
+}
+
+/**
+ * Build parent-child relationships between work items.
+ *
+ * Mutates the items array in place by populating the `children` arrays.
+ * An item is considered "orphaned" if it has a parentId but that parent
+ * doesn't exist in the items array.
+ *
+ * @param items - Array of work items to build relationships for (mutated in place)
+ * @param options - Optional configuration including orphan callback
+ * @returns The count of orphaned items (items with missing parents)
+ *
+ * @example
+ * const items = [
+ *   { id: 'a', parentId: undefined, children: [] },
+ *   { id: 'b', parentId: 'a', children: [] }
+ * ];
+ * buildRelationships(items);
+ * // items[0].children is now ['b']
+ */
+export function buildRelationships(items: WorkItem[], options?: BuildRelationshipsOptions): number {
+  const itemMap = new Map(items.map(item => [item.id, item]));
+  const orphanedItems: OrphanedItem[] = [];
+
+  for (const item of items) {
+    if (item.parentId) {
+      const parent = itemMap.get(item.parentId);
+      if (parent) {
+        if (!parent.children) {
+          parent.children = [];
+        }
+        parent.children.push(item.id);
+      } else {
+        // Track orphaned items (have parentId but parent not found)
+        orphanedItems.push({
+          id: item.id,
+          title: item.title,
+          parentId: item.parentId,
+        });
+      }
+    }
+  }
+
+  // Call the callback if there are orphaned items
+  if (orphanedItems.length > 0 && options?.onOrphanedItems) {
+    options.onOrphanedItems(orphanedItems);
+  }
+
+  return orphanedItems.length;
+}
+
 /**
  * Parse Notion API error response and return a user-friendly message.
  *

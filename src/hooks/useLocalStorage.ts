@@ -37,7 +37,7 @@ export function useLocalStorage<T>(
       const item = window.localStorage.getItem(key);
       return item ? (JSON.parse(item) as T) : initialValue;
     } catch (error) {
-      logger.warn('LocalStorage', `Error reading key "${key}":`, error);
+      logger.localStorage.warn(`Error reading key "${key}":`, error);
       return initialValue;
     }
   });
@@ -63,7 +63,7 @@ export function useLocalStorage<T>(
           return valueToStore;
         });
       } catch (error) {
-        logger.warn('LocalStorage', `Error setting key "${key}":`, error);
+        logger.localStorage.warn(`Error setting key "${key}":`, error);
       }
     },
     [key]
@@ -82,7 +82,7 @@ export function useLocalStorage<T>(
       window.localStorage.removeItem(key);
       setStoredValue(initialValueRef.current);
     } catch (error) {
-      logger.warn('LocalStorage', `Error removing key "${key}":`, error);
+      logger.localStorage.warn(`Error removing key "${key}":`, error);
     }
   }, [key]);
 

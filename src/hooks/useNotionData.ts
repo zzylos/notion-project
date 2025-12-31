@@ -168,7 +168,7 @@ export function useNotionData(effectiveConfig: NotionConfig | null): UseNotionDa
         if (abortControllerRef.current !== abortController) return;
 
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        logger.error('App', 'Failed to load data from Notion:', error);
+        logger.app.error('Failed to load data from Notion:', error);
         setError(`Failed to load data from Notion: ${errorMessage}. Using demo data instead.`);
         setItems(sampleData);
         setIsUsingDemoData(true);
