@@ -19,7 +19,7 @@ import type {
   FetchOptions,
   FetchProgressCallback,
 } from '../types/notion';
-import { NOTION, DEFAULT_CORS_PROXY } from '../constants';
+import { NOTION, NOTION_API, DEFAULT_CORS_PROXY } from '../constants';
 import { apiClient } from './apiClient';
 import { logger } from '../utils/logger';
 import { NotionPropertyMapper, NotionDataTransformer, NotionCacheManager } from './notion';
@@ -42,7 +42,7 @@ export type { FetchProgressCallback, FetchOptions } from '../types/notion';
  * Or use VITE_USE_BACKEND_API=true to use the backend API server.
  */
 const CORS_PROXY = import.meta.env.VITE_CORS_PROXY || DEFAULT_CORS_PROXY;
-const NOTION_API_BASE = NOTION.API_BASE;
+const NOTION_API_BASE = NOTION_API.BASE_URL;
 
 /**
  * Check if the backend API should be used instead of direct Notion calls.

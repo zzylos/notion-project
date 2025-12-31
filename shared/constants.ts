@@ -3,7 +3,7 @@
  * These constants are used by the Notion API integration across the application.
  */
 
-import type { PropertyMappings } from './types.js';
+import type { PropertyMappings, ItemType } from './types.js';
 
 /**
  * Common property name aliases for flexible matching.
@@ -53,6 +53,18 @@ export const DEFAULT_PROPERTY_MAPPINGS: PropertyMappings = {
   dueDate: 'Deadline',
   tags: 'Tags',
 };
+
+/**
+ * All item types in hierarchy order (top to bottom).
+ * Used for database configuration and display ordering.
+ */
+export const ITEM_TYPES: readonly ItemType[] = [
+  'mission',
+  'problem',
+  'solution',
+  'project',
+  'design',
+] as const;
 
 /**
  * Notion API constants.

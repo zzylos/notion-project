@@ -2,7 +2,12 @@ import type { ItemType, Priority, ViewMode } from './types';
 import { CACHE as SHARED_CACHE_VALUES } from '../shared/constants';
 
 // Re-export shared constants for convenient imports
-export { PROPERTY_ALIASES, DEFAULT_PROPERTY_MAPPINGS, NOTION_API } from '../shared/constants';
+export {
+  PROPERTY_ALIASES,
+  DEFAULT_PROPERTY_MAPPINGS,
+  NOTION_API,
+  ITEM_TYPES,
+} from '../shared/constants';
 
 /**
  * Canvas view layout constants
@@ -37,15 +42,12 @@ export const VIEW_LIMITS = {
 } as const;
 
 /**
- * Notion API constants
+ * Client-specific Notion constants.
+ * For API constants (BASE_URL, VERSION, PAGE_SIZE), use NOTION_API from shared.
  */
 export const NOTION = {
-  /** Cache timeout in milliseconds (5 minutes) */
+  /** Memory cache timeout in milliseconds (5 minutes) */
   CACHE_TIMEOUT: 5 * 60 * 1000,
-  /** Items per page when fetching from Notion */
-  PAGE_SIZE: 100,
-  /** Base URL for Notion API */
-  API_BASE: 'https://api.notion.com/v1',
 } as const;
 
 /**
