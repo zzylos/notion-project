@@ -20,7 +20,8 @@ export function createRateLimiter(options: RateLimitOptions) {
   const clients = new Map<string, RateLimitEntry>();
 
   // Cleanup old entries periodically (every minute)
-  setInterval(() => {
+  // Use .unref() to allow Node.js process to exit gracefully even if interval is running
+  const cleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of clients) {
       if (entry.resetTime <= now) {
@@ -28,6 +29,7 @@ export function createRateLimiter(options: RateLimitOptions) {
       }
     }
   }, 60000);
+  cleanupInterval.unref();
 
   return (req: Request, res: Response, next: NextFunction) => {
     // Use IP address as client identifier, with support for proxied requests.
