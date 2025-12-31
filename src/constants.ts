@@ -124,7 +124,7 @@ export const PRIORITY_ORDER: Priority[] = ['P0', 'P1', 'P2', 'P3'];
 
 /**
  * Status groups for combining similar statuses in the filter UI.
- * Simplified to 3 main categories: Not Started, In Progress, Done.
+ * Categories: Not Started, In Progress, Blocked, Done.
  */
 export const STATUS_GROUPS: Record<string, string[]> = {
   'Not Started': ['Not started', 'Not Started', '1-Not started', 'Backlog', 'To Do', 'New'],
@@ -143,12 +143,8 @@ export const STATUS_GROUPS: Record<string, string[]> = {
     'Analysis',
     'Research',
     'Solutioning',
-    'Blocked',
-    'blocked',
-    'On Hold',
-    'Waiting',
-    'Paused',
   ],
+  Blocked: ['Blocked', 'blocked', 'On Hold', 'On hold', 'Waiting', 'Paused', 'Stalled'],
   Done: [
     'Done',
     '8-Closed',

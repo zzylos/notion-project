@@ -9,7 +9,10 @@
 import type { NotionPage } from '../../types/notion';
 import type { WorkItem, ItemType, DatabaseConfig, PropertyMappings } from '../../types';
 import { NotionPropertyMapper } from './NotionPropertyMapper';
-import { normalizeUuid } from '../../../shared/utils';
+import {
+  normalizeUuid,
+  buildRelationships as sharedBuildRelationships,
+} from '../../../shared/utils';
 import { logger } from '../../utils/logger';
 
 export class NotionDataTransformer {
@@ -87,35 +90,20 @@ export class NotionDataTransformer {
    * Returns the count of orphaned items (items with parentId pointing to non-existent parents)
    */
   buildRelationships(items: WorkItem[]): number {
-    const itemMap = new Map(items.map(item => [item.id, item]));
-    const orphanedItems: Array<{ id: string; title: string; parentId: string }> = [];
+    const debugMode = this.debugMode;
 
-    for (const item of items) {
-      if (item.parentId) {
-        const parent = itemMap.get(item.parentId);
-        if (parent) {
-          if (!parent.children) parent.children = [];
-          parent.children.push(item.id);
-        } else {
-          // Track orphaned items (have parentId but parent not found)
-          orphanedItems.push({ id: item.id, title: item.title, parentId: item.parentId });
+    return sharedBuildRelationships(items, {
+      onOrphanedItems: orphanedItems => {
+        logger.warn(
+          'Notion',
+          `${orphanedItems.length} orphaned items (parent not found). ` +
+            `This may indicate missing databases or cross-database relations that couldn't be resolved.`
+        );
+        if (debugMode) {
+          logger.table('Notion', orphanedItems);
         }
-      }
-    }
-
-    // Always log orphaned items warning if any are found
-    if (orphanedItems.length > 0) {
-      logger.warn(
-        'Notion',
-        `${orphanedItems.length} orphaned items (parent not found). ` +
-          `This may indicate missing databases or cross-database relations that couldn't be resolved.`
-      );
-      if (this.debugMode) {
-        logger.table('Notion', orphanedItems);
-      }
-    }
-
-    return orphanedItems.length;
+      },
+    });
   }
 
   /**

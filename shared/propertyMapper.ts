@@ -28,6 +28,7 @@ import type {
   NamespaceLogger,
 } from './types.js';
 import { normalizeUuid } from './utils.js';
+import { DEFAULT_PROPERTY_MAPPINGS } from './constants.js';
 
 /**
  * Minimal logger interface for property mapper.
@@ -38,20 +39,6 @@ export interface PropertyMapperLogger {
   debug?(message: string, data?: unknown): void;
   table?(data: object[], columns?: string[]): void;
 }
-
-/**
- * Default property mappings when none are provided.
- */
-const DEFAULT_MAPPINGS: PropertyMappings = {
-  title: 'Name',
-  status: 'Status',
-  priority: 'Priority',
-  owner: 'Owner',
-  parent: 'Parent',
-  progress: 'Progress',
-  dueDate: 'Deadline',
-  tags: 'Tags',
-};
 
 /**
  * PropertyMapper - Environment-agnostic property extraction from Notion pages.
@@ -102,7 +89,7 @@ export class PropertyMapper {
     defaultMappings: PropertyMappings | undefined,
     dbConfig?: DatabaseConfig
   ): PropertyMappings {
-    const defaults = defaultMappings || DEFAULT_MAPPINGS;
+    const defaults = defaultMappings || DEFAULT_PROPERTY_MAPPINGS;
 
     if (!dbConfig?.mappings) {
       return defaults;

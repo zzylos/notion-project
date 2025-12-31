@@ -14,6 +14,7 @@ import {
   parseNotionError,
   PropertyMapper,
   normalizeUuid,
+  buildRelationships as sharedBuildRelationships,
 } from '../../../shared/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -276,26 +277,15 @@ class NotionService {
    * Build parent-child relationships
    */
   private buildRelationships(items: WorkItem[]): number {
-    const itemMap = new Map(items.map(item => [item.id, item]));
-    const orphanedItems: Array<{ id: string; title: string; parentId: string }> = [];
+    const debugMode = this.debugMode;
 
-    for (const item of items) {
-      if (item.parentId) {
-        const parent = itemMap.get(item.parentId);
-        if (parent) {
-          if (!parent.children) parent.children = [];
-          parent.children.push(item.id);
-        } else {
-          orphanedItems.push({ id: item.id, title: item.title, parentId: item.parentId });
+    return sharedBuildRelationships(items, {
+      onOrphanedItems: orphanedItems => {
+        if (debugMode) {
+          logger.notion.warn(`${orphanedItems.length} orphaned items (parent not found).`);
         }
-      }
-    }
-
-    if (orphanedItems.length > 0 && this.debugMode) {
-      logger.notion.warn(`${orphanedItems.length} orphaned items (parent not found).`);
-    }
-
-    return orphanedItems.length;
+      },
+    });
   }
 
   /**

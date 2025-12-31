@@ -94,7 +94,7 @@ export class NotionCacheManager {
 
       // Validate cached data structure
       if (!cached || !Array.isArray(cached.items) || typeof cached.timestamp !== 'number') {
-        logger.warn('Notion', `Invalid cache entry for key ${key}, removing`);
+        logger.cache.warn(`Invalid cache entry for key ${key}, removing`);
         localStorage.removeItem(CACHE_KEY_PREFIX + key);
         return null;
       }
@@ -107,7 +107,7 @@ export class NotionCacheManager {
 
       return cached;
     } catch (parseError) {
-      logger.warn('Notion', `Failed to parse cache entry for key ${key}, removing:`, parseError);
+      logger.cache.warn(`Failed to parse cache entry for key ${key}, removing:`, parseError);
       localStorage.removeItem(CACHE_KEY_PREFIX + key);
       return null;
     }
@@ -126,12 +126,12 @@ export class NotionCacheManager {
         const parsed = JSON.parse(metadataStr);
         // Validate parsed metadata structure
         if (!parsed || !Array.isArray(parsed.keys)) {
-          logger.warn('Notion', 'Invalid cache metadata structure, skipping load');
+          logger.cache.warn('Invalid cache metadata structure, skipping load');
           return;
         }
         metadata = parsed;
       } catch (parseError) {
-        logger.warn('Notion', 'Failed to parse cache metadata, clearing:', parseError);
+        logger.cache.warn('Failed to parse cache metadata, clearing:', parseError);
         localStorage.removeItem(CACHE_METADATA_KEY);
         return;
       }
@@ -144,11 +144,11 @@ export class NotionCacheManager {
 
         this.cache.set(key, cached);
         if (this.debugMode) {
-          logger.info('Notion', `Loaded ${cached.items.length} items from persistent cache`);
+          logger.cache.info(`Loaded ${cached.items.length} items from persistent cache`);
         }
       }
     } catch (error) {
-      logger.warn('Notion', 'Failed to load persistent cache:', error);
+      logger.cache.warn('Failed to load persistent cache:', error);
     }
   }
 
@@ -173,7 +173,7 @@ export class NotionCacheManager {
           }
         } catch (parseError) {
           // If metadata is corrupted, reset it
-          logger.warn('Notion', 'Corrupted cache metadata, resetting:', parseError);
+          logger.cache.warn('Corrupted cache metadata, resetting:', parseError);
         }
       }
 
@@ -183,11 +183,11 @@ export class NotionCacheManager {
       localStorage.setItem(CACHE_METADATA_KEY, JSON.stringify(metadata));
 
       if (this.debugMode) {
-        logger.info('Notion', `Saved ${items.length} items to persistent cache`);
+        logger.cache.info(`Saved ${items.length} items to persistent cache`);
       }
     } catch (error) {
       // localStorage might be full or unavailable
-      logger.warn('Notion', 'Failed to save persistent cache:', error);
+      logger.cache.warn('Failed to save persistent cache:', error);
     }
   }
 
@@ -208,7 +208,7 @@ export class NotionCacheManager {
       }
       localStorage.removeItem(CACHE_METADATA_KEY);
     } catch (error) {
-      logger.warn('Notion', 'Failed to clear persistent cache:', error);
+      logger.cache.warn('Failed to clear persistent cache:', error);
     }
   }
 
@@ -223,7 +223,7 @@ export class NotionCacheManager {
         return metadata.keys;
       }
     } catch (parseError) {
-      logger.warn('Notion', 'Failed to parse cache metadata during clear:', parseError);
+      logger.cache.warn('Failed to parse cache metadata during clear:', parseError);
     }
     return [];
   }

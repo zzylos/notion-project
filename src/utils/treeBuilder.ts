@@ -54,7 +54,7 @@ function buildTreeRecursive(
   return children.map(item => {
     // Safety: Check for circular reference
     if (ancestors.has(item.id)) {
-      logger.warn('TreeBuilder', `Circular reference detected in tree at item: ${item.id}`);
+      logger.tree.warn(`Circular reference detected in tree at item: ${item.id}`);
       return {
         item,
         children: [], // Stop recursion to prevent infinite loop
@@ -156,7 +156,7 @@ export function getItemPath(id: string, items: Map<string, WorkItem>): WorkItem[
   while (currentId) {
     // Check for circular reference
     if (visited.has(currentId)) {
-      logger.warn('TreeBuilder', `Circular parent reference detected at item: ${currentId}`);
+      logger.tree.warn(`Circular parent reference detected at item: ${currentId}`);
       break;
     }
     visited.add(currentId);
