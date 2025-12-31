@@ -55,7 +55,6 @@ interface StoreState {
   removeItem: (id: string) => void;
 
   setSelectedItem: (id: string | null) => void;
-  setFocusedItem: (id: string | null) => void;
   toggleExpanded: (id: string) => void;
   expandAll: () => void;
   collapseAll: () => void;
@@ -92,7 +91,6 @@ const defaultFilters: FilterState = {
   owners: [],
   excludeOwners: [],
   searchQuery: '',
-  showOnlyMyItems: false,
   filterMode: 'show', // Kept for backwards compatibility, prefer using exclude arrays
 };
 
@@ -148,7 +146,6 @@ export const useStore = create<StoreState>()(
 
       // Selection actions
       setSelectedItem: (id: string | null) => set({ selectedItemId: id }),
-      setFocusedItem: (id: string | null) => set({ focusedItemId: id }),
 
       toggleExpanded: (id: string) => {
         set(state => {

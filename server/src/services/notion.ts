@@ -48,13 +48,6 @@ class NotionService {
   }
 
   /**
-   * Get database IDs for cache key generation
-   */
-  getDatabaseIds(): string[] {
-    return this.config.databases.map(db => db.databaseId);
-  }
-
-  /**
    * Make a request to the Notion API with timeout
    */
   private async notionFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

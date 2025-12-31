@@ -20,7 +20,6 @@ describe('useStore', () => {
       setItems,
       resetFilters,
       setSelectedItem,
-      setFocusedItem,
       collapseAll,
       setHideOrphanItems,
       setShowOnlyOrphans,
@@ -28,7 +27,8 @@ describe('useStore', () => {
     setItems([]);
     resetFilters();
     setSelectedItem(null);
-    setFocusedItem(null);
+    // Reset focusedItemId directly via setState (no dedicated action needed)
+    useStore.setState({ focusedItemId: null });
     collapseAll();
     // Disable orphan filtering so standalone test items are visible
     setHideOrphanItems(false);

@@ -96,7 +96,6 @@ export function createLogger(prefix: string, options: LoggerOptions = {}): Names
  * Pre-configured logger instances for common modules
  */
 export const logger = {
-  cache: createLogger('Cache'),
   notion: createLogger('Notion'),
   server: createLogger('Server'),
   api: createLogger('API'),

@@ -482,13 +482,11 @@ router.get('/status', (_req: Request, res: Response) => {
 
   const response: ApiResponse<{
     configured: boolean;
-    hasVerificationToken: boolean;
     storeStats: typeof stats;
   }> = {
     success: true,
     data: {
       configured: !!verificationToken,
-      hasVerificationToken: !!verificationToken,
       storeStats: stats,
     },
   };
