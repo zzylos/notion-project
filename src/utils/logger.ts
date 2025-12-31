@@ -20,21 +20,11 @@
  * logger.store.warn('Cache miss');
  */
 
-type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+import type { LogLevel, NamespaceLogger } from '../../shared';
 
 interface LoggerConfig {
   enabled: boolean;
   minLevel: LogLevel;
-}
-
-/**
- * Namespace logger interface for pre-configured module loggers.
- */
-interface NamespaceLogger {
-  info(message: string, data?: unknown): void;
-  warn(message: string, data?: unknown): void;
-  error(message: string, error?: unknown): void;
-  debug(message: string, data?: unknown): void;
 }
 
 const LOG_LEVELS: Record<LogLevel, number> = {

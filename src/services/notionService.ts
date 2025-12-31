@@ -23,6 +23,7 @@ import { NOTION, DEFAULT_CORS_PROXY } from '../constants';
 import { apiClient } from './apiClient';
 import { logger } from '../utils/logger';
 import { NotionPropertyMapper, NotionDataTransformer, NotionCacheManager } from './notion';
+import { parseNotionError } from '../../shared';
 
 // Re-export types for backward compatibility
 export type { FetchProgressCallback, FetchOptions } from '../types/notion';
@@ -107,43 +108,6 @@ class NotionService {
     this.pendingRequests.clear();
   }
 
-  /**
-   * Parse Notion API error response and return a user-friendly message.
-   */
-  private parseNotionError(status: number, errorText: string): string {
-    let errorCode = '';
-    let errorMessage = '';
-    try {
-      const parsed = JSON.parse(errorText);
-      errorCode = parsed.code || '';
-      errorMessage = parsed.message || '';
-    } catch {
-      errorMessage = errorText;
-    }
-
-    switch (status) {
-      case 401:
-        return 'Invalid API key. Please check your Notion integration token.';
-      case 403:
-        return 'Access denied. Make sure you have shared the database with your integration.';
-      case 404:
-        return 'Database not found. Please verify the database ID and ensure it is shared with your integration.';
-      case 429:
-        return 'Rate limited by Notion API. Please wait a moment and try again.';
-      case 400:
-        if (errorCode === 'validation_error') {
-          return `Invalid request: ${errorMessage}`;
-        }
-        return `Bad request: ${errorMessage || 'Please check your configuration.'}`;
-      case 500:
-      case 502:
-      case 503:
-        return 'Notion API is temporarily unavailable. Please try again later.';
-      default:
-        return `Notion API error (${status}): ${errorMessage || 'Unknown error'}`;
-    }
-  }
-
   private async notionFetch<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -178,7 +142,7 @@ class NotionService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(this.parseNotionError(response.status, errorText));
+      throw new Error(parseNotionError(response.status, errorText));
     }
 
     try {
