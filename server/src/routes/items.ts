@@ -261,10 +261,15 @@ router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Res
     }
 
     const { progress } = req.body;
-    if (typeof progress !== 'number' || progress < 0 || progress > 100) {
+    if (
+      typeof progress !== 'number' ||
+      !Number.isFinite(progress) ||
+      progress < 0 ||
+      progress > 100
+    ) {
       const response: ApiResponse<never> = {
         success: false,
-        error: 'Progress must be a number between 0 and 100',
+        error: 'Progress must be a finite number between 0 and 100',
       };
       res.status(400).json(response);
       return;

@@ -23,8 +23,12 @@ import CanvasLegend from './CanvasLegend';
 import CanvasControls from './CanvasControls';
 import ItemLimitBanner from '../ui/ItemLimitBanner';
 
+/** Maximum traversal depth to prevent infinite loops in pathological data */
+const MAX_TRAVERSAL_DEPTH = 100;
+
 /**
  * Collect all ancestors of an item (iterative to avoid stack overflow)
+ * Limited to MAX_TRAVERSAL_DEPTH to handle pathological cycles
  */
 function collectAncestors(
   startId: string | undefined,
@@ -32,14 +36,17 @@ function collectAncestors(
   connected: Set<string>
 ): void {
   let currentId = startId;
-  while (currentId && !connected.has(currentId)) {
+  let depth = 0;
+  while (currentId && !connected.has(currentId) && depth < MAX_TRAVERSAL_DEPTH) {
     connected.add(currentId);
     currentId = items.get(currentId)?.parentId;
+    depth++;
   }
 }
 
 /**
  * Collect all descendants of an item using BFS
+ * Limited to MAX_TRAVERSAL_DEPTH iterations to handle pathological data
  */
 function collectDescendants(
   children: string[] | undefined,
@@ -47,13 +54,15 @@ function collectDescendants(
   connected: Set<string>
 ): void {
   const queue = children ? [...children] : [];
-  while (queue.length > 0) {
+  let iterations = 0;
+  while (queue.length > 0 && iterations < MAX_TRAVERSAL_DEPTH * 10) {
     const childId = queue.shift()!;
     if (!connected.has(childId)) {
       connected.add(childId);
       const child = items.get(childId);
       if (child?.children) queue.push(...child.children);
     }
+    iterations++;
   }
 }
 

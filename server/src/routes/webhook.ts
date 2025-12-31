@@ -13,26 +13,50 @@ const router = Router();
  * Idempotency cache to prevent duplicate webhook processing.
  * Maps event key (timestamp + entity.id + type) to processing timestamp.
  * Entries expire after 5 minutes to prevent memory bloat.
+ * Limited to MAX_CACHED_EVENTS entries to bound memory usage.
  */
 const processedEvents = new Map<string, number>();
 const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const IDEMPOTENCY_CLEANUP_INTERVAL_MS = 60 * 1000; // Clean up every 60 seconds
+const MAX_CACHED_EVENTS = 10000; // Maximum number of events to cache
+
+/** Minimum length for verification tokens */
+const MIN_TOKEN_LENGTH = 10;
+/** Maximum length for verification tokens */
+const MAX_TOKEN_LENGTH = 500;
 
 /**
  * Clean up expired entries from the idempotency cache.
  * Called both on new events and periodically via interval.
+ * Also enforces MAX_CACHED_EVENTS limit by evicting oldest entries.
  */
 function cleanupExpiredEvents(): void {
   const now = Date.now();
   let cleanedCount = 0;
+
+  // First, remove expired entries
   for (const [key, timestamp] of processedEvents.entries()) {
     if (now - timestamp > IDEMPOTENCY_TTL_MS) {
       processedEvents.delete(key);
       cleanedCount++;
     }
   }
+
+  // If still over limit, evict oldest entries
+  if (processedEvents.size > MAX_CACHED_EVENTS) {
+    const entries = Array.from(processedEvents.entries());
+    // Sort by timestamp (oldest first)
+    entries.sort((a, b) => a[1] - b[1]);
+    // Remove oldest entries until under limit
+    const toRemove = entries.slice(0, processedEvents.size - MAX_CACHED_EVENTS);
+    for (const [key] of toRemove) {
+      processedEvents.delete(key);
+      cleanedCount++;
+    }
+  }
+
   if (cleanedCount > 0) {
-    logger.webhook.debug(`Cleaned up ${cleanedCount} expired idempotency cache entries`);
+    logger.webhook.debug(`Cleaned up ${cleanedCount} idempotency cache entries`);
   }
 }
 
@@ -502,7 +526,13 @@ router.post('/set-token', (req: Request, res: Response) => {
   const adminApiKey = process.env.ADMIN_API_KEY;
   if (adminApiKey) {
     const providedKey = req.headers['x-admin-api-key'] as string | undefined;
-    if (!providedKey || providedKey !== adminApiKey) {
+    // Use timing-safe comparison to prevent timing attacks
+    const isValidKey =
+      providedKey &&
+      providedKey.length === adminApiKey.length &&
+      timingSafeEqual(Buffer.from(providedKey), Buffer.from(adminApiKey));
+
+    if (!isValidKey) {
       logger.webhook.warn('Attempted to set token without valid admin API key');
       res.status(401).json({
         success: false,
@@ -529,7 +559,7 @@ router.post('/set-token', (req: Request, res: Response) => {
   }
 
   // Validate token format (should be a reasonable length string)
-  if (token.length < 10 || token.length > 500) {
+  if (token.length < MIN_TOKEN_LENGTH || token.length > MAX_TOKEN_LENGTH) {
     res.status(400).json({ success: false, error: 'Invalid token format' });
     return;
   }
