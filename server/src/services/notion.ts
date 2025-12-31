@@ -2,35 +2,46 @@ import type {
   WorkItem,
   ItemType,
   ItemStatus,
-  Priority,
-  Owner,
   NotionConfig,
-  PropertyMappings,
   DatabaseConfig,
   NotionPage,
   NotionPropertyValue,
   NotionQueryResponse,
 } from '../types/index.js';
-import { PROPERTY_ALIASES, NOTION_API, parseNotionError } from '../../../shared/index.js';
+import {
+  PROPERTY_ALIASES,
+  NOTION_API,
+  parseNotionError,
+  PropertyMapper,
+  normalizeUuid,
+} from '../../../shared/index.js';
 import { logger } from '../utils/logger.js';
-import { normalizeUuid } from '../utils/uuid.js';
 
 const NOTION_API_BASE = NOTION_API.BASE_URL;
 
 /**
  * Server-side Notion API service.
  * Makes direct API calls without CORS proxy.
+ * Uses shared PropertyMapper for property extraction.
  */
 class NotionService {
   private config: NotionConfig;
   private debugMode: boolean;
-  private loggedDatabases = new Set<string>();
+  private propertyMapper: PropertyMapper;
   // Track property types for each database (needed for correct update format)
   private propertyTypes: Map<string, Map<string, string>> = new Map();
 
   constructor(config: NotionConfig) {
     this.config = config;
     this.debugMode = process.env.NODE_ENV !== 'production';
+
+    // Create server-side logger adapter for property mapper
+    const loggerAdapter = {
+      info: (message: string, data?: unknown) => logger.notion.info(message, data),
+      debug: (message: string, data?: unknown) => logger.notion.debug(message, data),
+    };
+
+    this.propertyMapper = new PropertyMapper(PROPERTY_ALIASES, loggerAdapter, this.debugMode);
   }
 
   /**
@@ -71,73 +82,10 @@ class NotionService {
   }
 
   /**
-   * Get effective mappings for a database
+   * Track property types for a database (needed for correct update format).
+   * This is server-specific functionality not in the shared PropertyMapper.
    */
-  private getMappings(dbConfig?: DatabaseConfig): PropertyMappings {
-    const defaults = this.config.defaultMappings;
-    if (!dbConfig?.mappings) {
-      return defaults;
-    }
-    return { ...defaults, ...dbConfig.mappings };
-  }
-
-  /**
-   * Find property by name with fuzzy matching
-   */
-  private findProperty(
-    props: Record<string, NotionPropertyValue>,
-    mappingName: string,
-    fallbackType?: string
-  ): NotionPropertyValue | null {
-    // Exact match
-    if (props[mappingName]) {
-      return props[mappingName];
-    }
-
-    // Case-insensitive match
-    const lowerMapping = mappingName.toLowerCase();
-    for (const [key, value] of Object.entries(props)) {
-      if (key.toLowerCase() === lowerMapping) {
-        return value;
-      }
-    }
-
-    // Try aliases
-    const aliases = PROPERTY_ALIASES[mappingName] || [];
-    for (const alias of aliases) {
-      const lowerAlias = alias.toLowerCase();
-      for (const [key, value] of Object.entries(props)) {
-        if (key.toLowerCase() === lowerAlias) {
-          return value;
-        }
-      }
-    }
-
-    // Fallback by type
-    if (fallbackType) {
-      for (const value of Object.values(props)) {
-        if (value.type === fallbackType) {
-          return value;
-        }
-      }
-    }
-
-    // Special case: find ANY relation for parent
-    if (fallbackType === 'relation' || mappingName.toLowerCase() === 'parent') {
-      for (const value of Object.values(props)) {
-        if (value.type === 'relation') {
-          return value;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Log property names for debugging and track property types
-   */
-  private logPropertyNames(
+  private trackPropertyTypes(
     databaseType: ItemType,
     props: Record<string, NotionPropertyValue>
   ): void {
@@ -151,17 +99,6 @@ class NotionService {
       }
       this.propertyTypes.set(dbKey, typeMap);
     }
-
-    if (!this.debugMode) return;
-    if (this.loggedDatabases.has(dbKey)) return;
-    this.loggedDatabases.add(dbKey);
-
-    const propertyInfo = Object.entries(props).map(([name, value]) => ({
-      name,
-      type: value.type,
-    }));
-
-    logger.notion.info(`${databaseType.toUpperCase()} database properties:`, propertyInfo);
   }
 
   /**
@@ -205,167 +142,8 @@ class NotionService {
     return null;
   }
 
-  // Property extraction methods
-  private extractTitle(props: Record<string, NotionPropertyValue>, mappingName: string): string {
-    const mapped = this.findProperty(props, mappingName);
-    if (mapped) {
-      if (mapped.type === 'title' && mapped.title) {
-        return mapped.title
-          .filter(t => t && typeof t.plain_text === 'string')
-          .map(t => t.plain_text)
-          .join('');
-      }
-      if (mapped.type === 'rich_text' && mapped.rich_text) {
-        return mapped.rich_text
-          .filter(t => t && typeof t.plain_text === 'string')
-          .map(t => t.plain_text)
-          .join('');
-      }
-    }
-
-    // Fallback: find ANY title property
-    for (const value of Object.values(props)) {
-      if (value.type === 'title' && value.title && value.title.length > 0) {
-        return value.title
-          .filter(t => t && typeof t.plain_text === 'string')
-          .map(t => t.plain_text)
-          .join('');
-      }
-    }
-
-    return '';
-  }
-
-  private extractStatus(
-    props: Record<string, NotionPropertyValue>,
-    mappingName: string
-  ): string | null {
-    const prop = this.findProperty(props, mappingName);
-    if (!prop) return null;
-
-    if (prop.type === 'select' && prop.select) {
-      return prop.select.name;
-    }
-    if (prop.type === 'status' && prop.status) {
-      return prop.status.name;
-    }
-
-    return null;
-  }
-
-  private extractSelect(
-    props: Record<string, NotionPropertyValue>,
-    mappingName: string
-  ): string | null {
-    const prop = this.findProperty(props, mappingName);
-    if (!prop) return null;
-
-    if (prop.type === 'select' && prop.select) {
-      return prop.select.name;
-    }
-    if (prop.type === 'status' && prop.status) {
-      return prop.status.name;
-    }
-
-    return null;
-  }
-
-  private extractMultiSelect(
-    props: Record<string, NotionPropertyValue>,
-    mappingName: string
-  ): string[] {
-    const prop = this.findProperty(props, mappingName);
-    if (!prop || prop.type !== 'multi_select' || !prop.multi_select) return [];
-    return prop.multi_select.map(s => s.name);
-  }
-
-  private extractNumber(
-    props: Record<string, NotionPropertyValue>,
-    mappingName: string
-  ): number | null {
-    const prop = this.findProperty(props, mappingName);
-    if (!prop || prop.type !== 'number') return null;
-    return prop.number ?? null;
-  }
-
-  private extractDate(
-    props: Record<string, NotionPropertyValue>,
-    mappingName: string
-  ): string | null {
-    const prop = this.findProperty(props, mappingName);
-    if (!prop || prop.type !== 'date' || !prop.date) return null;
-    return prop.date.start;
-  }
-
-  private extractPeople(props: Record<string, NotionPropertyValue>, mappingName: string): Owner[] {
-    const prop = this.findProperty(props, mappingName);
-    if (!prop || prop.type !== 'people' || !prop.people) return [];
-    return prop.people
-      .filter(p => p && p.id)
-      .map(p => ({
-        id: p.id,
-        name: typeof p.name === 'string' && p.name.length > 0 ? p.name : 'Unknown',
-        email: p.person?.email,
-        avatar: p.avatar_url,
-      }));
-  }
-
-  private extractRelation(
-    props: Record<string, NotionPropertyValue>,
-    mappingName: string
-  ): string[] {
-    const prop = this.findProperty(props, mappingName, 'relation');
-    if (!prop || prop.type !== 'relation' || !prop.relation) return [];
-    return prop.relation
-      .filter(r => r && r.id && typeof r.id === 'string')
-      .map(r => normalizeUuid(r.id))
-      .filter(id => id.length > 0);
-  }
-
-  private mapToItemStatus(notionStatus: string | null): ItemStatus {
-    return notionStatus?.trim() || 'Not Started';
-  }
-
-  private mapToPriority(notionPriority: string | null): Priority | undefined {
-    if (!notionPriority) return undefined;
-
-    const normalized = notionPriority.toLowerCase().trim();
-
-    const priorityMap: Record<string, Priority> = {
-      p0: 'P0',
-      p1: 'P1',
-      p2: 'P2',
-      p3: 'P3',
-      p4: 'P3',
-      critical: 'P0',
-      highest: 'P0',
-      urgent: 'P0',
-      blocker: 'P0',
-      high: 'P1',
-      important: 'P1',
-      medium: 'P2',
-      normal: 'P2',
-      moderate: 'P2',
-      low: 'P3',
-      minor: 'P3',
-      trivial: 'P3',
-      lowest: 'P3',
-    };
-
-    if (priorityMap[normalized]) {
-      return priorityMap[normalized];
-    }
-
-    if (normalized.includes('critical') || normalized.includes('urgent')) return 'P0';
-    if (normalized.includes('high')) return 'P1';
-    if (normalized.includes('medium') || normalized.includes('normal')) return 'P2';
-    if (normalized.includes('low')) return 'P3';
-
-    return undefined;
-  }
-
   /**
-   * Convert Notion page to WorkItem
+   * Convert Notion page to WorkItem using the shared PropertyMapper
    */
   private pageToWorkItem(
     page: NotionPage,
@@ -385,19 +163,24 @@ class NotionService {
       throw new Error('Invalid Notion page: missing page ID');
     }
 
-    const mappings = this.getMappings(dbConfig);
+    const mappings = this.propertyMapper.getMappings(this.config.defaultMappings, dbConfig);
     const props = page.properties;
 
-    this.logPropertyNames(itemType, props);
+    // Track property types for update operations (server-specific)
+    this.trackPropertyTypes(itemType, props);
 
-    const title = this.extractTitle(props, mappings.title);
-    const status = this.extractStatus(props, mappings.status);
-    const priority = this.extractSelect(props, mappings.priority);
-    const progress = this.extractNumber(props, mappings.progress);
-    const dueDate = this.extractDate(props, mappings.dueDate);
-    const people = this.extractPeople(props, mappings.owner);
-    const parentRelations = this.extractRelation(props, mappings.parent);
-    const tags = this.extractMultiSelect(props, mappings.tags);
+    // Log property names in debug mode
+    this.propertyMapper.logPropertyNames(itemType, props);
+
+    // Use shared PropertyMapper for all property extraction
+    const title = this.propertyMapper.extractTitle(props, mappings.title);
+    const status = this.propertyMapper.extractStatus(props, mappings.status);
+    const priority = this.propertyMapper.extractSelect(props, mappings.priority);
+    const progress = this.propertyMapper.extractNumber(props, mappings.progress);
+    const dueDate = this.propertyMapper.extractDate(props, mappings.dueDate);
+    const people = this.propertyMapper.extractPeople(props, mappings.owner);
+    const parentRelations = this.propertyMapper.extractRelation(props, mappings.parent);
+    const tags = this.propertyMapper.extractMultiSelect(props, mappings.tags);
 
     // Normalize the page ID to ensure consistent format for parent-child matching
     const normalizedId = normalizeUuid(page.id);
@@ -406,8 +189,8 @@ class NotionService {
       id: normalizedId,
       title: title || 'Untitled',
       type: itemType,
-      status: this.mapToItemStatus(status),
-      priority: this.mapToPriority(priority),
+      status: this.propertyMapper.mapToItemStatus(status),
+      priority: this.propertyMapper.mapToPriority(priority),
       progress: progress ?? undefined,
       owner: people[0],
       assignees: people,
@@ -622,7 +405,7 @@ class NotionService {
    * @param itemType Optional item type to look up correct property type
    */
   async updateItemStatus(pageId: string, status: ItemStatus, itemType?: ItemType): Promise<void> {
-    const mappings = this.getMappings();
+    const mappings = this.propertyMapper.getMappings(this.config.defaultMappings);
     const statusPropertyName = mappings.status;
 
     // Detect the property type (status vs select) - prefer specific database type
@@ -651,7 +434,7 @@ class NotionService {
    * Update item progress
    */
   async updateItemProgress(pageId: string, progress: number): Promise<void> {
-    const mappings = this.getMappings();
+    const mappings = this.propertyMapper.getMappings(this.config.defaultMappings);
 
     await this.notionFetch(`/pages/${pageId}`, {
       method: 'PATCH',

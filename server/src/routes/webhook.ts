@@ -5,6 +5,7 @@ import { getNotion } from '../services/notion.js';
 import { logger } from '../utils/logger.js';
 import { normalizeUuid } from '../utils/uuid.js';
 import type { ApiResponse } from '../types/index.js';
+// Note: Request is augmented with rawBody via types/express.d.ts (global declaration)
 
 const router = Router();
 
@@ -365,19 +366,12 @@ function handleVerificationRequest(token: string, res: Response): void {
 }
 
 /**
- * Extended Request type with raw body buffer for signature verification.
- * The raw body is captured by the express.json verify function in index.ts.
- */
-interface RequestWithRawBody extends Request {
-  rawBody?: Buffer;
-}
-
-/**
  * POST /api/webhook
  *
  * Receives webhook events from Notion.
+ * Note: rawBody is available on Request via type augmentation in types/express.d.ts
  */
-router.post('/', async (req: RequestWithRawBody, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
   // Handle verification request
   if (isVerificationPayload(req.body)) {
     handleVerificationRequest(req.body.verification_token, res);
