@@ -480,41 +480,142 @@ npm run dev:full
 
 Notion webhooks enable real-time data synchronization. When a page is created, updated, or deleted in Notion, your server is notified instantly.
 
-#### Step 1: Create Webhook Subscription
+#### Prerequisites
+
+Before setting up webhooks, ensure you have:
+
+1. **A Notion integration** created at [notion.so/my-integrations](https://www.notion.so/my-integrations)
+2. **Your databases shared** with the integration
+3. **The backend server running** (locally or deployed)
+4. **A publicly accessible URL** for webhook delivery (use ngrok for local development)
+
+#### Step 1: Make Your Server Publicly Accessible
+
+Notion needs to reach your server to send webhook events. For local development, use ngrok:
+
+```bash
+# Install ngrok (if not already installed)
+npm install -g ngrok
+
+# Start your backend server
+npm run dev:server
+
+# In a new terminal, create a tunnel to your server
+ngrok http 3001
+```
+
+ngrok will display a forwarding URL like:
+
+```
+Forwarding    https://abc123.ngrok.io -> http://localhost:3001
+```
+
+Copy this URL - you'll use it in the next step. For production, use your actual server URL (e.g., `https://api.yourapp.com`).
+
+#### Step 2: Create Webhook Subscription in Notion
 
 1. Go to [Notion Integrations](https://www.notion.so/profile/integrations)
-2. Select your integration
-3. Navigate to the **Webhooks** tab
+2. Click on your integration name to open settings
+3. Navigate to the **Webhooks** tab in the left sidebar
 4. Click **+ Create subscription**
-5. Enter your webhook URL: `https://your-server.com/api/webhook`
-6. Subscribe to these events:
-   - `page.content_updated`
-   - `page.created`
-   - `page.deleted`
-   - `page.moved`
+5. Configure the subscription:
+   - **Webhook URL**: Enter `https://your-ngrok-url.ngrok.io/api/webhook` (or your production URL)
+   - **Events to subscribe**: Select the following:
+     - ✅ `page.content_updated` - When page properties change
+     - ✅ `page.created` - When a new page is added
+     - ✅ `page.deleted` - When a page is deleted
+     - ✅ `page.moved` - When a page's parent changes
+     - ✅ `page.undeleted` - When a page is restored
+     - ✅ `page.unlocked` - When a page is unlocked
+     - ☑️ `database.schema_updated` - Optional, for schema change notifications
+6. Click **Create**
 
-#### Step 2: Receive Verification Token
+#### Step 3: Capture the Verification Token
 
-When you create the subscription, Notion sends a POST request to your webhook URL containing a `verification_token`. Check your server logs:
+When you create the subscription, Notion immediately sends a verification request to your webhook URL. Your server will log the verification token:
 
 ```
 [Webhook] Received verification token. Configure NOTION_WEBHOOK_SECRET:
-[Webhook] NOTION_WEBHOOK_SECRET=secret_xxxxx
+[Webhook] NOTION_WEBHOOK_SECRET=secret_abc123xyz...
 ```
 
-#### Step 3: Configure Environment
+**Important**: Copy this entire token value (including the `secret_` prefix).
 
-Add the token to your `.env` file:
+If you missed the token in the logs, you can:
+
+- Delete and recreate the webhook subscription, OR
+- Check your server's console output history
+
+#### Step 4: Configure the Webhook Secret
+
+Add the verification token to your `.env` file:
 
 ```bash
-NOTION_WEBHOOK_SECRET=secret_xxxxx
+# Add this line to your .env file
+NOTION_WEBHOOK_SECRET=secret_abc123xyz...
 ```
 
-Restart the server to load the new secret.
+Then restart your server to load the new configuration:
 
-#### Step 4: Verify in Notion UI
+```bash
+# Stop the server (Ctrl+C) and restart
+npm run dev:server
+```
 
-Paste the token in the Notion verification modal to activate the subscription.
+#### Step 5: Complete Verification in Notion
+
+1. Return to the Notion webhook settings page
+2. You'll see a verification modal asking for the token
+3. Paste the same token you added to `.env`
+4. Click **Verify**
+
+The webhook status should change to **Active** ✅
+
+#### Step 6: Test the Webhook
+
+1. Make a change to any page in your connected Notion databases
+2. Check your server logs - you should see:
+
+```
+[Webhook] Received event: page.content_updated for page abc123...
+[Webhook] Updated item: abc123 (Item Title, type: project)
+```
+
+3. Refresh your frontend - the change should appear instantly
+
+#### Troubleshooting Webhooks
+
+| Problem                        | Solution                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **Webhook shows "Pending"**    | Server isn't reachable. Check ngrok is running and URL is correct.                                            |
+| **"Invalid signature" errors** | Ensure `NOTION_WEBHOOK_SECRET` matches the token exactly. Restart server after changing.                      |
+| **Events not being received**  | Verify the page's database is connected to your integration. Check Notion's webhook logs for delivery status. |
+| **ngrok tunnel expired**       | Free ngrok tunnels expire. Restart ngrok and update the webhook URL in Notion.                                |
+| **Server crashes on webhook**  | Check server logs for errors. Ensure all database IDs are correctly configured.                               |
+
+#### Checking Webhook Status
+
+You can verify your webhook configuration via the API:
+
+```bash
+# Check webhook status
+curl http://localhost:3001/api/webhook/status
+
+# Response shows if token is configured:
+# {"configured": true, "message": "Webhook secret is configured"}
+```
+
+#### Manual Token Configuration
+
+If you need to set the token without restarting the server:
+
+```bash
+curl -X POST http://localhost:3001/api/webhook/set-token \
+  -H "Content-Type: application/json" \
+  -d '{"token": "secret_abc123xyz..."}'
+```
+
+**Note**: This only stores the token in memory. Add it to `.env` for persistence across restarts.
 
 ### Webhook Events Handled
 

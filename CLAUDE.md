@@ -196,36 +196,76 @@ The server uses Notion Integration Webhooks for real-time data synchronization:
 
 **Rate Limiting:**
 
-| Endpoint                  | Limit     | Description                          |
-| ------------------------- | --------- | ------------------------------------ |
-| `GET /api/items`          | 60/min    | Read operations                      |
-| `PATCH /api/items/:id/*`  | 20/min    | Mutation operations (status/progress)|
+| Endpoint                 | Limit  | Description                           |
+| ------------------------ | ------ | ------------------------------------- |
+| `GET /api/items`         | 60/min | Read operations                       |
+| `PATCH /api/items/:id/*` | 20/min | Mutation operations (status/progress) |
 
 ### Webhook Setup
 
-To enable real-time updates from Notion:
+To enable real-time updates from Notion, follow these steps:
 
-1. **Create webhook subscription** in your [Notion integration settings](https://www.notion.so/profile/integrations):
-   - Navigate to your integration → **Webhooks** tab
-   - Click **+ Create subscription**
-   - Enter your webhook URL: `https://your-server.com/api/webhook`
-   - Subscribe to events: `page.content_updated`, `page.created`, `page.deleted`, `page.moved`
+#### Prerequisites
 
-2. **Receive verification token**: When you create the subscription, Notion sends a POST request to your webhook URL containing a `verification_token`. Check your server logs:
+1. Backend server running (`npm run dev:server`)
+2. Server publicly accessible (use ngrok for local development)
+3. Notion integration with databases shared
 
-   ```
-   [Webhook] NOTION_WEBHOOK_SECRET=secret_xxxxx
-   ```
+#### Step-by-Step Setup
 
-3. **Configure environment**: Add the token to your `.env` file:
+**1. Make server publicly accessible (local development):**
 
-   ```bash
-   NOTION_WEBHOOK_SECRET=secret_xxxxx
-   ```
+```bash
+# Terminal 1: Start backend
+npm run dev:server
 
-4. **Verify in Notion UI**: Paste the token in the Notion verification modal to activate the subscription.
+# Terminal 2: Create tunnel
+ngrok http 3001
+# Copy the https URL (e.g., https://abc123.ngrok.io)
+```
 
-**Webhook Payload Validation:**
+**2. Create webhook subscription in Notion:**
+
+- Go to [Notion Integrations](https://www.notion.so/profile/integrations)
+- Select your integration → **Webhooks** tab
+- Click **+ Create subscription**
+- Webhook URL: `https://your-ngrok-url.ngrok.io/api/webhook`
+- Subscribe to: `page.content_updated`, `page.created`, `page.deleted`, `page.moved`, `page.undeleted`, `page.unlocked`
+
+**3. Capture verification token from server logs:**
+
+```
+[Webhook] Received verification token. Configure NOTION_WEBHOOK_SECRET:
+[Webhook] NOTION_WEBHOOK_SECRET=secret_abc123xyz...
+```
+
+**4. Add token to `.env` and restart server:**
+
+```bash
+# In .env file
+NOTION_WEBHOOK_SECRET=secret_abc123xyz...
+```
+
+**5. Complete verification in Notion UI:**
+
+Paste the token in the Notion verification modal. Status should show **Active** ✅
+
+**6. Test by making a change in Notion:**
+
+```
+[Webhook] Received event: page.content_updated for page abc123...
+[Webhook] Updated item: abc123 (Item Title, type: project)
+```
+
+#### Troubleshooting
+
+| Issue               | Solution                                                       |
+| ------------------- | -------------------------------------------------------------- |
+| Webhook "Pending"   | Check ngrok is running and URL is correct                      |
+| Invalid signature   | Verify `NOTION_WEBHOOK_SECRET` matches exactly, restart server |
+| Events not received | Ensure database is shared with integration                     |
+
+#### Webhook Security
 
 The server validates webhook signatures using HMAC-SHA256:
 
