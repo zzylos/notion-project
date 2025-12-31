@@ -9,6 +9,20 @@ import itemsRouter from './routes/items.js';
 import webhookRouter from './routes/webhook.js';
 import type { RequestWithRawBody } from './types/express.js';
 
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+  logger.server.error('Unhandled Promise Rejection:', reason);
+  logger.server.error('Promise:', promise);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error: Error) => {
+  logger.server.error('Uncaught Exception:', error.message);
+  logger.server.error('Stack:', error.stack);
+  // Give time for logs to flush before exiting
+  setTimeout(() => process.exit(1), 1000);
+});
+
 const app = express();
 
 // Middleware
@@ -19,8 +33,10 @@ app.use(
   })
 );
 // Capture raw body for webhook signature validation, then parse JSON
+// Limit body size to 1MB to prevent DoS attacks
 app.use(
   express.json({
+    limit: '1mb',
     verify: (req, _res, buf) => {
       // Store raw body buffer on request for signature verification
       // Type is augmented via types/express.d.ts

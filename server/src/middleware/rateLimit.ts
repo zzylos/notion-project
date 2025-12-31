@@ -9,14 +9,23 @@ interface RateLimitOptions {
   windowMs: number; // Time window in milliseconds
   maxRequests: number; // Max requests per window
   message?: string; // Custom error message
+  maxClients?: number; // Maximum number of clients to track (memory bound)
 }
 
+/** Default maximum number of clients to track to prevent memory exhaustion */
+const DEFAULT_MAX_CLIENTS = 10000;
+
 /**
- * Simple in-memory rate limiter middleware.
+ * Simple in-memory rate limiter middleware with memory bounds.
  * For production, consider using Redis-backed rate limiting.
  */
 export function createRateLimiter(options: RateLimitOptions) {
-  const { windowMs, maxRequests, message = 'Too many requests, please try again later' } = options;
+  const {
+    windowMs,
+    maxRequests,
+    message = 'Too many requests, please try again later',
+    maxClients = DEFAULT_MAX_CLIENTS,
+  } = options;
   const clients = new Map<string, RateLimitEntry>();
 
   // Cleanup old entries periodically (every minute)
@@ -25,6 +34,18 @@ export function createRateLimiter(options: RateLimitOptions) {
     const now = Date.now();
     for (const [key, entry] of clients) {
       if (entry.resetTime <= now) {
+        clients.delete(key);
+      }
+    }
+
+    // Emergency eviction if still over max clients (evict oldest entries)
+    if (clients.size > maxClients) {
+      const entries = Array.from(clients.entries());
+      // Sort by reset time (oldest first)
+      entries.sort((a, b) => a[1].resetTime - b[1].resetTime);
+      // Remove oldest entries until under limit
+      const toRemove = entries.slice(0, clients.size - maxClients);
+      for (const [key] of toRemove) {
         clients.delete(key);
       }
     }
@@ -49,6 +70,14 @@ export function createRateLimiter(options: RateLimitOptions) {
 
     // If no entry or window expired, create new entry
     if (!entry || entry.resetTime <= now) {
+      // Enforce memory bounds - if at limit and adding new client, skip rate limiting
+      // This prevents memory exhaustion while allowing legitimate new clients
+      if (clients.size >= maxClients && !clients.has(clientId)) {
+        // At capacity with new client - allow request but don't track
+        next();
+        return;
+      }
+
       entry = {
         count: 1,
         resetTime: now + windowMs,

@@ -20,6 +20,9 @@ import { logger } from '../utils/logger.js';
 
 const NOTION_API_BASE = NOTION_API.BASE_URL;
 
+/** Default timeout for Notion API requests (30 seconds) */
+const FETCH_TIMEOUT_MS = 30000;
+
 /**
  * Server-side Notion API service.
  * Makes direct API calls without CORS proxy.
@@ -53,32 +56,49 @@ class NotionService {
   }
 
   /**
-   * Make a request to the Notion API
+   * Make a request to the Notion API with timeout
    */
   private async notionFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${NOTION_API_BASE}${endpoint}`;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(parseNotionError(response.status, errorText));
-    }
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     try {
-      return (await response.json()) as T;
-    } catch {
-      throw new Error(
-        'Failed to parse Notion API response: Invalid JSON. The API may be experiencing issues.'
-      );
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(parseNotionError(response.status, errorText));
+      }
+
+      try {
+        return (await response.json()) as T;
+      } catch {
+        throw new Error(
+          'Failed to parse Notion API response: Invalid JSON. The API may be experiencing issues.'
+        );
+      }
+    } catch (error) {
+      // Handle timeout specifically
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(
+          `Notion API request timed out after ${FETCH_TIMEOUT_MS / 1000}s: ${endpoint}`
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

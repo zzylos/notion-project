@@ -1,6 +1,9 @@
 import type { WorkItem, ItemStatus } from '../types';
 import { ApiError, NetworkError, isAbortError } from '../utils/errors';
 
+/** Default timeout for API requests (30 seconds) */
+const FETCH_TIMEOUT_MS = 30000;
+
 /**
  * API response wrapper type
  */
@@ -39,7 +42,7 @@ class ApiClient {
   }
 
   /**
-   * Make a request to the backend API
+   * Make a request to the backend API with timeout
    */
   private async request<T>(
     endpoint: string,
@@ -48,10 +51,19 @@ class ApiClient {
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
 
+    // Create abort controller for timeout, but respect provided signal
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    // If a signal is provided, abort our controller when it aborts
+    if (signal) {
+      signal.addEventListener('abort', () => controller.abort());
+    }
+
     try {
       const response = await fetch(url, {
         ...options,
-        signal,
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -78,8 +90,14 @@ class ApiClient {
 
       return data;
     } catch (error) {
-      // Re-throw abort errors
+      // Re-throw abort errors (including timeout)
       if (isAbortError(error)) {
+        // Check if it was our timeout vs user cancellation
+        if (!signal?.aborted) {
+          throw new NetworkError(
+            `Request to ${endpoint} timed out after ${FETCH_TIMEOUT_MS / 1000}s`
+          );
+        }
         throw error;
       }
 
@@ -96,6 +114,8 @@ class ApiClient {
       }
 
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
