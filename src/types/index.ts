@@ -27,13 +27,8 @@ export type {
   NotionPage,
   NotionPropertyValue,
   NotionQueryResponse,
+  FetchItemsResponse,
 } from '../../shared/types';
-
-/**
- * Map of ItemType to database IDs.
- * Used for configuration where each item type has a corresponding database.
- */
-export type DatabaseIdMap = Record<SharedItemType, string>;
 
 /**
  * Known status categories for color mapping.

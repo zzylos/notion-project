@@ -11,6 +11,7 @@ import type {
 import {
   PROPERTY_ALIASES,
   NOTION_API,
+  NETWORK,
   parseNotionError,
   PropertyMapper,
   normalizeUuid,
@@ -19,9 +20,7 @@ import {
 import { logger } from '../utils/logger.js';
 
 const NOTION_API_BASE = NOTION_API.BASE_URL;
-
-/** Default timeout for Notion API requests (30 seconds) */
-const FETCH_TIMEOUT_MS = 30000;
+const FETCH_TIMEOUT_MS = NETWORK.FETCH_TIMEOUT_MS;
 
 /**
  * Server-side Notion API service.

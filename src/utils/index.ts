@@ -75,11 +75,8 @@ export {
 } from './typeGuards';
 
 // Validation
-export { isValidApiKey, isValidDatabaseId, isValidNotionUrl } from './validation';
-
-// Array utilities
-export { toggleArrayItem, unique } from './arrayUtils';
+export { isValidDatabaseId, isValidNotionUrl } from './validation';
 
 // Tree building utilities
-export { buildTreeNodes, getItemPath, buildChildMap } from './treeBuilder';
+export { buildTreeNodes, getItemPath } from './treeBuilder';
 export type { TreeBuildState } from './treeBuilder';

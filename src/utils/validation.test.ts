@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   isValidDatabaseId,
   isValidNotionUrl,
-  isValidApiKey,
   validateApiKey,
   validateNotionConfig,
 } from './validation';
@@ -60,39 +59,6 @@ const makeApiKey = (length: number): string => {
   const remaining = length - prefix.length;
   return prefix + 'a'.repeat(Math.max(0, remaining));
 };
-
-describe('isValidApiKey', () => {
-  it('should accept valid API keys with proper length', () => {
-    // Notion API keys are typically 50+ characters
-    expect(isValidApiKey(makeApiKey(50))).toBe(true);
-    expect(isValidApiKey(makeApiKey(100))).toBe(true);
-  });
-
-  it('should reject API keys without secret_ prefix', () => {
-    expect(isValidApiKey('abc123xyz'.repeat(10))).toBe(false);
-    expect(isValidApiKey('SECRET_' + 'a'.repeat(50))).toBe(false); // Case sensitive
-  });
-
-  it('should reject API keys that are too short', () => {
-    expect(isValidApiKey('secret_')).toBe(false); // Only 7 chars
-    expect(isValidApiKey('secret_abc')).toBe(false); // Only 10 chars
-    expect(isValidApiKey(makeApiKey(49))).toBe(false); // Just under limit
-  });
-
-  it('should reject API keys that are too long', () => {
-    expect(isValidApiKey(makeApiKey(201))).toBe(false);
-    expect(isValidApiKey(makeApiKey(500))).toBe(false);
-  });
-
-  it('should reject empty or whitespace-only values', () => {
-    expect(isValidApiKey('')).toBe(false);
-    expect(isValidApiKey('   ')).toBe(false);
-  });
-
-  it('should handle leading/trailing whitespace', () => {
-    expect(isValidApiKey('  ' + makeApiKey(50) + '  ')).toBe(true);
-  });
-});
 
 describe('validateApiKey', () => {
   it('should return valid: true for valid API keys', () => {

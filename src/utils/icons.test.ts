@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { typeIcons, getTypeIcon } from './icons';
+import { typeIcons } from './icons';
 import { Target, AlertCircle, Lightbulb, Palette, FolderKanban } from 'lucide-react';
 import type { ItemType } from '../types';
 
@@ -18,35 +18,5 @@ describe('typeIcons', () => {
     expect(typeIcons.solution).toBe(Lightbulb);
     expect(typeIcons.design).toBe(Palette);
     expect(typeIcons.project).toBe(FolderKanban);
-  });
-});
-
-describe('getTypeIcon', () => {
-  it('should return correct icon for mission type', () => {
-    expect(getTypeIcon('mission')).toBe(Target);
-  });
-
-  it('should return correct icon for problem type', () => {
-    expect(getTypeIcon('problem')).toBe(AlertCircle);
-  });
-
-  it('should return correct icon for solution type', () => {
-    expect(getTypeIcon('solution')).toBe(Lightbulb);
-  });
-
-  it('should return correct icon for design type', () => {
-    expect(getTypeIcon('design')).toBe(Palette);
-  });
-
-  it('should return correct icon for project type', () => {
-    expect(getTypeIcon('project')).toBe(FolderKanban);
-  });
-
-  it('should return a valid React component', () => {
-    const Icon = getTypeIcon('mission');
-    // Lucide icons are ForwardRef objects, not plain functions
-    // Just verify it's defined and matches the expected icon
-    expect(Icon).toBeDefined();
-    expect(Icon).toBe(Target);
   });
 });
