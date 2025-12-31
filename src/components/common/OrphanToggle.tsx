@@ -38,9 +38,7 @@ const OrphanToggle: React.FC = memo(() => {
       aria-pressed={showOnlyOrphans}
     >
       <Unlink className="w-4 h-4" />
-      <span className="hidden sm:inline">
-        {showOnlyOrphans ? 'Showing Orphans' : 'Orphans'}
-      </span>
+      <span className="hidden sm:inline">{showOnlyOrphans ? 'Showing Orphans' : 'Orphans'}</span>
       <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 rounded-full">
         {orphanCount}
       </span>

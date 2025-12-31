@@ -111,11 +111,7 @@ const HTTP_ERROR_MESSAGES: Record<number, string> = {
  * @returns User-friendly error message
  */
 export function getHttpErrorMessage(statusCode: number, fallback?: string): string {
-  return (
-    HTTP_ERROR_MESSAGES[statusCode] ||
-    fallback ||
-    `Request failed with status ${statusCode}`
-  );
+  return HTTP_ERROR_MESSAGES[statusCode] || fallback || `Request failed with status ${statusCode}`;
 }
 
 /**
@@ -206,7 +202,7 @@ export async function withRetry<T>(
 
       const delay = delayMs * Math.pow(backoff, attempt);
       onRetry?.(attempt + 1, lastError);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 

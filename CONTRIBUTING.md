@@ -139,6 +139,7 @@ type(scope): description
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -148,6 +149,7 @@ type(scope): description
 - `chore`: Maintenance tasks
 
 **Examples:**
+
 ```
 feat(canvas): add zoom controls to canvas view
 fix(notion): handle rate limiting errors gracefully
@@ -178,16 +180,20 @@ If a commit fails, fix the issues and try again.
 
 ```markdown
 ## Summary
+
 Brief description of the changes.
 
 ## Changes
+
 - List of specific changes made
 
 ## Testing
+
 - How the changes were tested
 - Any new tests added
 
 ## Screenshots (if applicable)
+
 Include screenshots for UI changes.
 ```
 

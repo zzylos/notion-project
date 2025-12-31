@@ -87,10 +87,7 @@ export function isNonEmptyArray<T>(value: unknown): value is T[] {
  *   console.error(response.error);
  * }
  */
-export function hasProperty<K extends string>(
-  obj: unknown,
-  prop: K
-): obj is Record<K, unknown> {
+export function hasProperty<K extends string>(obj: unknown, prop: K): obj is Record<K, unknown> {
   return isObject(obj) && prop in obj;
 }
 

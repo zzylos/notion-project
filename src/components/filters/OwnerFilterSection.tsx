@@ -38,15 +38,12 @@ const OwnerFilterSection: React.FC<OwnerFilterSectionProps> = memo(
     // Get unique owners from items
     const owners = useMemo(() => {
       const itemsArray = Array.from(items.values());
-      const ownerMap = itemsArray.reduce(
-        (acc, item) => {
-          if (item.owner && !acc.has(item.owner.id)) {
-            acc.set(item.owner.id, { id: item.owner.id, name: item.owner.name });
-          }
-          return acc;
-        },
-        new Map<string, { id: string; name: string }>()
-      );
+      const ownerMap = itemsArray.reduce((acc, item) => {
+        if (item.owner && !acc.has(item.owner.id)) {
+          acc.set(item.owner.id, { id: item.owner.id, name: item.owner.name });
+        }
+        return acc;
+      }, new Map<string, { id: string; name: string }>());
       return Array.from(ownerMap.values());
     }, [items]);
 
