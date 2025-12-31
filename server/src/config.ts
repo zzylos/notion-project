@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { NotionConfig, PropertyMappings, DatabaseConfig, ItemType } from './types/index.js';
+import type { NotionConfig, PropertyMappings, DatabaseConfig } from './types/index.js';
+import { DEFAULT_PROPERTY_MAPPINGS, ITEM_TYPES } from '../../shared/constants.js';
 
 // Load .env from root directory (parent of server/)
 const __filename = fileURLToPath(import.meta.url);
@@ -21,20 +22,6 @@ export interface ServerConfig {
     secret: string | null;
   };
 }
-
-/**
- * Default property mappings (same as frontend)
- */
-const DEFAULT_PROPERTY_MAPPINGS: PropertyMappings = {
-  title: 'Name',
-  status: 'Status',
-  priority: 'Priority',
-  owner: 'Owner',
-  parent: 'Parent',
-  progress: 'Progress',
-  dueDate: 'Deadline',
-  tags: 'Tags',
-};
 
 /**
  * Get an environment variable with optional VITE_ prefix fallback
@@ -65,9 +52,8 @@ function parseIntEnv(key: string, defaultValue: number, min?: number, max?: numb
  */
 function buildDatabaseConfigs(): DatabaseConfig[] {
   const databases: DatabaseConfig[] = [];
-  const dbTypes: ItemType[] = ['mission', 'problem', 'solution', 'project', 'design'];
 
-  for (const type of dbTypes) {
+  for (const type of ITEM_TYPES) {
     const envKey = `NOTION_DB_${type.toUpperCase()}`;
     const databaseId = getEnvVar(envKey)?.trim();
     if (databaseId) {

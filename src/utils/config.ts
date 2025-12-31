@@ -1,5 +1,5 @@
 import type { NotionConfig, DatabaseConfig, PropertyMappings, ItemType } from '../types';
-import { DEFAULT_PROPERTY_MAPPINGS, REFRESH } from '../constants';
+import { DEFAULT_PROPERTY_MAPPINGS, REFRESH, ITEM_TYPES } from '../constants';
 import { logger } from './logger';
 
 /**
@@ -110,15 +110,9 @@ export function getEnvConfig(): NotionConfig | null {
 
   // Build database configs from env vars
   const databases: DatabaseConfig[] = [];
-  const dbEnvMap: Record<ItemType, string> = {
-    mission: 'VITE_NOTION_DB_MISSION',
-    problem: 'VITE_NOTION_DB_PROBLEM',
-    solution: 'VITE_NOTION_DB_SOLUTION',
-    project: 'VITE_NOTION_DB_PROJECT',
-    design: 'VITE_NOTION_DB_DESIGN',
-  };
 
-  for (const [type, envKey] of Object.entries(dbEnvMap) as [ItemType, string][]) {
+  for (const type of ITEM_TYPES) {
+    const envKey = `VITE_NOTION_DB_${type.toUpperCase()}`;
     const dbId = getEnv(envKey);
     if (dbId && dbId.trim()) {
       databases.push({
@@ -133,16 +127,16 @@ export function getEnvConfig(): NotionConfig | null {
     return null;
   }
 
-  // Build property mappings from env vars (with defaults)
+  // Build property mappings from env vars (with defaults from shared constants)
   const defaultMappings: PropertyMappings = {
-    title: getEnv('VITE_MAPPING_TITLE') || 'Name',
-    status: getEnv('VITE_MAPPING_STATUS') || 'Status',
-    priority: getEnv('VITE_MAPPING_PRIORITY') || 'Priority',
-    owner: getEnv('VITE_MAPPING_OWNER') || 'Owner',
-    parent: getEnv('VITE_MAPPING_PARENT') || 'Parent',
-    progress: getEnv('VITE_MAPPING_PROGRESS') || 'Progress',
-    dueDate: getEnv('VITE_MAPPING_DUE_DATE') || 'Deadline',
-    tags: getEnv('VITE_MAPPING_TAGS') || 'Tags',
+    title: getEnv('VITE_MAPPING_TITLE') || DEFAULT_PROPERTY_MAPPINGS.title,
+    status: getEnv('VITE_MAPPING_STATUS') || DEFAULT_PROPERTY_MAPPINGS.status,
+    priority: getEnv('VITE_MAPPING_PRIORITY') || DEFAULT_PROPERTY_MAPPINGS.priority,
+    owner: getEnv('VITE_MAPPING_OWNER') || DEFAULT_PROPERTY_MAPPINGS.owner,
+    parent: getEnv('VITE_MAPPING_PARENT') || DEFAULT_PROPERTY_MAPPINGS.parent,
+    progress: getEnv('VITE_MAPPING_PROGRESS') || DEFAULT_PROPERTY_MAPPINGS.progress,
+    dueDate: getEnv('VITE_MAPPING_DUE_DATE') || DEFAULT_PROPERTY_MAPPINGS.dueDate,
+    tags: getEnv('VITE_MAPPING_TAGS') || DEFAULT_PROPERTY_MAPPINGS.tags,
   };
 
   return {
@@ -160,16 +154,8 @@ export function hasEnvConfig(): boolean {
   if (!apiKey) return false;
 
   // Check if at least one database is configured
-  const dbEnvKeys = [
-    'VITE_NOTION_DB_MISSION',
-    'VITE_NOTION_DB_PROBLEM',
-    'VITE_NOTION_DB_SOLUTION',
-    'VITE_NOTION_DB_PROJECT',
-    'VITE_NOTION_DB_DESIGN',
-  ];
-
-  return dbEnvKeys.some(key => {
-    const val = getEnv(key);
+  return ITEM_TYPES.some(type => {
+    const val = getEnv(`VITE_NOTION_DB_${type.toUpperCase()}`);
     return val && val.trim().length > 0;
   });
 }
@@ -206,13 +192,13 @@ export interface MigratedConfig {
  * Create default empty database map
  */
 function createEmptyDatabaseMap(): Record<ItemType, string> {
-  return {
-    mission: '',
-    problem: '',
-    solution: '',
-    project: '',
-    design: '',
-  };
+  return ITEM_TYPES.reduce(
+    (acc, type) => {
+      acc[type] = '';
+      return acc;
+    },
+    {} as Record<ItemType, string>
+  );
 }
 
 /**
