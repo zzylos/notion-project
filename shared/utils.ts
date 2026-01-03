@@ -47,13 +47,15 @@ export function buildRelationships(items: WorkItem[], options?: BuildRelationshi
   const itemMap = new Map(items.map(item => [item.id, item]));
   const orphanedItems: OrphanedItem[] = [];
 
+  // Clear all children arrays first to prevent duplicates when called multiple times
+  for (const item of items) {
+    item.children = [];
+  }
+
   for (const item of items) {
     if (item.parentId) {
       const parent = itemMap.get(item.parentId);
       if (parent) {
-        if (!parent.children) {
-          parent.children = [];
-        }
         parent.children.push(item.id);
       } else {
         // Track orphaned items (have parentId but parent not found)
