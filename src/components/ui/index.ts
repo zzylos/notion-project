@@ -1,3 +1,9 @@
+/**
+ * UI component exports for the Notion Opportunity Tree Visualizer.
+ *
+ * These are reusable UI primitives used across the application.
+ */
+
 export { default as StatusBadge } from './StatusBadge';
 export { default as PriorityBadge } from './PriorityBadge';
 export { default as ProgressBar } from './ProgressBar';

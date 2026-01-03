@@ -35,8 +35,13 @@ export interface UseNotionDataReturn {
   clearFailedDatabases: () => void;
   /** Force refresh data from Notion (bypasses cache) */
   refreshData: () => Promise<void>;
-  /** Load data with the given config */
-  loadData: (config: NotionConfig | null, forceRefresh?: boolean) => Promise<void>;
+  /**
+   * Load data with the given config.
+   * @param config - The Notion configuration to use
+   * @param _forceRefresh - Deprecated: Previously used for cache invalidation.
+   *                        Now handled automatically via webhooks on the backend.
+   */
+  loadData: (config: NotionConfig | null, _forceRefresh?: boolean) => Promise<void>;
 }
 
 /**
