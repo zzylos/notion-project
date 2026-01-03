@@ -11,6 +11,16 @@ const rootDir = path.resolve(__dirname, '../..');
 dotenv.config({ path: path.join(rootDir, '.env') });
 
 /**
+ * MongoDB configuration
+ */
+export interface MongoDbConfig {
+  /** MongoDB Atlas connection URI */
+  uri: string;
+  /** Database name */
+  dbName: string;
+}
+
+/**
  * Server configuration loaded from environment variables
  */
 export interface ServerConfig {
@@ -21,6 +31,7 @@ export interface ServerConfig {
     /** Secret token for validating webhook signatures (from Notion verification) */
     secret: string | null;
   };
+  mongodb: MongoDbConfig;
 }
 
 /**
@@ -139,6 +150,17 @@ export function loadConfig(): ServerConfig {
   // Webhook secret is optional - can be set after initial verification
   const webhookSecret = getEnvVar('NOTION_WEBHOOK_SECRET') || null;
 
+  // MongoDB configuration (required)
+  const mongoUri = getEnvVar('MONGODB_URI');
+  if (!mongoUri) {
+    throw new Error(
+      'MONGODB_URI environment variable is required. ' +
+        'Set it in the root .env file with your MongoDB Atlas connection string.'
+    );
+  }
+
+  const mongoDbName = getEnvVar('MONGODB_DB_NAME', 'notion-tree')!;
+
   return {
     port,
     corsOrigin,
@@ -149,6 +171,10 @@ export function loadConfig(): ServerConfig {
     },
     webhook: {
       secret: webhookSecret,
+    },
+    mongodb: {
+      uri: mongoUri,
+      dbName: mongoDbName,
     },
   };
 }

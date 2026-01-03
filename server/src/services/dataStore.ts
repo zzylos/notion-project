@@ -1,13 +1,19 @@
 import type { WorkItem } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { getMongoDB } from './mongodb.js';
 
 /**
- * Persistent in-memory data store for WorkItems.
+ * In-memory cache layer for WorkItems, backed by MongoDB.
  *
- * Unlike the previous cache service, this store:
- * - Has no TTL/expiration (data persists until server restart)
- * - Is updated in real-time via Notion webhooks
+ * This store:
+ * - Serves as a fast read cache for API requests
+ * - Is backed by MongoDB for persistence
+ * - Supports write-through operations that persist to MongoDB first
  * - Maintains parent-child relationships
+ *
+ * Two modes of operation:
+ * - Cache-only: upsert/delete methods update cache only (used by sync service)
+ * - Write-through: upsertWithPersistence/deleteWithPersistence write to MongoDB first
  */
 class DataStore {
   private items: Map<string, WorkItem> = new Map();
@@ -112,8 +118,9 @@ class DataStore {
   }
 
   /**
-   * Delete an item by ID
-   * Also removes from parent's children array
+   * Delete an item by ID (cache only).
+   * Also removes from parent's children array.
+   * Use deleteWithPersistence for write-through operations.
    */
   delete(id: string): boolean {
     const item = this.items.get(id);
@@ -142,8 +149,73 @@ class DataStore {
 
     this.items.delete(id);
     this.lastUpdated = new Date();
-    logger.store.debug(`Deleted item: ${id}`);
+    logger.store.debug(`Deleted item from cache: ${id}`);
     return true;
+  }
+
+  /**
+   * Add or update an item with persistence to MongoDB (write-through).
+   * Writes to MongoDB first, then updates cache on success.
+   * Throws if MongoDB write fails.
+   */
+  async upsertWithPersistence(item: WorkItem): Promise<void> {
+    const mongodb = getMongoDB();
+
+    // Get existing item to track parent change
+    const existing = await mongodb.getItem(item.id);
+    const oldParentId = existing?.parentId;
+
+    // Write to MongoDB first
+    await mongodb.upsertItem(item);
+
+    // Update relationships in MongoDB if parent changed
+    if (oldParentId !== item.parentId) {
+      await mongodb.updateRelationships(item, oldParentId);
+    }
+
+    // Update cache on success
+    this.upsert(item);
+
+    logger.store.debug(`Persisted and cached item: ${item.id} (${item.title})`);
+  }
+
+  /**
+   * Delete an item with persistence to MongoDB (write-through).
+   * Deletes from MongoDB first, then updates cache on success.
+   * Also orphans children in both MongoDB and cache.
+   * Returns true if the item was deleted.
+   */
+  async deleteWithPersistence(id: string): Promise<boolean> {
+    const mongodb = getMongoDB();
+
+    // Check if item exists
+    const exists = await mongodb.hasItem(id);
+    if (!exists) {
+      return false;
+    }
+
+    // Orphan children in MongoDB
+    await mongodb.orphanChildren(id);
+
+    // Delete from MongoDB
+    await mongodb.deleteItem(id);
+
+    // Update cache on success
+    this.delete(id);
+
+    logger.store.debug(`Persisted deletion and updated cache: ${id}`);
+    return true;
+  }
+
+  /**
+   * Refresh the cache from MongoDB.
+   * Replaces all cached items with current MongoDB data.
+   */
+  async refreshFromMongoDB(): Promise<void> {
+    const mongodb = getMongoDB();
+    const items = await mongodb.getAllItems();
+    this.initialize(items);
+    logger.store.info(`Cache refreshed from MongoDB: ${items.length} items`);
   }
 
   /**

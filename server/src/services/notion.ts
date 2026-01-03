@@ -244,12 +244,19 @@ class NotionService {
   }
 
   /**
-   * Fetch a single page of results
+   * Fetch a single page of results with optional filter.
    */
-  private async fetchPage(databaseId: string, cursor?: string): Promise<NotionQueryResponse> {
+  private async fetchPage(
+    databaseId: string,
+    cursor?: string,
+    filter?: Record<string, unknown>
+  ): Promise<NotionQueryResponse> {
     const body: Record<string, unknown> = { page_size: 100 };
     if (cursor) {
       body.start_cursor = cursor;
+    }
+    if (filter) {
+      body.filter = filter;
     }
 
     const response = await this.notionFetch<unknown>(`/databases/${databaseId}/query`, {
@@ -345,6 +352,85 @@ class NotionService {
       items: allItems,
       failedDatabases,
       orphanedItemsCount: orphanedCount,
+    };
+  }
+
+  /**
+   * Fetch items from a database that were modified since a given timestamp.
+   */
+  private async fetchFromDatabaseSince(dbConfig: DatabaseConfig, since: Date): Promise<WorkItem[]> {
+    const allPages: NotionPage[] = [];
+    let currentCursor: string | undefined;
+    let hasMore = true;
+
+    // Create filter for items edited after the given timestamp
+    const filter = {
+      timestamp: 'last_edited_time',
+      last_edited_time: {
+        on_or_after: since.toISOString(),
+      },
+    };
+
+    while (hasMore) {
+      const response = await this.fetchPage(dbConfig.databaseId, currentCursor, filter);
+      allPages.push(...response.results);
+      hasMore = response.has_more;
+      currentCursor = response.next_cursor ?? undefined;
+    }
+
+    return allPages
+      .filter(page => 'properties' in page)
+      .map(page => this.pageToWorkItem(page, dbConfig.type, dbConfig));
+  }
+
+  /**
+   * Fetch items modified since a given timestamp from all configured databases.
+   * Used for incremental sync to get only changed items.
+   *
+   * @param since - Fetch items modified on or after this timestamp
+   * @returns Items modified since the given time (without relationship building)
+   */
+  async fetchItemsSince(since: Date): Promise<{
+    items: WorkItem[];
+    failedDatabases: Array<{ type: string; error: string }>;
+  }> {
+    const allItems: WorkItem[] = [];
+    const failedDatabases: Array<{ type: string; error: string }> = [];
+
+    logger.notion.info(
+      `Fetching items modified since ${since.toISOString()} from ${this.config.databases.length} databases...`
+    );
+
+    // Fetch all databases in parallel with the time filter
+    const fetchPromises = this.config.databases.map(async dbConfig => {
+      try {
+        const items = await this.fetchFromDatabaseSince(dbConfig, since);
+        if (items.length > 0) {
+          logger.notion.info(`Fetched ${items.length} modified items from ${dbConfig.type}`);
+        }
+        return { success: true as const, items, type: dbConfig.type };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.notion.error(`Failed to fetch ${dbConfig.type}:`, errorMessage);
+        return { success: false as const, error: errorMessage, type: dbConfig.type };
+      }
+    });
+
+    const results = await Promise.all(fetchPromises);
+
+    for (const result of results) {
+      if (result.success) {
+        allItems.push(...result.items);
+      } else {
+        failedDatabases.push({ type: result.type, error: result.error });
+      }
+    }
+
+    logger.notion.info(`Total items modified since ${since.toISOString()}: ${allItems.length}`);
+
+    return {
+      items: allItems,
+      failedDatabases,
     };
   }
 

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { getDataStore } from '../services/dataStore.js';
 import { getNotion } from '../services/notion.js';
+import { getSyncService } from '../services/syncService.js';
 import { mutationRateLimiter } from '../middleware/rateLimit.js';
 import { logger } from '../utils/logger.js';
 import { normalizeUuid } from '../utils/uuid.js';
@@ -53,29 +54,54 @@ router.get('/', (_req: Request, res: Response) => {
 
 /**
  * POST /api/items/sync
- * Force a full re-sync from Notion (admin operation)
+ * Force a sync from Notion (admin operation)
  *
- * This fetches all items from all databases and replaces the store.
+ * Query params:
+ * - type: 'full' | 'incremental' (default: 'full')
+ *
+ * Full sync fetches all items and replaces MongoDB + cache.
+ * Incremental sync fetches last 26 hours and merges.
  * Use sparingly - webhooks should handle normal updates.
  */
-router.post('/sync', async (_req: Request, res: Response) => {
+router.post('/sync', async (req: Request, res: Response) => {
   try {
+    const syncType = req.query.type === 'incremental' ? 'incremental' : 'full';
+    const syncService = getSyncService();
     const store = getDataStore();
-    const notion = getNotion();
 
-    logger.api.info('Full sync requested');
+    logger.api.info(`${syncType} sync requested`);
 
-    const result = await notion.fetchAllItems();
+    let result;
+    if (syncType === 'full') {
+      result = await syncService.performFullSync();
+    } else {
+      result = await syncService.performScheduledIncrementalSync();
+    }
 
-    // Replace all items in store
-    store.initialize(result.items);
+    const items = store.getAll();
 
-    const response: ApiResponse<FetchItemsResponse> = {
+    const response: ApiResponse<{
+      items: typeof items;
+      syncResult: {
+        type: string;
+        itemsProcessed: number;
+        itemsAdded: number;
+        itemsUpdated: number;
+        duration: number;
+        errors: string[];
+      };
+    }> = {
       success: true,
       data: {
-        items: result.items,
-        failedDatabases: result.failedDatabases.length > 0 ? result.failedDatabases : undefined,
-        orphanedItemsCount: result.orphanedItemsCount > 0 ? result.orphanedItemsCount : undefined,
+        items,
+        syncResult: {
+          type: result.type,
+          itemsProcessed: result.itemsProcessed,
+          itemsAdded: result.itemsAdded,
+          itemsUpdated: result.itemsUpdated,
+          duration: result.duration,
+          errors: result.errors,
+        },
       },
     };
 
@@ -213,15 +239,16 @@ router.patch('/:id/status', mutationRateLimiter, async (req: Request, res: Respo
       existingItem.type
     );
 
-    // Update local store for faster UI feedback, but only if no webhook updated it concurrently
+    // Update MongoDB and cache (write-through), but only if no webhook updated it concurrently
     const currentItem = store.get(itemId);
     if (currentItem && currentItem.updatedAt === preUpdateTimestamp) {
       // No concurrent update occurred, safe to update
-      store.upsert({
+      const updatedItem = {
         ...currentItem,
         status: trimmedStatus,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      await store.upsertWithPersistence(updatedItem);
     } else {
       // A webhook updated the item concurrently - let the webhook's data take precedence
       logger.api.debug(
@@ -295,15 +322,16 @@ router.patch('/:id/progress', mutationRateLimiter, async (req: Request, res: Res
     // Update in Notion first - if this fails, we don't touch the store
     await notion.updateItemProgress(existingItem.notionPageId || itemId, progress);
 
-    // Update local store for faster UI feedback, but only if no webhook updated it concurrently
+    // Update MongoDB and cache (write-through), but only if no webhook updated it concurrently
     const currentItem = store.get(itemId);
     if (currentItem && currentItem.updatedAt === preUpdateTimestamp) {
       // No concurrent update occurred, safe to update
-      store.upsert({
+      const updatedItem = {
         ...currentItem,
         progress,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      await store.upsertWithPersistence(updatedItem);
     } else {
       // A webhook updated the item concurrently - let the webhook's data take precedence
       logger.api.debug(
