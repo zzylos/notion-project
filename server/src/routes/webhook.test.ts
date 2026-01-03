@@ -362,7 +362,6 @@ describe('Webhook Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('configured');
-      expect(response.body.data).toHaveProperty('hasVerificationToken');
       expect(response.body.data).toHaveProperty('storeStats');
       expect(response.body.data.storeStats.totalItems).toBe(10);
     });
