@@ -24,6 +24,8 @@ describe('Webhook Routes', () => {
     get: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
+    upsertWithPersistence: ReturnType<typeof vi.fn>;
+    deleteWithPersistence: ReturnType<typeof vi.fn>;
     getStats: ReturnType<typeof vi.fn>;
   };
   let mockNotion: {
@@ -39,6 +41,8 @@ describe('Webhook Routes', () => {
       get: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
+      upsertWithPersistence: vi.fn().mockResolvedValue(undefined),
+      deleteWithPersistence: vi.fn().mockResolvedValue(true),
       getStats: vi.fn().mockReturnValue({
         totalItems: 10,
         initialized: true,
@@ -221,7 +225,7 @@ describe('Webhook Routes', () => {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(mockNotion.fetchItem).toHaveBeenCalled();
-      expect(mockStore.upsert).toHaveBeenCalled();
+      expect(mockStore.upsertWithPersistence).toHaveBeenCalled();
     });
 
     it('should handle page.created event', async () => {
@@ -248,11 +252,11 @@ describe('Webhook Routes', () => {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(mockNotion.fetchItem).toHaveBeenCalled();
-      expect(mockStore.upsert).toHaveBeenCalled();
+      expect(mockStore.upsertWithPersistence).toHaveBeenCalled();
     });
 
     it('should handle page.deleted event', async () => {
-      mockStore.delete.mockReturnValue(true);
+      mockStore.deleteWithPersistence.mockResolvedValue(true);
 
       const event = {
         type: 'page.deleted',
@@ -276,7 +280,7 @@ describe('Webhook Routes', () => {
       // Wait for async processing
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(mockStore.delete).toHaveBeenCalled();
+      expect(mockStore.deleteWithPersistence).toHaveBeenCalled();
       expect(mockNotion.fetchItem).not.toHaveBeenCalled();
     });
 
@@ -405,6 +409,8 @@ describe('UUID Normalization', () => {
     get: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
+    upsertWithPersistence: ReturnType<typeof vi.fn>;
+    deleteWithPersistence: ReturnType<typeof vi.fn>;
     getStats: ReturnType<typeof vi.fn>;
   };
 
@@ -415,6 +421,8 @@ describe('UUID Normalization', () => {
       get: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn().mockReturnValue(true),
+      upsertWithPersistence: vi.fn().mockResolvedValue(undefined),
+      deleteWithPersistence: vi.fn().mockResolvedValue(true),
       getStats: vi.fn().mockReturnValue({
         totalItems: 0,
         initialized: true,
@@ -465,6 +473,8 @@ describe('UUID Normalization', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     // Should be called with normalized UUID (with dashes)
-    expect(mockStore.delete).toHaveBeenCalledWith('12345678-abcd-1234-abcd-1234abcd1234');
+    expect(mockStore.deleteWithPersistence).toHaveBeenCalledWith(
+      '12345678-abcd-1234-abcd-1234abcd1234'
+    );
   });
 });
