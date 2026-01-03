@@ -251,6 +251,7 @@ function validateSignature(payload: string, signature: string | undefined): bool
 
 /**
  * Handle page update events by fetching fresh data from Notion.
+ * Persists to MongoDB and updates cache (write-through).
  * Returns success/failure status for better observability.
  *
  * Type determination logic:
@@ -295,29 +296,39 @@ async function handlePageUpdate(pageId: string): Promise<{ success: boolean; err
       return { success: true };
     }
 
-    store.upsert(updatedItem);
+    // Write-through: persist to MongoDB, then update cache
+    await store.upsertWithPersistence(updatedItem);
     logger.webhook.info(
       `Updated item: ${updatedItem.id} (${updatedItem.title}, type: ${updatedItem.type})`
     );
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.webhook.error(`Failed to fetch page ${pageId}: ${errorMessage}`);
+    logger.webhook.error(`Failed to update page ${pageId}: ${errorMessage}`);
     return { success: false, error: errorMessage };
   }
 }
 
 /**
- * Handle page deletion events
+ * Handle page deletion events.
+ * Deletes from MongoDB and updates cache (write-through).
  */
-function handlePageDelete(pageId: string): void {
+async function handlePageDelete(pageId: string): Promise<{ success: boolean; error?: string }> {
   const store = getDataStore();
   const normalizedId = normalizeUuid(pageId);
 
-  if (store.delete(normalizedId)) {
-    logger.webhook.info(`Deleted item: ${normalizedId}`);
-  } else {
-    logger.webhook.debug(`Item not found for deletion: ${normalizedId}`);
+  try {
+    const deleted = await store.deleteWithPersistence(normalizedId);
+    if (deleted) {
+      logger.webhook.info(`Deleted item: ${normalizedId}`);
+    } else {
+      logger.webhook.debug(`Item not found for deletion: ${normalizedId}`);
+    }
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.webhook.error(`Failed to delete page ${pageId}: ${errorMessage}`);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -345,8 +356,8 @@ async function processWebhookEvent(
 
   // Handle page deletion
   if (type === 'page.deleted' && entity.type === 'page') {
-    handlePageDelete(entity.id);
-    return { handled: true, success: true };
+    const result = await handlePageDelete(entity.id);
+    return { handled: true, success: result.success, error: result.error };
   }
 
   // Handle database schema changes
