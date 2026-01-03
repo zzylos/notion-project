@@ -25,7 +25,7 @@ interface CacheStats {
 
 /**
  * Client for communicating with the backend API server.
- * Used when VITE_USE_BACKEND_API=true.
+ * The frontend always communicates via the backend server.
  */
 class ApiClient {
   private baseUrl: string;
