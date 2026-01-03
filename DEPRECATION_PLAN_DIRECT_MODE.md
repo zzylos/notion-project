@@ -34,6 +34,8 @@ Browser → Backend Server → Notion API
         Notion Webhooks (real-time updates)
 ```
 
+**Note**: Client-side caching (NotionCacheManager) will be **removed entirely** because it defeats the purpose of real-time webhook updates. With a 5-minute cache, users wouldn't see webhook-triggered updates for up to 5 minutes.
+
 ---
 
 ## Files Requiring Changes
@@ -67,32 +69,39 @@ Browser → Backend Server → Notion API
 
 **Changes Required**: None - this becomes the primary interface
 
-#### 1.3 `src/services/notion/NotionCacheManager.ts` (Keep/Simplify)
-**Current State**: 233 lines, dual-layer caching
+#### 1.3 `src/services/notion/NotionCacheManager.ts` (Remove Entirely)
+**Current State**: 233 lines, dual-layer caching (5-min memory + 24-hr localStorage)
 
-**Decision Point**:
-- **Option A**: Keep for client-side caching of backend responses (recommended)
-- **Option B**: Remove entirely and rely on backend DataStore
+**Problem**: Client-side caching defeats real-time webhook updates:
+```
+0:00 - Client fetches items, caches for 5 minutes
+0:30 - User edits item in Notion
+0:30 - Webhook updates server DataStore immediately ✓
+0:31 - Client navigates, gets STALE cached data ✗
+5:00 - Cache expires, client finally sees update
+```
 
-**Recommendation**: Keep Option A - client-side caching still provides:
-- Instant UI response on page navigation
-- Reduced backend load for repeat requests
-- Offline fallback with stale data
+**Decision**: Remove entirely - the backend DataStore is the single source of truth
 
-**Changes Required** (if keeping):
-- Remove localStorage caching (lines 155-230) - no longer needed with backend mode
-- Simplify to memory-only cache
-- Rename to `ClientCacheManager` or similar
+**Changes Required**:
+- Delete `src/services/notion/NotionCacheManager.ts` (233 lines)
+- Remove export from `src/services/notion/index.ts`
+- Remove import and usage from `src/services/notionService.ts`
+- Remove `NOTION.CACHE_TIMEOUT` constant from `src/constants.ts`
+- Remove `CACHE` constants related to client caching
+
+**Estimated Impact**: ~250 lines removed
 
 ### Category 2: Constants and Configuration (Medium Impact)
 
 #### 2.1 `src/constants.ts`
 **Changes Required**:
 - Remove `DEFAULT_CORS_PROXY` constant (line 82)
-- Keep `NOTION.CACHE_TIMEOUT` for client-side caching
+- Remove `NOTION.CACHE_TIMEOUT` constant (no longer needed)
+- Remove or simplify `CACHE` constants (lines 67-77) - only keep if needed elsewhere
 - Update comments
 
-**Lines Affected**: ~5 lines
+**Lines Affected**: ~20 lines
 
 #### 2.2 `src/utils/config.ts`
 **Changes Required**:
@@ -158,14 +167,20 @@ Browser → Backend Server → Notion API
 #### 4.3 `server/.env.example`
 **Changes Required**: Minor - already deprecated, may need comment updates
 
-### Category 5: Shared Code (Low Impact)
+### Category 5: Files to Delete Entirely
 
-#### 5.1 `shared/constants.ts`
+| File | Lines | Reason |
+|------|-------|--------|
+| `src/services/notion/NotionCacheManager.ts` | 233 | Client-side caching defeats webhook real-time updates |
+
+### Category 6: Shared Code (Low Impact)
+
+#### 6.1 `shared/constants.ts`
 **Changes Required**: Check for CORS-related constants (likely none)
 
-### Category 6: Types (Low Impact)
+### Category 7: Types (Low Impact)
 
-#### 6.1 `src/types/notion.ts`
+#### 7.1 `src/types/notion.ts`
 **Changes Required**: Review for direct-mode specific types
 
 ---
@@ -193,9 +208,10 @@ Execute in this order to minimize broken states:
    - Remove `DEFAULT_CORS_PROXY` from constants.ts
    - Clean up related environment variable handling
 
-4. **Simplify caching layer**
-   - Simplify `NotionCacheManager` to memory-only
-   - Remove localStorage caching
+4. **Remove client-side caching**
+   - Delete `NotionCacheManager.ts` entirely
+   - Remove all caching logic from `NotionService`
+   - Remove related constants (`NOTION.CACHE_TIMEOUT`, `CACHE.*`)
 
 5. **Update UI components**
    - Remove API key input from modal
@@ -218,27 +234,17 @@ Execute in this order to minimize broken states:
 ### 1. `src/services/notionService.ts` - Simplified Version
 
 ```typescript
-// AFTER: Simplified NotionService (conceptual)
-import type { WorkItem, ItemType, NotionConfig, DatabaseConfig } from '../types';
-import type { FetchOptions, FetchProgressCallback } from '../types/notion';
+// AFTER: Simplified NotionService - no client-side caching
+import type { WorkItem, NotionConfig } from '../types';
+import type { FetchOptions } from '../types/notion';
 import { apiClient } from './apiClient';
-import { logger } from '../utils/logger';
-import { NotionCacheManager } from './notion';
-import { NOTION } from '../constants';
 
 export type { FetchProgressCallback, FetchOptions } from '../types/notion';
 
 class NotionService {
   private config: NotionConfig | null = null;
-  private cacheManager: NotionCacheManager;
-  private debugMode = import.meta.env.DEV;
-
-  constructor() {
-    this.cacheManager = new NotionCacheManager(NOTION.CACHE_TIMEOUT, this.debugMode);
-  }
 
   initialize(config: NotionConfig) {
-    // Simplified validation - only validate database structure
     if (!config.databases || config.databases.length === 0) {
       throw new Error('Invalid config: at least one database must be configured');
     }
@@ -249,24 +255,12 @@ class NotionService {
     return this.config !== null;
   }
 
-  clearCache() {
-    this.cacheManager.clear();
-  }
-
   async fetchAllItems(options?: FetchOptions): Promise<WorkItem[]> {
     const { signal, onProgress } = options || {};
-
-    const cacheKey = 'backend-api';
-    const cached = this.cacheManager.get(cacheKey);
-    if (cached) {
-      onProgress?.({ loaded: cached.items.length, total: cached.items.length, items: cached.items, done: true });
-      return cached.items;
-    }
 
     onProgress?.({ loaded: 0, total: null, items: [], done: false, currentDatabase: 'backend' });
 
     const result = await apiClient.fetchItems(signal);
-    this.cacheManager.set(cacheKey, result.items);
 
     onProgress?.({
       loaded: result.items.length,
@@ -286,23 +280,27 @@ class NotionService {
 
   async updateItemStatus(pageId: string, status: string): Promise<void> {
     await apiClient.updateItemStatus(pageId, status);
-    this.clearCache();
   }
 
   async updateItemProgress(pageId: string, progress: number): Promise<void> {
     await apiClient.updateItemProgress(pageId, progress);
-    this.clearCache();
   }
 
   async invalidateServerCache(): Promise<void> {
     await apiClient.invalidateCache();
-    this.clearCache();
   }
 }
 
 export const notionService = new NotionService();
 export default notionService;
 ```
+
+**Key changes from current implementation:**
+- Removed `NotionCacheManager` import and usage
+- Removed `clearCache()` method (no longer needed)
+- Removed `cacheManager` field
+- Each request goes directly to backend (DataStore is the cache)
+- ~60 lines vs current ~540 lines
 
 ### 2. `src/constants.ts` - Updated Version
 
@@ -380,8 +378,8 @@ npm run dev:full  # or run dev and dev:server in separate terminals
 ### Unit Tests
 - [ ] Test apiClient methods work correctly
 - [ ] Test NotionService delegates to apiClient
-- [ ] Test cache manager (simplified version)
 - [ ] Test configuration validation
+- [ ] Verify no caching behavior (each call hits backend)
 
 ### Integration Tests
 - [ ] Frontend-backend communication
@@ -410,7 +408,8 @@ npm run dev:full  # or run dev and dev:server in separate terminals
 | Breaking change for direct mode users | High | Medium | Provide migration guide, announce in changelog |
 | Backend deployment complexity | Medium | Medium | Improve documentation, provide Docker setup |
 | Development setup friction | Medium | Low | `npm run dev:full` command already exists |
-| Lost offline capability | Low | Low | Client-side cache provides stale data fallback |
+| Increased backend load (no client cache) | Medium | Low | DataStore is in-memory and fast; rate limiting already in place |
+| No offline fallback | Low | Low | App requires backend anyway; show clear error state |
 
 ---
 
@@ -437,28 +436,32 @@ If issues arise post-deprecation:
 
 ## Open Questions
 
-1. **Client-side caching strategy**: Keep simplified memory cache or remove entirely?
-   - **Recommendation**: Keep memory cache for UX benefits
-
-2. **API key in config modal**: Remove input entirely or show masked status?
+1. **API key in config modal**: Remove input entirely or show masked status?
    - **Recommendation**: Remove entirely, show backend connection status instead
 
-3. **Environment variable**: Remove `VITE_USE_BACKEND_API` or keep as deprecated?
+2. **Environment variable**: Remove `VITE_USE_BACKEND_API` or keep as deprecated?
    - **Recommendation**: Remove - no longer serves a purpose
 
-4. **Demo data mode**: Keep working without backend for demo purposes?
+3. **Demo data mode**: Keep working without backend for demo purposes?
    - **Recommendation**: Keep demo data mode, it's separate from Notion integration
+
+4. **`clearCache()` callers**: Check if any code calls `notionService.clearCache()` and update accordingly
+   - May need to rename to `refreshData()` or remove entirely
 
 ---
 
 ## Summary
 
-Deprecating Direct Mode involves:
+Deprecating Direct Mode and removing client-side caching involves:
 
-1. **~400 lines of code removal** (primarily in notionService.ts)
-2. **Simplification of NotionService** to delegate to apiClient
-3. **UI updates** to reflect backend-only architecture
-4. **Documentation updates** across CLAUDE.md, README.md, and .env.example
-5. **Test updates** to verify backend-only operation
+1. **~650+ lines of code removal**:
+   - `notionService.ts`: ~480 lines removed/simplified (540 → ~60)
+   - `NotionCacheManager.ts`: ~233 lines deleted entirely
+   - Constants and related code: ~20 lines
+2. **Simplification of NotionService** to a thin wrapper around apiClient
+3. **Removal of NotionCacheManager** - backend DataStore is the single source of truth
+4. **UI updates** to reflect backend-only architecture
+5. **Documentation updates** across CLAUDE.md, README.md, and .env.example
+6. **Test updates** to verify backend-only operation
 
-The result is a cleaner, more secure, and more maintainable codebase with real-time webhook support as the only integration path.
+The result is a cleaner, more secure, and more maintainable codebase with real-time webhook support as the only integration path. Removing client-side caching ensures users always see the latest webhook-updated data.
