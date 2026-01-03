@@ -10,8 +10,8 @@ import {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
+  type Node,
 } from '@xyflow/react';
-import type { Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStore } from '../../store/useStore';
 import { useItemLimit, useFullscreen } from '../../hooks';

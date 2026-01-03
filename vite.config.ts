@@ -25,8 +25,6 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom'],
           // Canvas visualization library
           'canvas-vendor': ['@xyflow/react'],
-          // D3 for timeline view
-          'd3-vendor': ['d3'],
           // State management
           'zustand-vendor': ['zustand'],
         },
