@@ -63,7 +63,7 @@ src/
 - **Components**: PascalCase (`TreeNode`, `FilterPanel`)
 - **Functions/Variables**: camelCase (`calculateLayout`, `itemCount`)
 - **Types/Interfaces**: PascalCase (`WorkItem`, `NotionConfig`)
-- **Constants**: SCREAMING_SNAKE_CASE in `constants.ts` (`CACHE_TIMEOUT`)
+- **Constants**: SCREAMING_SNAKE_CASE in `constants.ts` (`VIEW_LIMITS`)
 
 ## Available Scripts
 

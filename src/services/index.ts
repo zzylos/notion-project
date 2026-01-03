@@ -14,6 +14,4 @@ export {
   notionPropertyMapper,
   NotionDataTransformer,
   notionDataTransformer,
-  NotionCacheManager,
-  notionCacheManager,
 } from './notion';
