@@ -18,35 +18,16 @@ import { useItemLimit, useFullscreen } from '../../hooks';
 import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import { calculateLayout } from '../../utils/layoutCalculator';
+import { collectAncestorIds } from '../../utils/treeBuilder';
+import { TREE } from '../../constants';
 import CanvasNode from './CanvasNode';
 import CanvasLegend from './CanvasLegend';
 import CanvasControls from './CanvasControls';
 import ItemLimitBanner from '../ui/ItemLimitBanner';
 
-/** Maximum traversal depth to prevent infinite loops in pathological data */
-const MAX_TRAVERSAL_DEPTH = 100;
-
-/**
- * Collect all ancestors of an item (iterative to avoid stack overflow)
- * Limited to MAX_TRAVERSAL_DEPTH to handle pathological cycles
- */
-function collectAncestors(
-  startId: string | undefined,
-  items: Map<string, WorkItem>,
-  connected: Set<string>
-): void {
-  let currentId = startId;
-  let depth = 0;
-  while (currentId && !connected.has(currentId) && depth < MAX_TRAVERSAL_DEPTH) {
-    connected.add(currentId);
-    currentId = items.get(currentId)?.parentId;
-    depth++;
-  }
-}
-
 /**
  * Collect all descendants of an item using BFS
- * Limited to MAX_TRAVERSAL_DEPTH iterations to handle pathological data
+ * Limited to TREE.MAX_DESCENDANT_ITERATIONS to handle pathological data
  */
 function collectDescendants(
   children: string[] | undefined,
@@ -55,7 +36,7 @@ function collectDescendants(
 ): void {
   const queue = children ? [...children] : [];
   let iterations = 0;
-  while (queue.length > 0 && iterations < MAX_TRAVERSAL_DEPTH * 10) {
+  while (queue.length > 0 && iterations < TREE.MAX_DESCENDANT_ITERATIONS) {
     const childId = queue.shift()!;
     if (!connected.has(childId)) {
       connected.add(childId);
@@ -78,7 +59,8 @@ function buildConnectedIds(
 
   const connected = new Set<string>([selectedItemId]);
 
-  collectAncestors(selectedItem.parentId, items, connected);
+  // Use shared utility with existingSet parameter to mutate connected set
+  collectAncestorIds(selectedItem.parentId, items, connected);
   collectDescendants(selectedItem.children, items, connected);
 
   // Add blocked by items

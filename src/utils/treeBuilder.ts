@@ -11,6 +11,53 @@ import { TREE } from '../constants';
 import { logger } from './logger';
 
 /**
+ * Collect all ancestor IDs from a starting item up to root.
+ * Used to ensure focused items and their ancestors bypass filters,
+ * and for building connected item sets in canvas view.
+ *
+ * Features:
+ * - Circular reference detection (stops if item already visited)
+ * - Iteration limiting (prevents infinite loops from pathological data)
+ * - Can either return a new Set or mutate an existing one
+ *
+ * @param startId - The starting item ID (can be undefined)
+ * @param items - Map of all work items
+ * @param existingSet - Optional existing Set to add ancestors to (mutates in place)
+ * @returns Set of all ancestor IDs including the starting item
+ *
+ * @example
+ * // Get ancestors as new Set
+ * const ancestors = collectAncestorIds('item-123', itemsMap);
+ *
+ * // Add ancestors to existing Set (for building connected items)
+ * const connected = new Set<string>();
+ * collectAncestorIds('item-123', itemsMap, connected);
+ */
+export function collectAncestorIds(
+  startId: string | undefined,
+  items: Map<string, WorkItem>,
+  existingSet?: Set<string>
+): Set<string> {
+  const ancestors = existingSet ?? new Set<string>();
+  let currentId = startId;
+
+  // Safety: limit iterations to prevent infinite loops from circular references
+  let iterations = 0;
+
+  while (currentId && iterations < TREE.MAX_ANCESTOR_ITERATIONS) {
+    // Circular reference detection
+    if (ancestors.has(currentId)) {
+      break;
+    }
+    ancestors.add(currentId);
+    currentId = items.get(currentId)?.parentId;
+    iterations++;
+  }
+
+  return ancestors;
+}
+
+/**
  * State needed for building tree nodes.
  */
 export interface TreeBuildState {

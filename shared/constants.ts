@@ -95,3 +95,19 @@ export const NETWORK = {
   /** Default timeout for API/fetch requests (30 seconds) */
   FETCH_TIMEOUT_MS: 30000,
 } as const;
+
+/**
+ * Webhook-related constants used by the server.
+ */
+export const WEBHOOK = {
+  /** Idempotency cache TTL in milliseconds (5 minutes) */
+  IDEMPOTENCY_TTL_MS: 5 * 60 * 1000,
+  /** Cleanup interval for idempotency cache in milliseconds (60 seconds) */
+  CLEANUP_INTERVAL_MS: 60 * 1000,
+  /** Maximum number of events to cache for idempotency checking */
+  MAX_CACHED_EVENTS: 10000,
+  /** Minimum length for verification tokens */
+  MIN_TOKEN_LENGTH: 10,
+  /** Maximum length for verification tokens */
+  MAX_TOKEN_LENGTH: 500,
+} as const;
