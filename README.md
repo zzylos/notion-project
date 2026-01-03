@@ -111,7 +111,8 @@ The app uses a backend server for secure, real-time Notion integration:
 
 - **Secure API key handling** - Keys stay on the server, not in the browser
 - **Real-time updates** - Notion webhooks push changes instantly (no polling)
-- **Persistent data store** - In-memory store with webhook-driven updates
+- **MongoDB persistence** - Data survives server restarts with automatic sync
+- **Scheduled syncs** - Daily incremental and weekly full syncs ensure consistency
 
 ## User Scenarios
 
@@ -266,7 +267,8 @@ Each Notion database should have these properties (configurable in settings):
 
 - **Express** - Web framework
 - **TypeScript** - Type safety
-- **node-cache** - In-memory caching (used for stale-while-revalidate)
+- **MongoDB** - Persistent data storage (via MongoDB Atlas)
+- **node-cron** - Scheduled sync jobs (daily incremental, weekly full)
 - **cors** - Cross-origin resource sharing
 - **dotenv** - Environment variable loading
 
@@ -308,13 +310,18 @@ server/                 # Backend API server
 │   │   └── webhook.ts  # Notion webhook handler
 │   ├── services/
 │   │   ├── notion.ts   # Server-side Notion API service
-│   │   └── dataStore.ts # Persistent in-memory data store
+│   │   ├── dataStore.ts # In-memory cache (fast reads)
+│   │   ├── mongodb.ts  # MongoDB persistence layer
+│   │   ├── syncService.ts # Full/incremental sync orchestration
+│   │   ├── syncState.ts # Sync state tracking (JSON file)
+│   │   └── scheduler.ts # Scheduled sync jobs (daily/weekly)
 │   ├── middleware/
 │   │   └── rateLimit.ts # Rate limiting middleware
 │   ├── utils/
 │   │   ├── logger.ts   # Server logging utility
 │   │   └── uuid.ts     # UUID normalization utility
 │   └── types/          # TypeScript types
+├── sync-state.json     # Sync timestamps (gitignored, auto-created)
 ├── package.json        # Server dependencies
 └── vitest.config.ts    # Backend test configuration
 
@@ -357,6 +364,19 @@ CONTRIBUTING.md         # Development and contribution guidelines
 - **Escape** - Exit fullscreen mode (Canvas view)
 
 ## Troubleshooting
+
+### MongoDB Connection Issues
+
+If the server fails to start with MongoDB errors:
+
+| Error                       | Cause                        | Solution                                      |
+| --------------------------- | ---------------------------- | --------------------------------------------- |
+| `MONGODB_URI is required`   | Missing environment variable | Add `MONGODB_URI` to your `.env` file         |
+| `MongoServerSelectionError` | Can't reach MongoDB          | Check your network access settings in Atlas   |
+| `Authentication failed`     | Wrong credentials            | Verify username/password in connection string |
+| `connection timed out`      | IP not whitelisted           | Add your IP in Atlas Network Access settings  |
+
+**Quick fix for local development:** Add `0.0.0.0/0` to Network Access in MongoDB Atlas (allows all IPs). For production, use specific IP addresses.
 
 ### Notion API Connection Issues
 
@@ -411,66 +431,137 @@ The app uses a backend server for secure Notion integration. This provides:
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     SERVER STARTUP                          │
-│  Fetch all items from all databases (once)                  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   PERSISTENT DATA STORE                     │
-│  In-memory Map (no TTL, updated via webhooks in real-time)  │
-└─────────────────────────────────────────────────────────────┘
-          │                                    │
-          ▼                                    ▼
-    ┌──────────────┐                ┌─────────────────────┐
-    │ GET /api/    │                │ POST /api/webhook   │
-    │  /items      │◀───────────────│  (from Notion)      │
-    │  /store/     │   Updates      │ with HMAC signature │
-    │  stats       │   store        │ validation          │
-    └──────────────┘                └─────────────────────┘
-          │
-          ▼
-    ┌──────────────┐
-    │   Browser    │
-    │  (Frontend)  │
-    └──────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              SERVER STARTUP                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  1. Connect to MongoDB Atlas (required)                                      │
+│  2. Check sync state (stored in sync-state.json)                            │
+│  3. If first run: Full Notion pull → MongoDB                                │
+│  4. If restart: Incremental sync for downtime period → MongoDB              │
+│  5. Load MongoDB data into in-memory cache                                  │
+│  6. Start scheduler for daily incremental & weekly full syncs              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              RUNTIME FLOW                                    │
+├──────────────────────┬──────────────────────┬───────────────────────────────┤
+│   WEBHOOKS (Real-time)│  SCHEDULED SYNCS     │  API REQUESTS                │
+│   ──────────────────  │  ────────────────    │  ────────────────            │
+│   • Notion events     │  • Every 24h:        │  • Read from cache           │
+│   • Update MongoDB    │    Incremental sync  │  • Write to MongoDB          │
+│   • Update cache      │    (last 26h filter) │    then cache                │
+│   • Handle deletions  │  • Every Sunday:     │                              │
+│                       │    Full re-pull      │                              │
+└──────────────────────┴──────────────────────┴───────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              DATA LAYERS                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                    IN-MEMORY CACHE (DataStore)                      │    │
+│  │                    Fast reads, volatile                             │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                     │                                        │
+│                                     ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                    MONGODB ATLAS (Persistent)                       │    │
+│  │                    Source of truth, survives restarts               │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Setting Up the Backend
 
-1. **Configure the root `.env` file** (used by both frontend and backend):
+#### Step 1: Set Up MongoDB Atlas
+
+The backend requires MongoDB Atlas for data persistence. Here's how to set it up:
+
+1. **Create a MongoDB Atlas account** at [mongodb.com/atlas](https://www.mongodb.com/atlas)
+2. **Create a new cluster** (the free M0 tier works for development)
+3. **Set up database access**:
+   - Go to "Database Access" and create a database user
+   - Note the username and password
+4. **Set up network access**:
+   - Go to "Network Access" and add your IP address (or `0.0.0.0/0` for development)
+5. **Get your connection string**:
+   - Click "Connect" on your cluster
+   - Choose "Connect your application"
+   - Copy the connection string (looks like `mongodb+srv://username:password@cluster.mongodb.net/`)
+
+#### Step 2: Configure Environment Variables
+
+Create your `.env` file from the example:
 
 ```bash
 # Copy the example file
 cp .env.example .env
+```
 
-# Edit with your Notion credentials
+Edit `.env` with your credentials:
+
+```bash
+# ============================================
+# Notion Configuration (Required)
+# ============================================
 VITE_NOTION_API_KEY=secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Database IDs (at least one required)
 VITE_NOTION_DB_MISSION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 VITE_NOTION_DB_PROBLEM=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 VITE_NOTION_DB_SOLUTION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 VITE_NOTION_DB_PROJECT=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 VITE_NOTION_DB_DESIGN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
-# Backend URL
-VITE_API_URL=http://localhost:3001  # or your production URL
+# ============================================
+# MongoDB Configuration (Required)
+# ============================================
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/notion-tree
+MONGODB_DB_NAME=notion-tree
 
-# Backend-specific settings
-PORT=3001
-CORS_ORIGIN=http://localhost:5173
+# ============================================
+# Server Configuration
+# ============================================
+VITE_API_URL=http://localhost:3001  # Backend URL for frontend
+PORT=3001                            # Backend server port
+CORS_ORIGIN=http://localhost:5173    # Frontend URL for CORS
 
 # Webhook secret (set after webhook verification - see below)
 # NOTION_WEBHOOK_SECRET=secret_xxxxx
 ```
 
-2. **Start both servers**:
+#### Step 3: Install Dependencies
 
 ```bash
+# Install all dependencies (frontend, backend, and shared)
+npm install
+cd server && npm install && cd ..
+```
+
+#### Step 4: Start the Application
+
+```bash
+# Start both frontend and backend together
 npm run dev:full
 ```
 
-3. **Set up Notion webhooks** (see next section for details)
+This starts:
+
+- Frontend at `http://localhost:5173`
+- Backend at `http://localhost:3001`
+
+On first startup, the server will:
+
+1. Connect to MongoDB Atlas
+2. Perform a full sync from all configured Notion databases
+3. Store all items in MongoDB
+4. Load data into the in-memory cache
+5. Start the scheduler for automatic syncs
+
+#### Step 5: Set Up Notion Webhooks (Recommended)
+
+See the [Setting Up Notion Webhooks](#setting-up-notion-webhooks) section for real-time updates.
 
 ### Setting Up Notion Webhooks
 
@@ -627,18 +718,19 @@ curl -X POST http://localhost:3001/api/webhook/set-token \
 
 ### Backend API Endpoints
 
-| Endpoint                  | Method | Description                          |
-| ------------------------- | ------ | ------------------------------------ |
-| `/api/items`              | GET    | Fetch all items from in-memory store |
-| `/api/items/sync`         | POST   | Force full re-sync from Notion       |
-| `/api/items/:id`          | GET    | Fetch single item from store         |
-| `/api/items/:id/status`   | PATCH  | Update item status                   |
-| `/api/items/:id/progress` | PATCH  | Update item progress                 |
-| `/api/webhook`            | POST   | Receive Notion webhook events        |
-| `/api/webhook/status`     | GET    | Check webhook configuration status   |
-| `/api/webhook/set-token`  | POST   | Manually set verification token      |
-| `/api/store/stats`        | GET    | Get store statistics                 |
-| `/api/health`             | GET    | Health check                         |
+| Endpoint                  | Method | Description                                       |
+| ------------------------- | ------ | ------------------------------------------------- |
+| `/api/items`              | GET    | Fetch all items from in-memory cache              |
+| `/api/items/sync`         | POST   | Force sync (query: `?type=full` or `incremental`) |
+| `/api/items/:id`          | GET    | Fetch single item from cache                      |
+| `/api/items/:id/status`   | PATCH  | Update item status (write-through to MongoDB)     |
+| `/api/items/:id/progress` | PATCH  | Update item progress (write-through to MongoDB)   |
+| `/api/sync/status`        | GET    | Get sync status and next scheduled sync times     |
+| `/api/webhook`            | POST   | Receive Notion webhook events                     |
+| `/api/webhook/status`     | GET    | Check webhook configuration status                |
+| `/api/webhook/set-token`  | POST   | Manually set verification token                   |
+| `/api/store/stats`        | GET    | Get store/cache statistics                        |
+| `/api/health`             | GET    | Health check (includes MongoDB status)            |
 
 ### Webhook Security
 
@@ -651,26 +743,289 @@ The server validates webhook signatures using HMAC-SHA256:
 
 **Setup mode**: Before the first token is configured, the server accepts unsigned requests to allow initial verification. Once a token is set, signature validation becomes mandatory.
 
-### Production Deployment
+## Production Deployment
 
-For production, you can deploy the backend separately:
+This section covers deploying the application to production environments.
+
+### Prerequisites
+
+Before deploying, ensure you have:
+
+1. **MongoDB Atlas cluster** with a production-ready tier (M10+ recommended for production workloads)
+2. **Notion integration** with all databases shared
+3. **A domain name** (optional but recommended)
+4. **SSL certificate** (required for webhooks - Notion only sends to HTTPS endpoints)
+
+### Option 1: Manual Deployment (VPS/Cloud VM)
+
+#### Step 1: Build the Application
 
 ```bash
-# Build the backend
-npm run build:server
+# Build frontend
+npm run build
 
-# Start production server
-npm run start:server
+# Build backend
+cd server && npm run build && cd ..
 ```
 
-Update your frontend's `VITE_API_URL` to point to your production backend URL.
+This creates:
 
-**Important for webhooks**: Your server must be publicly accessible for Notion to send webhook events. Use a service like ngrok for local development:
+- `dist/` - Production frontend (static files)
+- `server/dist/` - Compiled backend (Node.js)
+
+#### Step 2: Set Up Production Environment
+
+Create a production `.env` file on your server:
 
 ```bash
-ngrok http 3001
-# Use the ngrok URL when setting up the webhook subscription
+# ============================================
+# Production Environment Variables
+# ============================================
+
+# Notion Configuration
+VITE_NOTION_API_KEY=secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_NOTION_DB_MISSION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_PROBLEM=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_SOLUTION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_PROJECT=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+VITE_NOTION_DB_DESIGN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+# MongoDB (use production cluster)
+MONGODB_URI=mongodb+srv://user:password@production-cluster.mongodb.net/notion-tree
+MONGODB_DB_NAME=notion-tree
+
+# Server Configuration
+PORT=3001
+CORS_ORIGIN=https://your-domain.com
+VITE_API_URL=https://api.your-domain.com
+
+# Webhook (set after initial setup)
+NOTION_WEBHOOK_SECRET=secret_xxxxx
+
+# Production Settings
+NODE_ENV=production
+VITE_DISABLE_CONFIG_UI=true
+VITE_REFRESH_COOLDOWN_MINUTES=5
 ```
+
+#### Step 3: Run with Process Manager
+
+Use PM2 for process management:
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start the backend
+cd server
+pm2 start dist/index.js --name "notion-tree-api"
+
+# Save PM2 configuration
+pm2 save
+pm2 startup
+```
+
+#### Step 4: Set Up Reverse Proxy (Nginx)
+
+Example Nginx configuration for both frontend and backend:
+
+```nginx
+# Frontend (static files)
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    root /var/www/notion-tree/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript;
+}
+
+# Backend API
+server {
+    listen 443 ssl http2;
+    server_name api.your-domain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### Option 2: Docker Deployment
+
+#### Dockerfile for Backend
+
+Create `server/Dockerfile`:
+
+```dockerfile
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY ../shared ../shared
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy built files
+COPY dist ./dist
+
+# Expose port
+EXPOSE 3001
+
+# Start server
+CMD ["node", "dist/index.js"]
+```
+
+#### Docker Compose
+
+Create `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - '3001:3001'
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME}
+      - VITE_NOTION_API_KEY=${VITE_NOTION_API_KEY}
+      - VITE_NOTION_DB_MISSION=${VITE_NOTION_DB_MISSION}
+      - VITE_NOTION_DB_PROBLEM=${VITE_NOTION_DB_PROBLEM}
+      - VITE_NOTION_DB_SOLUTION=${VITE_NOTION_DB_SOLUTION}
+      - VITE_NOTION_DB_PROJECT=${VITE_NOTION_DB_PROJECT}
+      - VITE_NOTION_DB_DESIGN=${VITE_NOTION_DB_DESIGN}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - NOTION_WEBHOOK_SECRET=${NOTION_WEBHOOK_SECRET}
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+```
+
+Run with:
+
+```bash
+docker-compose up -d
+```
+
+### Option 3: Cloud Platform Deployment
+
+#### Railway
+
+1. Connect your GitHub repository to [Railway](https://railway.app)
+2. Add environment variables in the Railway dashboard
+3. Railway auto-detects Node.js and deploys
+
+#### Render
+
+1. Create a new Web Service on [Render](https://render.com)
+2. Connect your repository
+3. Set build command: `cd server && npm install && npm run build`
+4. Set start command: `cd server && npm start`
+5. Add environment variables
+
+#### Vercel (Frontend) + Railway/Render (Backend)
+
+For best performance, deploy frontend and backend separately:
+
+**Frontend on Vercel:**
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy frontend
+vercel --prod
+```
+
+**Backend on Railway/Render** (as described above)
+
+### Post-Deployment Checklist
+
+After deploying, verify the following:
+
+1. **Health check**: `curl https://api.your-domain.com/api/health`
+2. **MongoDB connection**: Check the health endpoint shows MongoDB stats
+3. **Notion sync**: Verify items are loaded in the frontend
+4. **Webhook setup**: Configure webhook with your production URL
+5. **SSL**: Ensure HTTPS is working (required for webhooks)
+
+### Monitoring and Maintenance
+
+#### Sync Status Endpoint
+
+Check sync status at any time:
+
+```bash
+curl https://api.your-domain.com/api/sync/status
+```
+
+Response includes:
+
+- Last full sync timestamp
+- Last incremental sync timestamp
+- Next scheduled sync times
+- Whether a full sync is needed
+
+#### Force Sync
+
+Trigger a manual sync if needed:
+
+```bash
+# Full sync (replaces all data)
+curl -X POST https://api.your-domain.com/api/items/sync?type=full
+
+# Incremental sync (last 26 hours only)
+curl -X POST https://api.your-domain.com/api/items/sync?type=incremental
+```
+
+#### Log Monitoring
+
+Monitor server logs for:
+
+- Webhook events: `[Webhook] Received event: page.content_updated`
+- Sync operations: `[Notion] Full sync completed: 150 items`
+- Errors: `[Error]` prefix indicates issues
 
 ## Configuration Options
 
@@ -680,18 +1035,19 @@ The app supports two configuration methods:
 
 Create a `.env` file based on `.env.example`. Environment config takes precedence over UI settings.
 
-| Variable                        | Description                                        |
-| ------------------------------- | -------------------------------------------------- |
-| `VITE_NOTION_API_KEY`           | Your Notion API key (used by backend server)       |
-| `VITE_NOTION_DB_MISSION`        | Objectives database ID                             |
-| `VITE_NOTION_DB_PROBLEM`        | Problems database ID                               |
-| `VITE_NOTION_DB_SOLUTION`       | Solutions database ID                              |
-| `VITE_NOTION_DB_PROJECT`        | Projects database ID                               |
-| `VITE_NOTION_DB_DESIGN`         | Deliverables database ID                           |
-| `VITE_MAPPING_*`                | Property name mappings (see `.env.example`)        |
-| `VITE_API_URL`                  | Backend API URL (default: `http://localhost:3001`) |
-| `VITE_DISABLE_CONFIG_UI`        | Set to `true` to disable UI configuration          |
-| `VITE_REFRESH_COOLDOWN_MINUTES` | Rate limit for refresh button (default: 2 minutes) |
+| Variable                        | Required | Description                                                |
+| ------------------------------- | -------- | ---------------------------------------------------------- |
+| `VITE_NOTION_API_KEY`           | Yes      | Your Notion API key (used by backend server)               |
+| `VITE_NOTION_DB_*`              | Yes (1+) | Database IDs (MISSION, PROBLEM, SOLUTION, PROJECT, DESIGN) |
+| `MONGODB_URI`                   | Yes      | MongoDB Atlas connection string                            |
+| `MONGODB_DB_NAME`               | No       | Database name (default: `notion-tree`)                     |
+| `VITE_API_URL`                  | No       | Backend API URL (default: `http://localhost:3001`)         |
+| `PORT`                          | No       | Backend server port (default: `3001`)                      |
+| `CORS_ORIGIN`                   | No       | Frontend URL for CORS (default: `http://localhost:5173`)   |
+| `NOTION_WEBHOOK_SECRET`         | No       | Webhook signature validation token                         |
+| `VITE_MAPPING_*`                | No       | Property name mappings (see `.env.example`)                |
+| `VITE_DISABLE_CONFIG_UI`        | No       | Set to `true` to disable UI configuration                  |
+| `VITE_REFRESH_COOLDOWN_MINUTES` | No       | Rate limit for refresh button (default: 2 minutes)         |
 
 ### 2. UI Settings Modal
 
