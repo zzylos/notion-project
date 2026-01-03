@@ -108,7 +108,7 @@ class DataStore {
 
     this.items.set(itemToStore.id, itemToStore);
     this.lastUpdated = new Date();
-    logger.store.debug(`Upserted item: ${item.id} (${item.title})`);
+    logger.store.debug(`Upserted item: ${itemToStore.id} (${itemToStore.title})`);
   }
 
   /**
@@ -130,11 +130,12 @@ class DataStore {
     }
 
     // Orphan any children (set their parentId to undefined)
+    // Create a new object to avoid mutating the existing reference
     if (item.children) {
       for (const childId of item.children) {
         const child = this.items.get(childId);
         if (child) {
-          child.parentId = undefined;
+          this.items.set(childId, { ...child, parentId: undefined });
         }
       }
     }

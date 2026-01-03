@@ -32,13 +32,30 @@ export function calculateLayout(
 
   // Calculate positions using a tree layout algorithm
   const positionMap = new Map<string, { x: number; y: number }>();
+  // Track items currently in the recursion stack for cycle detection
+  const visiting = new Set<string>();
   let currentX = 0;
 
   /**
    * Recursively calculate positions for an item and its children.
    * Leaf nodes are placed at currentX, parents are centered above children.
+   * Includes cycle detection to prevent infinite recursion.
    */
   const calculatePositions = (item: WorkItem, level: number): number => {
+    // Cycle detection: if we're already visiting this item, skip it
+    if (visiting.has(item.id)) {
+      return currentX;
+    }
+
+    // If already positioned, return its position
+    const existing = positionMap.get(item.id);
+    if (existing) {
+      return existing.x;
+    }
+
+    // Mark as currently visiting
+    visiting.add(item.id);
+
     const children = filteredItems.filter(i => i.parentId === item.id);
 
     if (children.length === 0) {
@@ -46,6 +63,7 @@ export function calculateLayout(
       const x = currentX;
       positionMap.set(item.id, { x, y: level * VERTICAL_SPACING });
       currentX = x + HORIZONTAL_SPACING;
+      visiting.delete(item.id);
       return x;
     }
 
@@ -62,6 +80,9 @@ export function calculateLayout(
     // Parent is centered above children (guard against division by zero)
     const avgChildX = childCount > 0 ? childXSum / childCount : currentX;
     positionMap.set(item.id, { x: avgChildX, y: level * VERTICAL_SPACING });
+
+    // Remove from visiting set
+    visiting.delete(item.id);
 
     return avgChildX;
   };
