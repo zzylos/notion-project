@@ -42,8 +42,10 @@ class ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     // If a signal is provided, abort our controller when it aborts
-    if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
+    // Store handler reference so we can remove it later to prevent memory leaks
+    const abortHandler = signal ? () => controller.abort() : null;
+    if (signal && abortHandler) {
+      signal.addEventListener('abort', abortHandler);
     }
 
     try {
@@ -102,6 +104,10 @@ class ApiClient {
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      // Clean up event listener to prevent memory leaks
+      if (signal && abortHandler) {
+        signal.removeEventListener('abort', abortHandler);
+      }
     }
   }
 
