@@ -15,14 +15,6 @@ interface ApiResponse<T> {
   cacheAge?: number;
 }
 
-interface CacheStats {
-  entries: number;
-  keys: string[];
-  hitRate: number;
-  hits: number;
-  misses: number;
-}
-
 /**
  * Client for communicating with the backend API server.
  * The frontend always communicates via the backend server.
@@ -194,32 +186,6 @@ class ApiClient {
 
     if (!response.success) {
       throw new ApiError(response.error || 'Failed to sync data from Notion', endpoint);
-    }
-  }
-
-  /**
-   * Get store statistics (replaces old cache stats)
-   */
-  async getCacheStats(): Promise<CacheStats> {
-    const endpoint = '/api/store/stats';
-    const response = await this.request<CacheStats>(endpoint);
-
-    if (!response.success || !response.data) {
-      throw new ApiError(response.error || 'Failed to get store stats', endpoint);
-    }
-
-    return response.data;
-  }
-
-  /**
-   * Check if the backend is healthy
-   */
-  async healthCheck(): Promise<boolean> {
-    try {
-      const response = await this.request<{ status: string }>('/api/health');
-      return response.success;
-    } catch {
-      return false;
     }
   }
 }
