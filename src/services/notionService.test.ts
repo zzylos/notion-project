@@ -49,13 +49,6 @@ class TestNotionService {
     const response = await this.mockFetch();
     return response;
   }
-
-  async fetchItem(pageId: string): Promise<unknown> {
-    if (!this.config) {
-      throw new Error('NotionService not initialized');
-    }
-    return this.mockFetch(`/pages/${pageId}`);
-  }
 }
 
 // Mock Notion page factory
@@ -216,24 +209,6 @@ describe('NotionService', () => {
         type: 'problem',
         error: 'Access denied',
       });
-    });
-  });
-
-  describe('fetchItem', () => {
-    it('throws error when not initialized', async () => {
-      await expect(service.fetchItem('page-123')).rejects.toThrow('NotionService not initialized');
-    });
-
-    it('fetches single item', async () => {
-      service.initialize(createTestConfig());
-
-      const mockPage = createMockNotionPage({ id: 'page-123' });
-      mockFetch.mockResolvedValue(mockPage);
-
-      const result = await service.fetchItem('page-123');
-
-      expect(result).toEqual(mockPage);
-      expect(mockFetch).toHaveBeenCalledWith('/pages/page-123');
     });
   });
 });

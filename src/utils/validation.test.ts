@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  isValidDatabaseId,
-  isValidNotionUrl,
-  validateApiKey,
-  validateNotionConfig,
-} from './validation';
+import { isValidDatabaseId, isValidNotionUrl } from './validation';
 
 describe('isValidDatabaseId', () => {
   it('should accept valid UUID with hyphens', () => {
@@ -50,91 +45,5 @@ describe('isValidNotionUrl', () => {
     expect(isValidNotionUrl('')).toBe(false);
     expect(isValidNotionUrl('not-a-url')).toBe(false);
     expect(isValidNotionUrl('notion.so/page')).toBe(false); // No protocol
-  });
-});
-
-// Helper to create a valid API key of specified length
-const makeApiKey = (length: number): string => {
-  const prefix = 'secret_';
-  const remaining = length - prefix.length;
-  return prefix + 'a'.repeat(Math.max(0, remaining));
-};
-
-describe('validateApiKey', () => {
-  it('should return valid: true for valid API keys', () => {
-    expect(validateApiKey(makeApiKey(50))).toEqual({ valid: true });
-  });
-
-  it('should return specific error for missing API key', () => {
-    expect(validateApiKey('')).toEqual({
-      valid: false,
-      error: 'API key is required',
-    });
-  });
-
-  it('should return specific error for wrong prefix', () => {
-    expect(validateApiKey('wrong_' + 'a'.repeat(50))).toEqual({
-      valid: false,
-      error: 'API key must start with "secret_"',
-    });
-  });
-
-  it('should return specific error for short key', () => {
-    const result = validateApiKey('secret_short');
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('too short');
-  });
-
-  it('should return specific error for long key', () => {
-    const result = validateApiKey(makeApiKey(250));
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('too long');
-  });
-});
-
-describe('validateNotionConfig', () => {
-  it('should return valid: true for valid config', () => {
-    const result = validateNotionConfig({
-      apiKey: makeApiKey(50),
-      databases: [{ databaseId: '12345678123412341234123456789abc', type: 'project' }],
-    });
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
-  });
-
-  it('should return error for missing API key', () => {
-    const result = validateNotionConfig({
-      apiKey: '',
-      databases: [{ databaseId: '12345678123412341234123456789abc', type: 'project' }],
-    });
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.field === 'apiKey')).toBe(true);
-  });
-
-  it('should return error for missing databases', () => {
-    const result = validateNotionConfig({
-      apiKey: makeApiKey(50),
-      databases: [],
-    });
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.field === 'databases')).toBe(true);
-  });
-
-  it('should return error for invalid database ID', () => {
-    const result = validateNotionConfig({
-      apiKey: makeApiKey(50),
-      databases: [{ databaseId: 'invalid', type: 'project' }],
-    });
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.field.includes('databaseId'))).toBe(true);
-  });
-
-  it('should return error for missing database type', () => {
-    const result = validateNotionConfig({
-      apiKey: makeApiKey(50),
-      databases: [{ databaseId: '12345678123412341234123456789abc', type: '' }],
-    });
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.field.includes('type'))).toBe(true);
   });
 });

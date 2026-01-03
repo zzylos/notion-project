@@ -69,22 +69,6 @@ class NotionService {
 
     return result.items;
   }
-
-  async fetchItem(pageId: string): Promise<WorkItem> {
-    return apiClient.fetchItem(pageId);
-  }
-
-  async updateItemStatus(pageId: string, status: string): Promise<void> {
-    await apiClient.updateItemStatus(pageId, status);
-  }
-
-  async updateItemProgress(pageId: string, progress: number): Promise<void> {
-    await apiClient.updateItemProgress(pageId, progress);
-  }
-
-  async invalidateServerCache(): Promise<void> {
-    await apiClient.invalidateCache();
-  }
 }
 
 export const notionService = new NotionService();
