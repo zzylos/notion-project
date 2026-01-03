@@ -283,7 +283,7 @@ src/
 ├── hooks/              # Custom React hooks
 ├── services/
 │   ├── notionService.ts  # Notion API service with multi-database support
-│   └── apiClient.ts      # Backend API client (for backend mode)
+│   └── apiClient.ts      # Backend API client
 ├── store/              # Zustand state management
 ├── test/               # Test setup and utilities
 │   └── setup.ts        # Vitest setup with mocks
