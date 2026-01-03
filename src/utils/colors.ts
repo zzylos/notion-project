@@ -215,45 +215,6 @@ export function getStatusColors(status: string): StatusColorSet {
   return colors;
 }
 
-/**
- * Combined status style information.
- * Returns both the status category and colors in a single call,
- * avoiding redundant lookups when both are needed.
- */
-export interface StatusStyle {
-  category: StatusCategory;
-  colors: StatusColorSet;
-  isInProgress: boolean;
-  isCompleted: boolean;
-  isBlocked: boolean;
-}
-
-/**
- * Gets the complete status style including category and colors.
- * This is more efficient than calling getStatusCategory and getStatusColors separately
- * when you need both values.
- *
- * @param status - The status string from Notion
- * @returns StatusStyle object with category, colors, and convenience booleans
- *
- * @example
- * const style = getStatusStyle("In Progress");
- * // style.category === 'in-progress'
- * // style.colors === { bg: '...', text: '...', ... }
- * // style.isInProgress === true
- */
-export function getStatusStyle(status: string): StatusStyle {
-  const category = getStatusCategory(status);
-  const colors = statusCategoryColors[category];
-
-  return {
-    category,
-    colors,
-    isInProgress: category === 'in-progress',
-    isCompleted: category === 'completed',
-    isBlocked: category === 'blocked',
-  };
-}
 
 // Type colors
 export const typeColors: Record<
@@ -340,21 +301,6 @@ export const getProgressColor = (progress: number): string => {
   if (progress >= 25) return 'bg-amber-500';
   return 'bg-slate-400';
 };
-
-// SVG colors for tree lines (hex values) by category
-const statusCategoryHexColors: Record<StatusCategory, string> = {
-  'not-started': '#94a3b8',
-  'in-progress': '#3b82f6',
-  blocked: '#ef4444',
-  'in-review': '#f59e0b',
-  completed: '#22c55e',
-};
-
-// Get hex color for any status
-export function getStatusHexColor(status: string): string {
-  const category = getStatusCategory(status);
-  return statusCategoryHexColors[category];
-}
 
 export const typeHexColors: Record<ItemType, string> = {
   mission: '#7c3aed',

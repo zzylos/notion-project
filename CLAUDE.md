@@ -291,11 +291,9 @@ The server validates webhook signatures using HMAC-SHA256:
 The `src/hooks/` directory contains reusable hooks:
 
 - `useNotionData.ts` - Data fetching orchestration with progress tracking
-- `useCooldownTimer.ts` - Refresh rate limiting with countdown
 - `useFilterToggle.ts` - Filter state management helpers
 - `useFullscreen.ts` - Fullscreen API integration for canvas view
 - `useItemLimit.ts` - Item limit management for performance
-- `useFetch.ts` - Generic fetch hook with abort support
 - `useLocalStorage.ts` - Persistent localStorage hook
 
 ### Shared Code
@@ -352,15 +350,13 @@ The `shared/` directory contains code shared between frontend and backend:
 
 ### Hooks
 
-| File                            | Purpose                                   |
-| ------------------------------- | ----------------------------------------- |
-| `src/hooks/useNotionData.ts`    | Data fetching orchestration with progress |
-| `src/hooks/useCooldownTimer.ts` | Refresh rate limiting with countdown      |
-| `src/hooks/useFilterToggle.ts`  | Filter state management helpers           |
-| `src/hooks/useItemLimit.ts`     | Item limit management for performance     |
-| `src/hooks/useFetch.ts`         | Generic fetch hook with abort support     |
-| `src/hooks/useLocalStorage.ts`  | Persistent localStorage hook              |
-| `src/hooks/useFullscreen.ts`    | Fullscreen API integration                |
+| File                           | Purpose                                   |
+| ------------------------------ | ----------------------------------------- |
+| `src/hooks/useNotionData.ts`   | Data fetching orchestration with progress |
+| `src/hooks/useFilterToggle.ts` | Filter state management helpers           |
+| `src/hooks/useItemLimit.ts`    | Item limit management for performance     |
+| `src/hooks/useLocalStorage.ts` | Persistent localStorage hook              |
+| `src/hooks/useFullscreen.ts`   | Fullscreen API integration                |
 
 ### Components
 
@@ -397,7 +393,6 @@ The `shared/` directory contains code shared between frontend and backend:
 | `src/utils/treeBuilder.ts`      | Tree building and path utilities            |
 | `src/utils/layoutCalculator.ts` | Canvas layout calculations                  |
 | `src/utils/dateUtils.ts`        | Date parsing and formatting                 |
-| `src/utils/arrayUtils.ts`       | Array manipulation helpers                  |
 | `src/utils/icons.ts`            | Icon utilities for item types               |
 
 ### Backend Server
@@ -754,17 +749,6 @@ const date = parseDate('2024-01-15');
 const formatted = formatDate(date); // "Jan 15, 2024"
 const overdue = isOverdue('2024-01-01'); // true if past
 const relative = getRelativeTime('2024-01-15'); // "in 2 days"
-```
-
-### Array Utilities (`src/utils/arrayUtils.ts`)
-
-Array manipulation helpers:
-
-```typescript
-import { toggleArrayItem, unique } from './utils/arrayUtils';
-
-const newArray = toggleArrayItem(array, item); // Add if missing, remove if present
-const uniqueItems = unique(arrayWithDuplicates);
 ```
 
 ## Contributing

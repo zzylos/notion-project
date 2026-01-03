@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   getStatusCategory,
   getStatusColors,
-  getStatusStyle,
-  getStatusHexColor,
   getProgressColor,
   getUniqueStatuses,
   typeColors,
@@ -129,59 +127,6 @@ describe('colors utility', () => {
       const result1 = getStatusColors('Done');
       const result2 = getStatusColors('Done');
       expect(result1).toBe(result2); // Same object reference
-    });
-  });
-
-  describe('getStatusStyle', () => {
-    it('should return complete style information', () => {
-      const style = getStatusStyle('In Progress');
-      expect(style).toHaveProperty('category', 'in-progress');
-      expect(style).toHaveProperty('colors');
-      expect(style).toHaveProperty('isInProgress', true);
-      expect(style).toHaveProperty('isCompleted', false);
-      expect(style).toHaveProperty('isBlocked', false);
-    });
-
-    it('should set isCompleted flag correctly', () => {
-      const style = getStatusStyle('Done');
-      expect(style.isCompleted).toBe(true);
-      expect(style.isInProgress).toBe(false);
-      expect(style.isBlocked).toBe(false);
-    });
-
-    it('should set isBlocked flag correctly', () => {
-      const style = getStatusStyle('Blocked');
-      expect(style.isBlocked).toBe(true);
-      expect(style.isInProgress).toBe(false);
-      expect(style.isCompleted).toBe(false);
-    });
-  });
-
-  describe('getStatusHexColor', () => {
-    it('should return hex color for completed status', () => {
-      const hex = getStatusHexColor('Done');
-      expect(hex).toMatch(/^#[0-9a-f]{6}$/i);
-      expect(hex).toBe('#22c55e'); // green
-    });
-
-    it('should return hex color for in-progress status', () => {
-      const hex = getStatusHexColor('In Progress');
-      expect(hex).toBe('#3b82f6'); // blue
-    });
-
-    it('should return hex color for blocked status', () => {
-      const hex = getStatusHexColor('Blocked');
-      expect(hex).toBe('#ef4444'); // red
-    });
-
-    it('should return hex color for in-review status', () => {
-      const hex = getStatusHexColor('In Review');
-      expect(hex).toBe('#f59e0b'); // amber
-    });
-
-    it('should return hex color for not-started status', () => {
-      const hex = getStatusHexColor('New');
-      expect(hex).toBe('#94a3b8'); // slate
     });
   });
 
