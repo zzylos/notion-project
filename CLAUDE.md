@@ -42,12 +42,15 @@ The app supports configuration through environment variables (`.env` file) or th
 
 1. Copy `.env.example` to `.env`
 2. Fill in your Notion API key and database IDs
-3. Run `npm run dev`
+3. Run `npm run dev:full` (starts both frontend and backend)
 
 ### Environment Variables
 
 ```bash
-# Required
+# Backend API URL (required)
+VITE_API_URL=http://localhost:3001      # Your backend server URL
+
+# Notion API key (required - used by backend)
 VITE_NOTION_API_KEY=secret_xxx          # Your Notion API key
 
 # At least one database ID required
@@ -66,9 +69,6 @@ VITE_MAPPING_PARENT=Parent
 VITE_MAPPING_PROGRESS=Progress
 VITE_MAPPING_DUE_DATE=Deadline
 VITE_MAPPING_TAGS=Tags
-
-# Optional CORS proxy override
-VITE_CORS_PROXY=https://corsproxy.io/?
 
 # Production settings (optional)
 VITE_DISABLE_CONFIG_UI=true             # Disable UI configuration (use .env only)
@@ -99,17 +99,19 @@ When refresh cooldown is active:
 - Button is disabled until cooldown expires
 - Cooldown persists across page reloads
 
-### Backend API Mode (Recommended for Production)
+### Backend Server Configuration
 
-For production deployments, use the backend API mode instead of direct browser-to-Notion calls:
+The app uses a backend server to communicate with the Notion API. This provides:
+
+- **Security**: API key stays on the server (never exposed to browser)
+- **Real-time updates**: Notion webhooks for instant data synchronization
+- **Reliability**: No third-party CORS proxies required
 
 ```bash
 # Root .env (used by both frontend and backend)
-VITE_USE_BACKEND_API=true
-VITE_API_URL=http://localhost:3001  # Or your production backend URL
+VITE_API_URL=http://localhost:3001  # Backend server URL
 
-# Notion credentials (shared by frontend and backend)
-# Backend reads both VITE_* and non-prefixed versions
+# Notion credentials (used by backend server)
 VITE_NOTION_API_KEY=secret_xxx
 VITE_NOTION_DB_MISSION=xxx
 VITE_NOTION_DB_PROBLEM=xxx
@@ -129,13 +131,6 @@ NOTION_WEBHOOK_SECRET=secret_xxx    # Webhook verification token (from Notion)
 ```
 
 **Note:** The backend server reads the root `.env` file (not `server/.env`). It supports both `VITE_*` prefixed variables (for sharing with frontend) and non-prefixed versions.
-
-**Benefits:**
-
-- API key stays on the server (more secure)
-- Real-time updates via Notion webhooks
-- No CORS proxy needed
-- Data synced automatically when pages change in Notion
 
 **Architecture:**
 
@@ -313,20 +308,13 @@ The `shared/` directory contains code shared between frontend and backend:
 
 ### Notion Integration
 
-- Service at `src/services/notionService.ts`
+- Service at `src/services/notionService.ts` - thin wrapper around apiClient
 - Modular service components in `src/services/notion/`:
-  - `NotionCacheManager.ts` - Client-side caching logic
   - `NotionDataTransformer.ts` - Data transformation from Notion format
   - `NotionPropertyMapper.ts` - Property mapping and alias resolution
-- API client at `src/services/apiClient.ts` (for backend mode)
+- API client at `src/services/apiClient.ts` - communicates with backend server
 - **Multi-database support**: Fetches from up to 5 databases (Objectives, Problems, Solutions, Projects, Deliverables)
-- **Two operation modes**:
-  - **Direct mode** (default): Uses CORS proxy (`corsproxy.io`) for browser-based API calls
-  - **Backend mode** (`VITE_USE_BACKEND_API=true`): Calls your own backend server with webhook support
-- **Client-side caching** (direct mode):
-  - Memory cache (5 minutes) - for quick navigation
-  - Persistent localStorage cache (24 hours) - survives page reloads for faster startup
-- **Server-side data store** (backend mode):
+- **Server-side data store**:
   - Persistent in-memory store (no expiration)
   - Real-time updates via Notion webhooks
   - Full re-sync available via `/api/items/sync`
@@ -355,13 +343,12 @@ The `shared/` directory contains code shared between frontend and backend:
 
 ### Services
 
-| File                                           | Purpose                               |
-| ---------------------------------------------- | ------------------------------------- |
-| `src/services/notionService.ts`                | Multi-database Notion API integration |
-| `src/services/apiClient.ts`                    | Backend API client (for backend mode) |
-| `src/services/notion/NotionCacheManager.ts`    | Client-side caching logic             |
-| `src/services/notion/NotionDataTransformer.ts` | Data transformation from Notion       |
-| `src/services/notion/NotionPropertyMapper.ts`  | Property mapping and alias resolution |
+| File                                           | Purpose                                |
+| ---------------------------------------------- | -------------------------------------- |
+| `src/services/notionService.ts`                | Notion API orchestration via backend   |
+| `src/services/apiClient.ts`                    | Backend API client                     |
+| `src/services/notion/NotionDataTransformer.ts` | Data transformation from Notion format |
+| `src/services/notion/NotionPropertyMapper.ts`  | Property mapping and alias resolution  |
 
 ### Hooks
 
@@ -564,11 +551,11 @@ interface PropertyMappings {
 
 ## Known Considerations
 
-1. **Multi-Database Fetching**: Items from each database are fetched in parallel, then merged. Parent relations work across databases.
+1. **Multi-Database Fetching**: Items from each database are fetched in parallel by the backend, then merged. Parent relations work across databases.
 
-2. **CORS Proxy**: The app uses `corsproxy.io` to bypass CORS restrictions when calling Notion API from the browser. This may have rate limits.
+2. **Backend Required**: The frontend requires the backend server to be running. Use `npm run dev:full` for development.
 
-3. **Notion API Pagination**: Large databases are fetched in pages of 100. The service handles pagination automatically.
+3. **Notion API Pagination**: Large databases are fetched in pages of 100. The backend service handles pagination automatically.
 
 4. **React Flow Provider**: Canvas view must be wrapped in `ReactFlowProvider` for hooks like `useReactFlow` to work.
 
@@ -722,11 +709,7 @@ Application-wide constants organized by category:
 - `CANVAS` - Canvas view layout (spacing, node width, tree gap)
 - `TREE` - Tree view (max depth, indentation)
 - `VIEW_LIMITS` - Item rendering limits for performance
-- `NOTION` - API constants (cache timeout, page size, base URL)
 - `REFRESH` - Refresh rate limiting (default cooldown, localStorage key)
-- `CACHE` - Caching timeouts and keys (persistent timeout, metadata key)
-- `EDGE_STYLES` - Canvas edge styling (stroke width, colors)
-- `TIMING` - Animation and debounce delays
 - `VIEW_MODES` - Available view modes array
 - `TYPE_ORDER` / `PRIORITY_ORDER` - Display order for types and priorities
 - `DEFAULT_PROPERTY_MAPPINGS` - Default Notion property names

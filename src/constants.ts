@@ -1,5 +1,4 @@
 import type { ItemType, Priority, ViewMode } from './types';
-import { CACHE as SHARED_CACHE_VALUES } from '../shared/constants';
 
 // Re-export shared constants for convenient imports
 export {
@@ -42,15 +41,6 @@ export const VIEW_LIMITS = {
 } as const;
 
 /**
- * Client-specific Notion constants.
- * For API constants (BASE_URL, VERSION, PAGE_SIZE), use NOTION_API from shared.
- */
-export const NOTION = {
-  /** Memory cache timeout in milliseconds (5 minutes) */
-  CACHE_TIMEOUT: 5 * 60 * 1000,
-} as const;
-
-/**
  * Refresh rate limiting constants
  */
 export const REFRESH = {
@@ -59,27 +49,6 @@ export const REFRESH = {
   /** LocalStorage key for storing last refresh timestamp */
   LAST_REFRESH_KEY: 'notion-last-refresh',
 } as const;
-
-/**
- * Cache-related constants
- * Extends shared constants with client-specific properties
- */
-export const CACHE = {
-  ...SHARED_CACHE_VALUES,
-  /** Persistent cache timeout in milliseconds (24 hours) */
-  PERSISTENT_TIMEOUT_MS: 24 * 60 * 60 * 1000,
-  /** LocalStorage key prefix for cache entries */
-  KEY_PREFIX: 'notion-cache-',
-  /** LocalStorage key for cache metadata */
-  METADATA_KEY: 'notion-cache-metadata',
-  /** Throttle duration for page progress callbacks in milliseconds */
-  PAGE_PROGRESS_THROTTLE_MS: 100,
-} as const;
-
-/**
- * Default CORS proxy for browser-based Notion API calls
- */
-export const DEFAULT_CORS_PROXY = 'https://corsproxy.io/?';
 
 /**
  * Available view modes
