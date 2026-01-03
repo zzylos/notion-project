@@ -1,4 +1,19 @@
+/**
+ * Color utilities for work item visualization.
+ *
+ * This module provides color mapping functions for statuses, types, and priorities.
+ *
+ * Status Categorization:
+ * - Uses fuzzy keyword matching to categorize any status string
+ * - Maps to StatusCategory: 'not-started' | 'in-progress' | 'blocked' | 'in-review' | 'completed'
+ * - Results are cached for performance (LRU cache with max size from CACHE.MAX_SIZE)
+ *
+ * @see STATUS_GROUPS in constants.ts for exact-match status grouping (used in filter UI)
+ * @see STATUS_GROUP_TO_CATEGORY in constants.ts for mapping between groups and categories
+ */
+
 import type { ItemType, Priority, StatusCategory } from '../types';
+import { CACHE } from '../constants';
 
 // Status color definitions by category
 interface StatusColorSet {
@@ -41,9 +56,6 @@ const statusCategoryColors: Record<StatusCategory, StatusColorSet> = {
   },
 };
 
-// Maximum cache size to prevent memory leaks in long-running sessions
-const MAX_CACHE_SIZE = 1000;
-
 // Cache for consistent color assignment
 const statusColorCache = new Map<string, StatusColorSet>();
 
@@ -60,9 +72,9 @@ function addToCache<K, V>(cache: Map<K, V>, key: K, value: V): void {
   cache.delete(key);
 
   // Evict oldest entries if cache is full
-  if (cache.size >= MAX_CACHE_SIZE) {
-    // Delete oldest 10% (entries at the beginning of the Map)
-    const evictCount = Math.floor(MAX_CACHE_SIZE * 0.1);
+  if (cache.size >= CACHE.MAX_SIZE) {
+    // Delete oldest entries (percentage defined in constants)
+    const evictCount = Math.floor(CACHE.MAX_SIZE * CACHE.EVICTION_RATIO);
     let count = 0;
     for (const k of cache.keys()) {
       if (count >= evictCount) break;
@@ -214,7 +226,6 @@ export function getStatusColors(status: string): StatusColorSet {
   addToCache(statusColorCache, status, colors);
   return colors;
 }
-
 
 // Type colors
 export const typeColors: Record<

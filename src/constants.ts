@@ -30,6 +30,20 @@ export const TREE = {
   MAX_DEPTH: 50,
   /** Indentation per level in pixels */
   INDENT_PX: 24,
+  /** Maximum iterations for ancestor collection to prevent infinite loops */
+  MAX_ANCESTOR_ITERATIONS: 100,
+  /** Maximum iterations for descendant collection (BFS) to prevent infinite loops */
+  MAX_DESCENDANT_ITERATIONS: 1000,
+} as const;
+
+/**
+ * Cache configuration constants
+ */
+export const CACHE = {
+  /** Maximum number of entries in LRU caches before eviction */
+  MAX_SIZE: 1000,
+  /** Percentage of cache to evict when full (0.1 = 10%) */
+  EVICTION_RATIO: 0.1,
 } as const;
 
 /**
@@ -67,7 +81,12 @@ export const PRIORITY_ORDER: Priority[] = ['P0', 'P1', 'P2', 'P3'];
 
 /**
  * Status groups for combining similar statuses in the filter UI.
- * Categories: Not Started, In Progress, Blocked, Done.
+ * Uses exact string matching for known Notion status values.
+ *
+ * Note: For color assignment, see STATUS_CATEGORY_KEYWORDS in utils/colors.ts
+ * which uses fuzzy keyword matching and maps to StatusCategory values.
+ *
+ * @see getStatusCategory() in utils/colors.ts for color mapping
  */
 export const STATUS_GROUPS: Record<string, string[]> = {
   'Not Started': ['Not started', 'Not Started', '1-Not started', 'Backlog', 'To Do', 'New'],
@@ -103,6 +122,17 @@ export const STATUS_GROUPS: Record<string, string[]> = {
     "Won't Do",
     'Wontfix',
   ],
+} as const;
+
+/**
+ * Maps filter UI group names to StatusCategory values for color consistency.
+ * Use this when you need to get the color category for a status group.
+ */
+export const STATUS_GROUP_TO_CATEGORY: Record<string, string> = {
+  'Not Started': 'not-started',
+  'In Progress': 'in-progress',
+  Blocked: 'blocked',
+  Done: 'completed',
 } as const;
 
 /**

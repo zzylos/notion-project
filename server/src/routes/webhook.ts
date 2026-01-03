@@ -4,6 +4,7 @@ import { getDataStore } from '../services/dataStore.js';
 import { getNotion } from '../services/notion.js';
 import { logger } from '../utils/logger.js';
 import { normalizeUuid } from '../utils/uuid.js';
+import { WEBHOOK } from '../../../shared/constants.js';
 import type { ApiResponse } from '../types/index.js';
 // Note: Request is augmented with rawBody via types/express.d.ts (global declaration)
 
@@ -12,23 +13,15 @@ const router = Router();
 /**
  * Idempotency cache to prevent duplicate webhook processing.
  * Maps event key (timestamp + entity.id + type) to processing timestamp.
- * Entries expire after 5 minutes to prevent memory bloat.
- * Limited to MAX_CACHED_EVENTS entries to bound memory usage.
+ * Entries expire after WEBHOOK.IDEMPOTENCY_TTL_MS to prevent memory bloat.
+ * Limited to WEBHOOK.MAX_CACHED_EVENTS entries to bound memory usage.
  */
 const processedEvents = new Map<string, number>();
-const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const IDEMPOTENCY_CLEANUP_INTERVAL_MS = 60 * 1000; // Clean up every 60 seconds
-const MAX_CACHED_EVENTS = 10000; // Maximum number of events to cache
-
-/** Minimum length for verification tokens */
-const MIN_TOKEN_LENGTH = 10;
-/** Maximum length for verification tokens */
-const MAX_TOKEN_LENGTH = 500;
 
 /**
  * Clean up expired entries from the idempotency cache.
  * Called both on new events and periodically via interval.
- * Also enforces MAX_CACHED_EVENTS limit by evicting oldest entries.
+ * Also enforces WEBHOOK.MAX_CACHED_EVENTS limit by evicting oldest entries.
  */
 function cleanupExpiredEvents(): void {
   const now = Date.now();
@@ -36,19 +29,19 @@ function cleanupExpiredEvents(): void {
 
   // First, remove expired entries
   for (const [key, timestamp] of processedEvents.entries()) {
-    if (now - timestamp > IDEMPOTENCY_TTL_MS) {
+    if (now - timestamp > WEBHOOK.IDEMPOTENCY_TTL_MS) {
       processedEvents.delete(key);
       cleanedCount++;
     }
   }
 
   // If still over limit, evict oldest entries
-  if (processedEvents.size > MAX_CACHED_EVENTS) {
+  if (processedEvents.size > WEBHOOK.MAX_CACHED_EVENTS) {
     const entries = Array.from(processedEvents.entries());
     // Sort by timestamp (oldest first)
     entries.sort((a, b) => a[1] - b[1]);
     // Remove oldest entries until under limit
-    const toRemove = entries.slice(0, processedEvents.size - MAX_CACHED_EVENTS);
+    const toRemove = entries.slice(0, processedEvents.size - WEBHOOK.MAX_CACHED_EVENTS);
     for (const [key] of toRemove) {
       processedEvents.delete(key);
       cleanedCount++;
@@ -61,7 +54,7 @@ function cleanupExpiredEvents(): void {
 }
 
 // Start periodic cleanup to prevent memory leaks when webhooks are idle
-const cleanupInterval = setInterval(cleanupExpiredEvents, IDEMPOTENCY_CLEANUP_INTERVAL_MS);
+const cleanupInterval = setInterval(cleanupExpiredEvents, WEBHOOK.CLEANUP_INTERVAL_MS);
 // Allow Node.js to exit even if interval is running (don't keep process alive)
 cleanupInterval.unref();
 
@@ -557,7 +550,7 @@ router.post('/set-token', (req: Request, res: Response) => {
   }
 
   // Validate token format (should be a reasonable length string)
-  if (token.length < MIN_TOKEN_LENGTH || token.length > MAX_TOKEN_LENGTH) {
+  if (token.length < WEBHOOK.MIN_TOKEN_LENGTH || token.length > WEBHOOK.MAX_TOKEN_LENGTH) {
     res.status(400).json({ success: false, error: 'Invalid token format' });
     return;
   }

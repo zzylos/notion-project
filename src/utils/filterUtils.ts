@@ -9,6 +9,30 @@
 import type { WorkItem, FilterState } from '../types';
 
 /**
+ * Build a map of parent ID to set of child IDs.
+ * Used for efficient orphan checking without O(n²) iteration.
+ *
+ * @param items - Map of all work items
+ * @returns Map where keys are parent IDs and values are Sets of child IDs
+ */
+export function buildChildMap(items: Map<string, WorkItem>): Map<string, Set<string>> {
+  const childMap = new Map<string, Set<string>>();
+
+  for (const item of items.values()) {
+    if (item.parentId) {
+      const children = childMap.get(item.parentId);
+      if (children) {
+        children.add(item.id);
+      } else {
+        childMap.set(item.parentId, new Set([item.id]));
+      }
+    }
+  }
+
+  return childMap;
+}
+
+/**
  * Check if an item matches the include filters (show only these).
  * Returns true if item should be included based on include criteria.
  *
@@ -80,37 +104,8 @@ export function itemMatchesExcludeFilters(item: WorkItem, filters: FilterState):
   return false;
 }
 
-/**
- * Collect all ancestor IDs from a starting item up to root.
- * Used to ensure focused items and their ancestors bypass filters.
- *
- * @param startId - The starting item ID
- * @param items - Map of all work items
- * @returns Set of all ancestor IDs including the starting item
- */
-export function collectAncestorIds(
-  startId: string | undefined,
-  items: Map<string, WorkItem>
-): Set<string> {
-  const ancestors = new Set<string>();
-  let currentId = startId;
-
-  // Safety: limit iterations to prevent infinite loops from circular references
-  let iterations = 0;
-  const MAX_ITERATIONS = 100;
-
-  while (currentId && iterations < MAX_ITERATIONS) {
-    if (ancestors.has(currentId)) {
-      // Circular reference detected
-      break;
-    }
-    ancestors.add(currentId);
-    currentId = items.get(currentId)?.parentId;
-    iterations++;
-  }
-
-  return ancestors;
-}
+// Re-export collectAncestorIds from treeBuilder for backwards compatibility
+export { collectAncestorIds } from './treeBuilder';
 
 /**
  * Check if an item is an orphan (no parent and no children in the item set).
@@ -118,9 +113,14 @@ export function collectAncestorIds(
  *
  * @param item - The work item to check
  * @param items - Map of all work items
+ * @param childMap - Optional pre-computed map of parent ID to child IDs (for performance)
  * @returns True if item is an orphan
  */
-export function isOrphanItem(item: WorkItem, items: Map<string, WorkItem>): boolean {
+export function isOrphanItem(
+  item: WorkItem,
+  items: Map<string, WorkItem>,
+  childMap?: Map<string, Set<string>>
+): boolean {
   // Has a parent that exists in our item set = not an orphan
   if (item.parentId && items.has(item.parentId)) {
     return false;
@@ -136,9 +136,18 @@ export function isOrphanItem(item: WorkItem, items: Map<string, WorkItem>): bool
   }
 
   // Check if this item is a parent of any other item
-  for (const otherItem of items.values()) {
-    if (otherItem.parentId === item.id) {
+  // Use pre-computed childMap if available (O(1) lookup vs O(n) iteration)
+  if (childMap) {
+    const children = childMap.get(item.id);
+    if (children && children.size > 0) {
       return false;
+    }
+  } else {
+    // Fallback to O(n) iteration if childMap not provided
+    for (const otherItem of items.values()) {
+      if (otherItem.parentId === item.id) {
+        return false;
+      }
     }
   }
 
@@ -170,15 +179,17 @@ export function itemMatchesSearch(item: WorkItem, query: string): boolean {
  * @param items - Map of all work items
  * @param showOnlyOrphans - If true, only show orphan items
  * @param hideOrphanItems - If true, hide orphan items
+ * @param childMap - Optional pre-computed map of parent ID to child IDs (for performance)
  * @returns True if item passes orphan filtering
  */
 export function applyOrphanFilter(
   item: WorkItem,
   items: Map<string, WorkItem>,
   showOnlyOrphans: boolean,
-  hideOrphanItems: boolean
+  hideOrphanItems: boolean,
+  childMap?: Map<string, Set<string>>
 ): boolean {
-  const orphan = isOrphanItem(item, items);
+  const orphan = isOrphanItem(item, items, childMap);
   if (showOnlyOrphans) return orphan;
   if (hideOrphanItems && orphan) return false;
   return true;

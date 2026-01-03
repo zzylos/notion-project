@@ -11,17 +11,21 @@ import type {
   DashboardStats,
 } from '../types';
 import { getStatusCategory } from '../utils/colors';
-import { buildTreeNodes, getItemPath as getItemPathUtil } from '../utils/treeBuilder';
+import {
+  buildTreeNodes,
+  getItemPath as getItemPathUtil,
+  collectAncestorIds,
+} from '../utils/treeBuilder';
 import { parseDate } from '../utils/dateUtils';
 import {
   itemMatchesIncludeFilters,
   itemMatchesExcludeFilters,
-  collectAncestorIds,
   isOrphanItem,
   itemMatchesSearch,
   applyOrphanFilter,
   hasActiveIncludeFilters,
   hasActiveExcludeFilters,
+  buildChildMap,
 } from '../utils/filterUtils';
 import { logger } from '../utils/logger';
 
@@ -243,6 +247,11 @@ export const useStore = create<StoreState>()(
         // Legacy filterMode: 'hide' support - convert to exclude filters logic
         const isHideMode = filters.filterMode === 'hide';
 
+        // Pre-compute child map for efficient orphan checking (O(n) instead of O(n²))
+        // Only build if orphan filtering is active
+        const needsOrphanCheck = hideOrphanItems || showOnlyOrphans;
+        const childMap = needsOrphanCheck ? buildChildMap(items) : undefined;
+
         return allItems.filter(item => {
           // Items in the focused path always bypass filters to maintain tree structure
           if (focusedPathIds.has(item.id)) {
@@ -269,17 +278,19 @@ export const useStore = create<StoreState>()(
             return false;
           }
 
-          // Step 4: Orphan filtering (global)
-          return applyOrphanFilter(item, items, showOnlyOrphans, hideOrphanItems);
+          // Step 4: Orphan filtering (global) - uses pre-computed childMap for O(1) lookup
+          return applyOrphanFilter(item, items, showOnlyOrphans, hideOrphanItems, childMap);
         });
       },
 
       getOrphanCount: (): number => {
         const state = get();
         const items = state.items;
+        // Pre-compute child map once for O(n) total instead of O(n²)
+        const childMap = buildChildMap(items);
         let count = 0;
         for (const item of items.values()) {
-          if (isOrphanItem(item, items)) {
+          if (isOrphanItem(item, items, childMap)) {
             count++;
           }
         }
