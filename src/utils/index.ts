@@ -69,3 +69,15 @@ export { isValidDatabaseId, isValidNotionUrl } from './validation';
 // Tree building utilities
 export { buildTreeNodes, getItemPath } from './treeBuilder';
 export type { TreeBuildState } from './treeBuilder';
+
+// Filter utilities
+export {
+  itemMatchesIncludeFilters,
+  itemMatchesExcludeFilters,
+  collectAncestorIds,
+  isOrphanItem,
+  itemMatchesSearch,
+  applyOrphanFilter,
+  hasActiveIncludeFilters,
+  hasActiveExcludeFilters,
+} from './filterUtils';
