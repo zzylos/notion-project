@@ -144,7 +144,6 @@ export function useNotionData(effectiveConfig: NotionConfig | null): UseNotionDa
 
       try {
         if (usingNotion) {
-          if (forceRefresh) notionService.clearCache();
           notionService.initialize(config);
 
           const items = await notionService.fetchAllItems({
@@ -182,7 +181,7 @@ export function useNotionData(effectiveConfig: NotionConfig | null): UseNotionDa
     [setItems, setLoading, setError, handleFetchProgress, loadSampleData, scheduleExpandAll]
   );
 
-  // Force refresh data (bypasses cache)
+  // Force refresh data from backend
   const refreshData = useCallback(async () => {
     await loadData(effectiveConfig, true);
   }, [effectiveConfig, loadData]);

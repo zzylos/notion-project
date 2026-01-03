@@ -97,23 +97,20 @@ Status labels are automatically imported from your Notion database. The app inte
 - Sync work items from each database with correct type assignment
 - Configurable property mappings
 - Open items directly in Notion
-- CORS proxy support for browser-based API calls
 
 ### Performance Optimizations
 
-- **Dual-layer caching** (direct mode) - 5-minute memory cache + 24-hour localStorage cache
-- **Real-time webhook sync** (backend mode) - Data updated instantly via Notion webhooks
+- **Real-time webhook sync** - Data updated instantly via Notion webhooks
 - **Progressive loading** - See items as they load with progress bar
 - **Virtualized lists** - Smooth scrolling for thousands of items
-- **Force refresh** - Clear cache and reload data when needed
+- **Force refresh** - Trigger full re-sync from Notion when needed
 
-### Backend API Mode with Webhooks (Production)
+### Backend Server Architecture
 
-For production deployments, use the optional backend API server:
+The app uses a backend server for secure, real-time Notion integration:
 
 - **Secure API key handling** - Keys stay on the server, not in the browser
 - **Real-time updates** - Notion webhooks push changes instantly (no polling)
-- **No CORS proxy needed** - Direct server-to-Notion communication
 - **Persistent data store** - In-memory store with webhook-driven updates
 
 ## User Scenarios
@@ -265,7 +262,7 @@ Each Notion database should have these properties (configurable in settings):
 - **Vitest** - Testing framework
 - **React Testing Library** - Component testing utilities
 
-### Backend (Optional)
+### Backend
 
 - **Express** - Web framework
 - **TypeScript** - Type safety
@@ -302,7 +299,7 @@ src/
 ├── constants.ts        # Application-wide constants
 └── App.tsx             # Main application with all view modes
 
-server/                 # Backend API server (optional)
+server/                 # Backend API server
 ├── src/
 │   ├── index.ts        # Express server entry point
 │   ├── config.ts       # Server configuration loader
@@ -390,8 +387,8 @@ If items don't show parent-child relationships:
 
 The app includes several optimizations for large databases:
 
-- Data is cached for 5 minutes
-- Use the refresh button to force-reload data
+- Data is cached server-side and updated via webhooks
+- Use the refresh button to force re-sync from Notion
 - Progressive loading shows items as they arrive
 
 ### Canvas View Performance
@@ -402,9 +399,9 @@ For databases with 500+ items:
 - Use filters to reduce the number of visible items
 - Drag nodes to reorganize as needed
 
-## Backend API Mode with Webhooks (Recommended for Production)
+## Backend Server with Webhooks
 
-For production deployments, use the backend API mode instead of direct browser-to-Notion calls. This provides:
+The app uses a backend server for secure Notion integration. This provides:
 
 - **Secure API key handling** - Keys stay on the server, not in the browser
 - **Real-time updates** - Notion webhooks push changes instantly to your server
@@ -440,7 +437,7 @@ For production deployments, use the backend API mode instead of direct browser-t
     └──────────────┘
 ```
 
-### Setting Up Backend Mode
+### Setting Up the Backend
 
 1. **Configure the root `.env` file** (used by both frontend and backend):
 
@@ -456,8 +453,7 @@ VITE_NOTION_DB_SOLUTION=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 VITE_NOTION_DB_PROJECT=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 VITE_NOTION_DB_DESIGN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
-# Enable backend API mode
-VITE_USE_BACKEND_API=true
+# Backend URL
 VITE_API_URL=http://localhost:3001  # or your production URL
 
 # Backend-specific settings
@@ -686,15 +682,13 @@ Create a `.env` file based on `.env.example`. Environment config takes precedenc
 
 | Variable                        | Description                                        |
 | ------------------------------- | -------------------------------------------------- |
-| `VITE_NOTION_API_KEY`           | Your Notion API key (required for direct mode)     |
+| `VITE_NOTION_API_KEY`           | Your Notion API key (used by backend server)       |
 | `VITE_NOTION_DB_MISSION`        | Objectives database ID                             |
 | `VITE_NOTION_DB_PROBLEM`        | Problems database ID                               |
 | `VITE_NOTION_DB_SOLUTION`       | Solutions database ID                              |
 | `VITE_NOTION_DB_PROJECT`        | Projects database ID                               |
 | `VITE_NOTION_DB_DESIGN`         | Deliverables database ID                           |
 | `VITE_MAPPING_*`                | Property name mappings (see `.env.example`)        |
-| `VITE_CORS_PROXY`               | Custom CORS proxy URL (direct mode only)           |
-| `VITE_USE_BACKEND_API`          | Set to `true` to use backend API mode              |
 | `VITE_API_URL`                  | Backend API URL (default: `http://localhost:3001`) |
 | `VITE_DISABLE_CONFIG_UI`        | Set to `true` to disable UI configuration          |
 | `VITE_REFRESH_COOLDOWN_MINUTES` | Rate limit for refresh button (default: 2 minutes) |

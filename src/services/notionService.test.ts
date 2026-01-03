@@ -1,18 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import type { NotionConfig, NotionPage, NotionQueryResponse } from '../types';
-import type * as ConstantsModule from '../constants';
-
-// Mock import.meta.env before importing notionService
-vi.mock('../constants', async importOriginal => {
-  const actual = await importOriginal<typeof ConstantsModule>();
-  return {
-    ...actual,
-    NOTION: {
-      ...actual.NOTION,
-      CACHE_TIMEOUT: 100, // Short timeout for tests
-    },
-  };
-});
 
 // We need to create a fresh NotionService instance for testing
 // rather than importing the singleton
