@@ -1,13 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import {
-  AppError,
-  NetworkError,
-  ApiError,
-  ValidationError,
-  getHttpErrorMessage,
-  shouldRetry,
-  withRetry,
-} from './errors';
+import { describe, it, expect } from 'vitest';
+import { AppError, NetworkError, ApiError, ValidationError, getHttpErrorMessage } from './errors';
 
 describe('AppError', () => {
   it('should create error with message and defaults', () => {
@@ -82,75 +74,5 @@ describe('getHttpErrorMessage', () => {
   it('should return fallback for unknown status codes', () => {
     expect(getHttpErrorMessage(418)).toContain('status 418');
     expect(getHttpErrorMessage(418, 'Custom fallback')).toBe('Custom fallback');
-  });
-});
-
-describe('shouldRetry', () => {
-  it('should return false for abort errors', () => {
-    const abortError = new DOMException('Aborted', 'AbortError');
-    expect(shouldRetry(abortError)).toBe(false);
-  });
-
-  it('should return true for NetworkError', () => {
-    expect(shouldRetry(new NetworkError('Failed'))).toBe(true);
-  });
-
-  it('should return true for 5xx ApiError', () => {
-    expect(shouldRetry(new ApiError('Error', '/api', { statusCode: 500 }))).toBe(true);
-    expect(shouldRetry(new ApiError('Error', '/api', { statusCode: 502 }))).toBe(true);
-  });
-
-  it('should return true for rate limiting (429)', () => {
-    expect(shouldRetry(new ApiError('Error', '/api', { statusCode: 429 }))).toBe(true);
-  });
-
-  it('should return false for 4xx errors (except 429)', () => {
-    expect(shouldRetry(new ApiError('Error', '/api', { statusCode: 400 }))).toBe(false);
-    expect(shouldRetry(new ApiError('Error', '/api', { statusCode: 404 }))).toBe(false);
-  });
-});
-
-describe('withRetry', () => {
-  it('should return result on first success', async () => {
-    const operation = vi.fn().mockResolvedValue('success');
-    const result = await withRetry(operation);
-    expect(result).toBe('success');
-    expect(operation).toHaveBeenCalledTimes(1);
-  });
-
-  it('should retry on failure and succeed', async () => {
-    const operation = vi
-      .fn()
-      .mockRejectedValueOnce(new NetworkError('Failed'))
-      .mockResolvedValue('success');
-
-    const result = await withRetry(operation, { delayMs: 10 });
-    expect(result).toBe('success');
-    expect(operation).toHaveBeenCalledTimes(2);
-  });
-
-  it('should throw after max retries', async () => {
-    const operation = vi.fn().mockRejectedValue(new NetworkError('Failed'));
-
-    await expect(withRetry(operation, { maxRetries: 2, delayMs: 10 })).rejects.toThrow('Failed');
-    expect(operation).toHaveBeenCalledTimes(3); // Initial + 2 retries
-  });
-
-  it('should not retry non-retryable errors', async () => {
-    const operation = vi.fn().mockRejectedValue(new ValidationError('Invalid'));
-
-    await expect(withRetry(operation, { maxRetries: 3 })).rejects.toThrow('Invalid');
-    expect(operation).toHaveBeenCalledTimes(1);
-  });
-
-  it('should call onRetry callback', async () => {
-    const onRetry = vi.fn();
-    const operation = vi
-      .fn()
-      .mockRejectedValueOnce(new NetworkError('Failed'))
-      .mockResolvedValue('success');
-
-    await withRetry(operation, { delayMs: 10, onRetry });
-    expect(onRetry).toHaveBeenCalledWith(1, expect.any(Error));
   });
 });

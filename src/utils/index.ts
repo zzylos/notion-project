@@ -35,15 +35,7 @@ export type { MigratedConfig } from './config';
 export { parseDate, formatDate, isOverdue, getRelativeTime } from './dateUtils';
 
 // Error handling
-export {
-  AppError,
-  ApiError,
-  NetworkError,
-  ValidationError,
-  getHttpErrorMessage,
-  shouldRetry,
-  withRetry,
-} from './errors';
+export { AppError, ApiError, NetworkError, ValidationError, getHttpErrorMessage } from './errors';
 
 // Icons
 export { typeIcons } from './icons';
