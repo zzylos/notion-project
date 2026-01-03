@@ -1,3 +1,9 @@
+/**
+ * Detail panel component exports for the Notion Opportunity Tree Visualizer.
+ *
+ * These components are used within DetailPanel to display work item information.
+ */
+
 export { default as DetailHeader } from './DetailHeader';
 export { default as BreadcrumbPath } from './BreadcrumbPath';
 export { default as ProgressSection } from './ProgressSection';

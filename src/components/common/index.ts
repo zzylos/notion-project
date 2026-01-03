@@ -11,6 +11,7 @@ export { default as NotionConfigModal } from './NotionConfigModal';
 export { default as RelationshipItem } from './RelationshipItem';
 export { default as RelationshipList } from './RelationshipList';
 export { default as StatsOverview } from './StatsOverview';
+export { default as OrphanToggle } from './OrphanToggle';
 export { LoadingProgressBar, FailedDatabasesWarning, StatsToggle } from './StatusIndicators';
 
 // Detail panel subcomponents
