@@ -33,7 +33,6 @@ const createEmptyFilters = (): FilterState => ({
   owners: [],
   excludeOwners: [],
   searchQuery: '',
-  showOnlyMyItems: false,
   filterMode: 'show',
 });
 
@@ -503,10 +502,9 @@ describe('hasActiveExcludeFilters', () => {
       priorities: [],
       owners: [],
       searchQuery: '',
-      showOnlyMyItems: false,
       filterMode: 'show' as const,
       // Explicitly not setting exclude arrays to test defensive coding
-    } as FilterState;
+    } as unknown as FilterState;
 
     expect(hasActiveExcludeFilters(filters)).toBe(false);
   });

@@ -7,7 +7,7 @@
  */
 
 import type { WorkItem, NotionConfig } from '../types';
-import type { FetchOptions, FetchProgressCallback } from '../types/notion';
+import type { FetchOptions } from '../types/notion';
 import { apiClient } from './apiClient';
 
 // Re-export types for backward compatibility

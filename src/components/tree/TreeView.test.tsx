@@ -82,7 +82,6 @@ describe('TreeView', () => {
         owners: [],
         excludeOwners: [],
         searchQuery: '',
-        showOnlyMyItems: false,
         filterMode: 'show',
       },
     });
@@ -278,7 +277,6 @@ describe('TreeView', () => {
         owners: [],
         excludeOwners: [],
         searchQuery: 'Apple',
-        showOnlyMyItems: false,
         filterMode: 'show',
       },
     });
@@ -308,7 +306,6 @@ describe('TreeView', () => {
         owners: [],
         excludeOwners: [],
         searchQuery: '',
-        showOnlyMyItems: false,
         filterMode: 'show',
       },
     });
@@ -346,7 +343,6 @@ describe('TreeView', () => {
         owners: [],
         excludeOwners: [],
         searchQuery: '',
-        showOnlyMyItems: false,
         filterMode: 'show',
       },
     });
@@ -384,7 +380,6 @@ describe('TreeView', () => {
         owners: [],
         excludeOwners: [],
         searchQuery: '',
-        showOnlyMyItems: false,
         filterMode: 'hide',
       },
     });
@@ -425,7 +420,6 @@ describe('TreeView', () => {
         owners: [],
         excludeOwners: [],
         searchQuery: '',
-        showOnlyMyItems: false,
         filterMode: 'show',
       },
     });

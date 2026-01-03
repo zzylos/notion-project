@@ -115,7 +115,6 @@ describe('CanvasView', () => {
         owners: [],
         excludeOwners: [],
         searchQuery: '',
-        showOnlyMyItems: false,
         filterMode: 'show',
       },
     });

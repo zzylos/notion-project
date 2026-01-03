@@ -3,6 +3,15 @@ import { calculateLayout } from './layoutCalculator';
 import type { WorkItem } from '../types';
 import { CANVAS } from '../constants';
 
+// Type for the node data structure used by calculateLayout
+interface NodeData {
+  item: WorkItem;
+  isSelected: boolean;
+}
+
+// Helper to get typed node data
+const getNodeData = (node: { data: unknown }): NodeData => node.data as NodeData;
+
 // Helper to create mock work items
 const createMockItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({
   id: 'test-id',
@@ -29,15 +38,15 @@ describe('calculateLayout', () => {
       expect(result.nodes).toHaveLength(1);
       expect(result.nodes[0].id).toBe('item1');
       expect(result.nodes[0].type).toBe('workItem');
-      expect(result.nodes[0].data.item.title).toBe('Item 1');
+      expect(getNodeData(result.nodes[0]).item.title).toBe('Item 1');
     });
 
     it('should set isSelected true for selected item', () => {
       const items = [createMockItem({ id: 'item1' }), createMockItem({ id: 'item2' })];
       const result = calculateLayout(items, 'item2');
 
-      expect(result.nodes[0].data.isSelected).toBe(false);
-      expect(result.nodes[1].data.isSelected).toBe(true);
+      expect(getNodeData(result.nodes[0]).isSelected).toBe(false);
+      expect(getNodeData(result.nodes[1]).isSelected).toBe(true);
     });
 
     it('should set node width from CANVAS constant', () => {

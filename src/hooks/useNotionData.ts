@@ -124,7 +124,7 @@ export function useNotionData(effectiveConfig: NotionConfig | null): UseNotionDa
 
   // Main data loading function
   const loadData = useCallback(
-    async (config: NotionConfig | null, forceRefresh = false) => {
+    async (config: NotionConfig | null, _forceRefresh = false) => {
       // Abort any existing request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
