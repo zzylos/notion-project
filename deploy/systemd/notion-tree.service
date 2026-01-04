@@ -1,0 +1,50 @@
+[Unit]
+Description=Notion Opportunity Tree Visualizer Backend
+Documentation=https://github.com/your-org/notion-project
+After=network.target mongodb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/notion-tree/server
+
+# Environment file
+EnvironmentFile=/var/www/notion-tree/.env
+
+# Node.js path (adjust if using nvm or different installation)
+Environment=NODE_ENV=production
+Environment=PATH=/usr/bin:/usr/local/bin
+
+# Start command
+ExecStart=/usr/bin/node dist/index.js
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Process limits
+LimitNOFILE=65536
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/www/notion-tree
+
+# Graceful shutdown (matches server's 10s timeout)
+TimeoutStopSec=15
+KillMode=mixed
+KillSignal=SIGTERM
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=notion-tree
+
+[Install]
+WantedBy=multi-user.target
