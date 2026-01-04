@@ -1,6 +1,5 @@
 [Unit]
 Description=Notion Opportunity Tree Visualizer Backend
-Documentation=https://github.com/your-org/notion-project
 After=network.target mongodb.service
 Wants=network-online.target
 
