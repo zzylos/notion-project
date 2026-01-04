@@ -147,13 +147,12 @@ npm run build
 
 ```bash
 # Create directories
-sudo mkdir -p /var/www/notion-tree/{dist,server/dist,shared}
+sudo mkdir -p /var/www/notion-tree/{dist,server/dist}
 
-# Copy files
+# Copy files (shared/ is compiled into server/dist/)
 sudo cp -r dist/* /var/www/notion-tree/dist/
 sudo cp -r server/dist/* /var/www/notion-tree/server/dist/
 sudo cp server/package*.json /var/www/notion-tree/server/
-sudo cp -r shared/* /var/www/notion-tree/shared/
 
 # Install production dependencies
 cd /var/www/notion-tree/server

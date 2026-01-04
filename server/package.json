@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "Backend API server for Notion Opportunity Tree with webhook-based real-time updates",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/server/src/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/server/src/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",

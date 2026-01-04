@@ -1,14 +1,28 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { NotionConfig, PropertyMappings, DatabaseConfig } from './types/index.js';
 import { DEFAULT_PROPERTY_MAPPINGS, ITEM_TYPES } from '../../shared/constants.js';
 
 // Load .env from root directory (parent of server/)
+// In development: server/src/config.ts -> ../../.env
+// In production: server/dist/server/src/config.js -> ../../../../.env
+// We use process.cwd() as a more reliable way to find the project root
+// since the server is started from the server/ directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '../..');
-dotenv.config({ path: path.join(rootDir, '.env') });
+
+// Determine the correct path to .env:
+// - If running from server/ directory (production): cwd is server/, parent has .env
+// - If running from repo root (development): __dirname-based resolution works
+const cwdEnvPath = path.join(process.cwd(), '..', '.env');
+const fileBasedEnvPath = path.resolve(__dirname, '../..', '.env');
+
+// Try cwd-based path first (works in production), fall back to file-based (development)
+const envPath = fs.existsSync(cwdEnvPath) ? cwdEnvPath : fileBasedEnvPath;
+
+dotenv.config({ path: envPath });
 
 /**
  * MongoDB configuration

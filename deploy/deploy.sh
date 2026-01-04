@@ -163,15 +163,12 @@ mkdir -p "${APP_DIR}"/{dist,server/dist}
 # Copy frontend build
 rsync -av --delete "${REPO_DIR}/dist/" "${APP_DIR}/dist/"
 
-# Copy backend build
+# Copy backend build (includes compiled shared/ directory)
 rsync -av --delete "${REPO_DIR}/server/dist/" "${APP_DIR}/server/dist/"
 
 # Copy package files for backend
 cp "${REPO_DIR}/server/package.json" "${APP_DIR}/server/"
 cp "${REPO_DIR}/server/package-lock.json" "${APP_DIR}/server/" 2>/dev/null || true
-
-# Copy shared directory
-rsync -av --delete "${REPO_DIR}/shared/" "${APP_DIR}/shared/"
 
 # Install production dependencies in deployment directory
 cd "${APP_DIR}/server"
