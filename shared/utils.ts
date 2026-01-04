@@ -56,7 +56,7 @@ export function buildRelationships(items: WorkItem[], options?: BuildRelationshi
     if (item.parentId) {
       const parent = itemMap.get(item.parentId);
       if (parent) {
-        parent.children.push(item.id);
+        (parent.children ??= []).push(item.id);
       } else {
         // Track orphaned items (have parentId but parent not found)
         orphanedItems.push({
