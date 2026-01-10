@@ -4,6 +4,8 @@ import path from 'path';
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Base path for subpath deployments (e.g., /notionvisualizer/)
+  base: process.env.VITE_BASE_PATH || '/',
   plugins: [react()],
   resolve: {
     alias: {
