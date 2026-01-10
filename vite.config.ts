@@ -5,6 +5,9 @@ import path from 'path';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Base path for subdirectory deployment (e.g., /notionvisualizer/ui/)
+  // Set via VITE_BASE_PATH env var or defaults to '/'
+  base: process.env.VITE_BASE_PATH || '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
