@@ -3,8 +3,9 @@ import { useStore } from '../../store/useStore';
 import { getStatusColors, getUniqueStatuses } from '../../utils/colors';
 
 const KanbanView: React.FC = memo(() => {
-  const { getFilteredItems, setSelectedItem, selectedItemId, items: allItems, isLoading } = useStore();
-  const filteredItems = getFilteredItems();
+  // Subscribe to filters to ensure re-render when filters change
+  const { getFilteredItems, setSelectedItem, selectedItemId, items: allItems, isLoading, filters } = useStore();
+  const filteredItems = useMemo(() => getFilteredItems(), [getFilteredItems, filters]);
 
   // Get unique statuses from all items
   const statuses = useMemo(() => getUniqueStatuses(allItems.values()), [allItems]);

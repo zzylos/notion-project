@@ -23,8 +23,9 @@ const nodeTypes = {
 };
 
 const CanvasViewInner: React.FC = () => {
-  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
-  const filteredItems = getFilteredItems();
+  // Subscribe to filters to ensure re-render when filters change
+  const { getFilteredItems, setSelectedItem, selectedItemId, filters } = useStore();
+  const filteredItems = useMemo(() => getFilteredItems(), [getFilteredItems, filters]);
   const { fitView } = useReactFlow();
 
   // Track data changes

@@ -62,15 +62,15 @@ interface StoreState {
 }
 
 /**
- * Default filter state - shows everything by default.
- * Users can then deselect what they don't want to see.
+ * Default filter state - shows nothing by default.
+ * Users select what they want to see (selected items show in color).
  *
  * Filter logic: items are shown only if they match ALL selected filters.
- * Empty array = show all (no filter applied for that dimension).
+ * Empty array = show nothing (must select to show).
  */
 const defaultFilters: FilterState = {
-  types: [...TYPE_ORDER], // Show all types by default
-  statusCategories: [...STATUS_FILTER_CATEGORIES], // Show all status categories by default
+  types: [], // Empty = show nothing, user selects what to show
+  statusCategories: [], // Empty = show nothing, user selects what to show
   owners: [], // Empty = show all owners (no owner filter)
   searchQuery: '',
 };
