@@ -68,21 +68,21 @@ const FilterPanel: React.FC = memo(() => {
 
   // Select/deselect all types
   const toggleAllTypes = useCallback(() => {
-    const allSelected = filters.types.length === TYPE_ORDER.length;
-    setFilters({ types: allSelected ? [] : [...TYPE_ORDER] });
+    const anySelected = filters.types.length > 0;
+    setFilters({ types: anySelected ? [] : [...TYPE_ORDER] });
   }, [filters.types.length, setFilters]);
 
   // Select/deselect all status categories
   const toggleAllStatuses = useCallback(() => {
-    const allSelected = filters.statusCategories.length === STATUS_FILTER_CATEGORIES.length;
-    setFilters({ statusCategories: allSelected ? [] : [...STATUS_FILTER_CATEGORIES] });
+    const anySelected = filters.statusCategories.length > 0;
+    setFilters({ statusCategories: anySelected ? [] : [...STATUS_FILTER_CATEGORIES] });
   }, [filters.statusCategories.length, setFilters]);
 
-  // Check if any filters are active (not at default state)
+  // Check if any filters are active (something is selected)
   const hasActiveFilters =
     filters.searchQuery ||
-    filters.types.length !== TYPE_ORDER.length ||
-    filters.statusCategories.length !== STATUS_FILTER_CATEGORIES.length ||
+    filters.types.length > 0 ||
+    filters.statusCategories.length > 0 ||
     filters.owners.length > 0;
 
   return (
@@ -120,7 +120,7 @@ const FilterPanel: React.FC = memo(() => {
               onClick={toggleAllTypes}
               className="text-xs text-blue-600 hover:text-blue-800"
             >
-              {filters.types.length === TYPE_ORDER.length ? 'None' : 'All'}
+              {filters.types.length > 0 ? 'None' : 'All'}
             </button>
           </div>
           <div className="flex flex-wrap gap-1">
@@ -152,7 +152,7 @@ const FilterPanel: React.FC = memo(() => {
               onClick={toggleAllStatuses}
               className="text-xs text-blue-600 hover:text-blue-800"
             >
-              {filters.statusCategories.length === STATUS_FILTER_CATEGORIES.length ? 'None' : 'All'}
+              {filters.statusCategories.length > 0 ? 'None' : 'All'}
             </button>
           </div>
           <div className="flex flex-wrap gap-1">
