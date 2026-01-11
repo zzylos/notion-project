@@ -21,9 +21,8 @@ export const PROPERTY_ALIASES: Record<string, string[]> = {
     'Epic',
     'Initiative',
     'Objective',
-    'Problem',
-    'Solution',
-    'Project',
+    // Note: Do NOT add generic type names like 'Problem', 'Solution', 'Project' here
+    // as they cause false positive matches with unrelated relation properties
   ],
   Owner: [
     'Owner',
