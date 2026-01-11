@@ -62,6 +62,9 @@ class SyncService {
       const allItems = await mongodb.getAllItems();
       dataStore.initialize(allItems);
 
+      // Rebuild relationships in cache (in case MongoDB didn't preserve children arrays)
+      this.rebuildCacheRelationships();
+
       // Mark full sync complete
       await syncState.markFullSyncComplete();
 
