@@ -284,7 +284,6 @@ The server validates webhook signatures using HMAC-SHA256:
 - **Tree View** (`src/components/tree/TreeView.tsx`) - Default hierarchical view
 - **Canvas View** (`src/components/canvas/CanvasView.tsx`) - Node-based visualization with @xyflow/react
 - **Kanban View** (`src/components/views/KanbanView.tsx`) - Board by dynamic status columns
-- **Timeline View** (`src/components/views/TimelineView.tsx`) - Chronological view by due date
 
 ### Custom Hooks
 
@@ -376,8 +375,7 @@ The `shared/` directory contains code shared between frontend and backend:
 | `src/components/tree/TreeView.tsx`            | Tree view with expand/collapse             |
 | `src/components/tree/TreeNode.tsx`            | Individual tree node component             |
 | `src/components/views/KanbanView.tsx`         | Dynamic status columns from data           |
-| `src/components/views/TimelineView.tsx`       | Timeline view                              |
-| `src/components/filters/FilterPanel.tsx`      | Dynamic filter controls                    |
+| `src/components/filters/FilterPanel.tsx`      | Simplified filter controls                 |
 
 ### Utilities
 
@@ -441,15 +439,41 @@ Database types:
 - `project` → Projects database
 - `design` → Deliverables database
 
+### Simplified Filter System
+
+The filter system uses a "show what you select" model for simplicity:
+
+- **Types**: Select which item types to show (mission, problem, solution, design, project)
+- **Status Categories**: Three simplified categories instead of raw Notion statuses:
+  - `Not Started` - Backlog, Planning, etc.
+  - `In Progress` - Analysis, Solutioning, Scheduling, Active work
+  - `Finished` - Done, Closed, Canceled, Post mortem
+- **Owners**: Optional filter by owner (empty = show all)
+- **Search**: Text search across title and description
+
+```typescript
+interface FilterState {
+  types: ItemType[];                    // Selected types to show
+  statusCategories: StatusFilterCategory[]; // Selected status categories
+  owners: string[];                     // Selected owner IDs (empty = all)
+  searchQuery: string;                  // Text search
+}
+
+// Map any Notion status to a filter category
+import { getStatusFilterCategory } from './constants';
+getStatusFilterCategory('2-Analysis/Research'); // returns 'in-progress'
+getStatusFilterCategory('Done');                // returns 'finished'
+```
+
 ### Dynamic Status Labels
 
-Status is now a string type (not a union) to preserve original Notion values:
+Status is preserved as the original Notion value for display, but mapped to categories for filtering:
 
 ```typescript
 type ItemStatus = string; // Preserves "Analysis/Research", "Solutioning", etc.
 type StatusCategory = 'not-started' | 'in-progress' | 'blocked' | 'in-review' | 'completed';
 
-// Get color category from any status string
+// Get color category from any status string (for display colors)
 const category = getStatusCategory(item.status);
 const colors = getStatusColors(item.status);
 ```
@@ -706,10 +730,11 @@ Application-wide constants organized by category:
 - `VIEW_LIMITS` - Item rendering limits for performance
 - `REFRESH` - Refresh rate limiting (default cooldown, localStorage key)
 - `VIEW_MODES` - Available view modes array
-- `TYPE_ORDER` / `PRIORITY_ORDER` - Display order for types and priorities
+- `TYPE_ORDER` - Display order for item types
 - `DEFAULT_PROPERTY_MAPPINGS` - Default Notion property names
 - `PROPERTY_ALIASES` - Alternative property names for flexible matching
-- `STATUS_GROUPS` / `STATUS_TO_GROUP` - Status grouping for filters
+- `STATUS_FILTER_CATEGORIES` - Simplified status categories (Not Started, In Progress, Finished)
+- `STATUS_TO_FILTER_CATEGORY` - Maps Notion status strings to filter categories
 
 ### Tree Builder (`src/utils/treeBuilder.ts`)
 

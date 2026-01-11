@@ -9,9 +9,11 @@ import type {
   ItemType,
   Priority,
   DashboardStats,
+  StatusFilterCategory,
 } from '../types';
 import { getStatusCategory } from '../utils/colors';
 import { buildTreeNodes, getItemPath as getItemPathUtil } from '../utils/treeBuilder';
+import { getStatusFilterCategory, STATUS_FILTER_CATEGORIES, TYPE_ORDER } from '../constants';
 
 interface StoreState {
   // Data
@@ -59,17 +61,18 @@ interface StoreState {
   getItemPath: (id: string) => WorkItem[];
 }
 
+/**
+ * Default filter state - shows everything by default.
+ * Users can then deselect what they don't want to see.
+ *
+ * Filter logic: items are shown only if they match ALL selected filters.
+ * Empty array = show all (no filter applied for that dimension).
+ */
 const defaultFilters: FilterState = {
-  types: [],
-  excludeTypes: [],
-  statuses: [],
-  excludeStatuses: [],
-  priorities: [],
-  excludePriorities: [],
-  owners: [],
-  excludeOwners: [],
+  types: [...TYPE_ORDER], // Show all types by default
+  statusCategories: [...STATUS_FILTER_CATEGORIES], // Show all status categories by default
+  owners: [], // Empty = show all owners (no owner filter)
   searchQuery: '',
-  filterMode: 'show',
 };
 
 export const useStore = create<StoreState>()(
@@ -180,7 +183,7 @@ export const useStore = create<StoreState>()(
         const allItems = Array.from(items.values());
 
         return allItems.filter(item => {
-          // Search query filter
+          // Search query filter (always applies if set)
           if (filters.searchQuery) {
             const query = filters.searchQuery.toLowerCase();
             const matchesTitle = item.title.toLowerCase().includes(query);
@@ -188,36 +191,26 @@ export const useStore = create<StoreState>()(
             if (!matchesTitle && !matchesDesc) return false;
           }
 
-          // Type filter
-          if (filters.types.length > 0 && !filters.types.includes(item.type)) {
-            return false;
-          }
-          if (filters.excludeTypes.length > 0 && filters.excludeTypes.includes(item.type)) {
+          // Type filter: must be in selected types (empty = show none)
+          if (filters.types.length === 0 || !filters.types.includes(item.type)) {
             return false;
           }
 
-          // Status filter
-          if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) {
-            return false;
-          }
-          if (filters.excludeStatuses.length > 0 && filters.excludeStatuses.includes(item.status)) {
-            return false;
-          }
-
-          // Priority filter
-          if (filters.priorities.length > 0 && (!item.priority || !filters.priorities.includes(item.priority))) {
-            return false;
-          }
-          if (filters.excludePriorities.length > 0 && item.priority && filters.excludePriorities.includes(item.priority)) {
+          // Status category filter: map item's status to category, must be selected
+          const itemStatusCategory = getStatusFilterCategory(item.status);
+          if (
+            filters.statusCategories.length === 0 ||
+            !filters.statusCategories.includes(itemStatusCategory)
+          ) {
             return false;
           }
 
-          // Owner filter
-          if (filters.owners.length > 0 && (!item.owner || !filters.owners.includes(item.owner.id))) {
-            return false;
-          }
-          if (filters.excludeOwners.length > 0 && item.owner && filters.excludeOwners.includes(item.owner.id)) {
-            return false;
+          // Owner filter: if owners are selected, item must match one of them
+          // Empty owners array = show all owners (no filter)
+          if (filters.owners.length > 0) {
+            if (!item.owner || !filters.owners.includes(item.owner.id)) {
+              return false;
+            }
           }
 
           return true;

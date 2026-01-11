@@ -1,4 +1,4 @@
-import type { ItemType, Priority, ViewMode } from './types';
+import type { ItemType, ViewMode } from './types';
 
 // Re-export shared constants for convenient imports
 export {
@@ -75,76 +75,76 @@ export const VIEW_MODES: ViewMode[] = ['tree', 'canvas', 'kanban'];
 export const TYPE_ORDER: ItemType[] = ['mission', 'problem', 'solution', 'design', 'project'];
 
 /**
- * Priority order for consistent display
+ * Simplified status filter categories.
+ * All Notion statuses are consolidated into 3 simple categories.
  */
-export const PRIORITY_ORDER: Priority[] = ['P0', 'P1', 'P2', 'P3'];
+export const STATUS_FILTER_CATEGORIES = ['not-started', 'in-progress', 'finished'] as const;
 
 /**
- * Status groups for combining similar statuses in the filter UI.
- * Uses exact string matching for known Notion status values.
- *
- * Note: For color assignment, see STATUS_CATEGORY_KEYWORDS in utils/colors.ts
- * which uses fuzzy keyword matching and maps to StatusCategory values.
- *
- * @see getStatusCategory() in utils/colors.ts for color mapping
+ * Display labels for status filter categories
  */
-export const STATUS_GROUPS: Record<string, string[]> = {
-  'Not Started': ['Not started', 'Not Started', '1-Not started', 'Backlog', 'To Do', 'New'],
-  'In Progress': [
-    'In progress',
-    'In Progress',
-    '6-Project in progress',
-    'Active',
-    'Doing',
-    'WIP',
-    'Planning',
-    '2-Analysis/Research',
-    '3-Solutioning',
-    '4-Prioritization',
-    '5-Scheduling',
-    'Analysis',
-    'Research',
-    'Solutioning',
-  ],
-  Blocked: ['Blocked', 'blocked', 'On Hold', 'On hold', 'Waiting', 'Paused', 'Stalled'],
-  Done: [
-    'Done',
-    '8-Closed',
-    '7-Post mortem',
-    'Completed',
-    'Complete',
-    'Closed',
-    'Resolved',
-    'Shipped',
-    'Canceled',
-    'Cancelled',
-    'Duplicate',
-    "Won't Do",
-    'Wontfix',
-  ],
+export const STATUS_FILTER_LABELS: Record<string, string> = {
+  'not-started': 'Not Started',
+  'in-progress': 'In Progress',
+  finished: 'Finished',
 } as const;
 
 /**
- * Maps filter UI group names to StatusCategory values for color consistency.
- * Use this when you need to get the color category for a status group.
+ * Maps raw Notion status strings to simplified filter categories.
+ * Case-insensitive matching is performed by normalizing to lowercase.
+ *
+ * Categories:
+ * - not-started: Items that haven't been worked on yet
+ * - in-progress: Items actively being worked on (includes all work phases)
+ * - finished: Items that are done, closed, canceled, or otherwise complete
  */
-export const STATUS_GROUP_TO_CATEGORY: Record<string, string> = {
-  'Not Started': 'not-started',
-  'In Progress': 'in-progress',
-  Blocked: 'blocked',
-  Done: 'completed',
-} as const;
+export const STATUS_TO_FILTER_CATEGORY: Record<string, 'not-started' | 'in-progress' | 'finished'> =
+  {
+    // Not Started
+    '1-not started': 'not-started',
+    'not started': 'not-started',
+    backlog: 'not-started',
+    planning: 'not-started',
+    'to do': 'not-started',
+    new: 'not-started',
+
+    // In Progress (all active work phases)
+    '2-analysis/research': 'in-progress',
+    '3-solutioning': 'in-progress',
+    '4-prioritization': 'in-progress',
+    '5-scheduling': 'in-progress',
+    '6-project in progress': 'in-progress',
+    'in progress': 'in-progress',
+    recurring: 'in-progress',
+    active: 'in-progress',
+    doing: 'in-progress',
+    wip: 'in-progress',
+    working: 'in-progress',
+    analysis: 'in-progress',
+    research: 'in-progress',
+    solutioning: 'in-progress',
+
+    // Finished (done, closed, or terminal states)
+    '7-post mortem': 'finished',
+    '8-closed': 'finished',
+    done: 'finished',
+    closed: 'finished',
+    completed: 'finished',
+    complete: 'finished',
+    canceled: 'finished',
+    cancelled: 'finished',
+    duplicate: 'finished',
+    resolved: 'finished',
+    shipped: 'finished',
+    "won't do": 'finished',
+    wontfix: 'finished',
+  } as const;
 
 /**
- * Reverse lookup map: status string (lowercase) -> group name.
- * Pre-computed once at module load for efficient lookups in FilterPanel.
+ * Gets the filter category for a status string.
+ * Falls back to 'not-started' for unknown statuses.
  */
-export const STATUS_TO_GROUP: Map<string, string> = (() => {
-  const map = new Map<string, string>();
-  for (const [group, statuses] of Object.entries(STATUS_GROUPS)) {
-    for (const status of statuses) {
-      map.set(status.toLowerCase(), group);
-    }
-  }
-  return map;
-})();
+export function getStatusFilterCategory(status: string): 'not-started' | 'in-progress' | 'finished' {
+  const normalized = status.toLowerCase().trim();
+  return STATUS_TO_FILTER_CATEGORY[normalized] ?? 'not-started';
+}
