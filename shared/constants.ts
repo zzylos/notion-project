@@ -16,13 +16,17 @@ export const PROPERTY_ALIASES: Record<string, string[]> = {
     'Parent',
     'Parent Item',
     'Parent Task',
+    'Parent Problem',
+    'Parent Solution',
+    'Parent Project',
+    'Parent Mission',
+    'Parent Objective',
+    'Parent Design',
     'Belongs To',
     'Part Of',
     'Epic',
     'Initiative',
     'Objective',
-    // Note: Do NOT add generic type names like 'Problem', 'Solution', 'Project' here
-    // as they cause false positive matches with unrelated relation properties
   ],
   Owner: [
     'Owner',
