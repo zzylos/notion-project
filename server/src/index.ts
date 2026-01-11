@@ -90,8 +90,8 @@ app.get('/api/health', async (_req, res) => {
     mongodb: mongoStats,
     sync: {
       initialized: syncState.isInitialized(),
-      lastFullSync: syncState.getState().lastFullSync,
-      lastIncrementalSync: syncState.getState().lastIncrementalSync,
+      lastFullSync: syncState.getSyncState().lastFullSync,
+      lastIncrementalSync: syncState.getSyncState().lastIncrementalSync,
       needsFullSync: syncState.needsFullSync(),
     },
     webhookConfigured: !!config.webhook.secret,
@@ -116,7 +116,7 @@ app.get('/api/sync/status', (_req, res) => {
   res.json({
     success: true,
     data: {
-      state: syncState.getState(),
+      state: syncState.getSyncState(),
       scheduler: {
         running: scheduler.isSchedulerRunning(),
         nextIncrementalSync: nextRuns.incremental?.toISOString() ?? null,
@@ -160,9 +160,9 @@ async function startServer(): Promise<void> {
 
   // 2. Initialize sync state manager
   logger.server.info('Loading sync state...');
-  initializeSyncState();
+  await initializeSyncState();
   const syncState = getSyncState();
-  syncState.markServerStartup();
+  await syncState.markServerStartup();
 
   // 3. Initialize other services
   logger.server.info('Initializing services...');
@@ -244,7 +244,7 @@ async function startServer(): Promise<void> {
     logger.server.info('Recording shutdown time...');
     try {
       const syncState = getSyncState();
-      syncState.markServerShutdown();
+      await syncState.markServerShutdown();
     } catch (error) {
       logger.server.warn('Failed to record shutdown time:', error);
     }
