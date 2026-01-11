@@ -11,6 +11,29 @@ interface WorkItemDocument extends Omit<WorkItem, 'id'> {
 }
 
 /**
+ * Sync state structure stored in MongoDB.
+ */
+export interface SyncState {
+  initialized: boolean;
+  lastFullSync: string | null;
+  lastIncrementalSync: string | null;
+  lastServerShutdown: string | null;
+  lastServerStartup: string | null;
+}
+
+interface SyncStateDocument extends SyncState {
+  _id: string;
+}
+
+const DEFAULT_SYNC_STATE: SyncState = {
+  initialized: false,
+  lastFullSync: null,
+  lastIncrementalSync: null,
+  lastServerShutdown: null,
+  lastServerStartup: null,
+};
+
+/**
  * MongoDB service for persistent WorkItem storage.
  * Provides connection management and CRUD operations for the items collection.
  */
@@ -278,6 +301,46 @@ class MongoDBService {
     }
 
     return { totalItems, itemsByType };
+  }
+
+  // ==================== Sync State Methods ====================
+
+  private getSyncStateCollection(): Collection<SyncStateDocument> {
+    if (!this.db) {
+      throw new Error('MongoDB not connected');
+    }
+    return this.db.collection<SyncStateDocument>('sync_state');
+  }
+
+  /**
+   * Get the current sync state from MongoDB.
+   */
+  async getSyncState(): Promise<SyncState> {
+    const collection = this.getSyncStateCollection();
+    const doc = await collection.findOne({ _id: 'sync_state' });
+
+    if (!doc) {
+      return { ...DEFAULT_SYNC_STATE };
+    }
+
+    const { _id, ...state } = doc;
+    return state;
+  }
+
+  /**
+   * Update the sync state in MongoDB.
+   */
+  async updateSyncState(update: Partial<SyncState>): Promise<void> {
+    const collection = this.getSyncStateCollection();
+    const current = await this.getSyncState();
+    const newState: SyncState = { ...current, ...update };
+
+    await collection.updateOne(
+      { _id: 'sync_state' },
+      { $set: newState },
+      { upsert: true }
+    );
+    logger.store.debug('Sync state updated in MongoDB');
   }
 }
 

@@ -63,7 +63,7 @@ class SyncService {
       dataStore.initialize(allItems);
 
       // Mark full sync complete
-      syncState.markFullSyncComplete();
+      await syncState.markFullSyncComplete();
 
       const duration = Date.now() - startTime;
       logger.notion.info(
@@ -122,7 +122,7 @@ class SyncService {
 
       if (items.length === 0) {
         logger.notion.info('Incremental sync: no modified items found');
-        syncState.markIncrementalSyncComplete();
+        await syncState.markIncrementalSyncComplete();
 
         return {
           type: 'incremental',
@@ -164,7 +164,7 @@ class SyncService {
       this.rebuildCacheRelationships();
 
       // Mark incremental sync complete
-      syncState.markIncrementalSyncComplete();
+      await syncState.markIncrementalSyncComplete();
 
       const duration = Date.now() - startTime;
       logger.notion.info(

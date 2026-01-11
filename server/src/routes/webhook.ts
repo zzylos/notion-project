@@ -4,89 +4,11 @@ import { getDataStore } from '../services/dataStore.js';
 import { getNotion } from '../services/notion.js';
 import { logger } from '../utils/logger.js';
 import { normalizeUuid } from '../utils/uuid.js';
+import { idempotencyCache } from '../utils/idempotencyCache.js';
 import { WEBHOOK } from '../../../shared/constants.js';
 import type { ApiResponse } from '../types/index.js';
-// Note: Request is augmented with rawBody via types/express.d.ts (global declaration)
 
 const router = Router();
-
-/**
- * Idempotency cache to prevent duplicate webhook processing.
- * Maps event key (timestamp + entity.id + type) to processing timestamp.
- * Entries expire after WEBHOOK.IDEMPOTENCY_TTL_MS to prevent memory bloat.
- * Limited to WEBHOOK.MAX_CACHED_EVENTS entries to bound memory usage.
- */
-const processedEvents = new Map<string, number>();
-
-/**
- * Clean up expired entries from the idempotency cache.
- * Called both on new events and periodically via interval.
- * Also enforces WEBHOOK.MAX_CACHED_EVENTS limit by evicting oldest entries.
- */
-function cleanupExpiredEvents(): void {
-  const now = Date.now();
-  let cleanedCount = 0;
-
-  // First, remove expired entries
-  for (const [key, timestamp] of processedEvents.entries()) {
-    if (now - timestamp > WEBHOOK.IDEMPOTENCY_TTL_MS) {
-      processedEvents.delete(key);
-      cleanedCount++;
-    }
-  }
-
-  // If still over limit, evict oldest entries
-  if (processedEvents.size > WEBHOOK.MAX_CACHED_EVENTS) {
-    const entries = Array.from(processedEvents.entries());
-    // Sort by timestamp (oldest first)
-    entries.sort((a, b) => a[1] - b[1]);
-    // Remove oldest entries until under limit
-    const toRemove = entries.slice(0, processedEvents.size - WEBHOOK.MAX_CACHED_EVENTS);
-    for (const [key] of toRemove) {
-      processedEvents.delete(key);
-      cleanedCount++;
-    }
-  }
-
-  if (cleanedCount > 0) {
-    logger.webhook.debug(`Cleaned up ${cleanedCount} idempotency cache entries`);
-  }
-}
-
-// Start periodic cleanup to prevent memory leaks when webhooks are idle
-const cleanupInterval = setInterval(cleanupExpiredEvents, WEBHOOK.CLEANUP_INTERVAL_MS);
-// Allow Node.js to exit even if interval is running (don't keep process alive)
-cleanupInterval.unref();
-
-/**
- * Generate a unique key for a webhook event for idempotency checking.
- * Uses timestamp + entity.id + event type to create a unique identifier.
- */
-function getEventKey(event: NotionWebhookEvent): string {
-  return `${event.timestamp}:${event.entity.id}:${event.type}`;
-}
-
-/**
- * Check if an event has already been processed (idempotency check).
- * Returns true if the event was already processed recently.
- */
-function isEventAlreadyProcessed(event: NotionWebhookEvent): boolean {
-  const key = getEventKey(event);
-  const processedAt = processedEvents.get(key);
-
-  if (processedAt) {
-    // Event was already processed
-    return true;
-  }
-
-  // Mark as processed
-  processedEvents.set(key, Date.now());
-
-  // Also clean up on event processing (belt and suspenders)
-  cleanupExpiredEvents();
-
-  return false;
-}
 
 /**
  * Whether we are in setup mode (no token configured yet).
@@ -449,7 +371,8 @@ router.post('/', async (req: Request, res: Response) => {
   logger.webhook.info(`Received event: ${event.type} for ${event.entity.type} ${event.entity.id}`);
 
   // Idempotency check - skip duplicate events (e.g., from Notion retries)
-  if (isEventAlreadyProcessed(event)) {
+  const eventKey = `${event.timestamp}:${event.entity.id}:${event.type}`;
+  if (idempotencyCache.checkAndMark(eventKey)) {
     logger.webhook.info(
       `Skipping duplicate event: ${event.type} for ${event.entity.id} (already processed)`
     );
