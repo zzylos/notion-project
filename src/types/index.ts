@@ -58,46 +58,29 @@ export interface TreeNode {
 }
 
 /**
- * Filter mode - whether filters show or hide matching items
+ * Simplified status category for filtering.
+ * All Notion statuses are mapped to one of these three categories.
  */
-export type FilterMode = 'show' | 'hide';
+export type StatusFilterCategory = 'not-started' | 'in-progress' | 'finished';
 
 /**
  * Filter state for filtering work items.
+ *
+ * Design principle: Everything is hidden by default.
+ * Users explicitly select what they want to see.
+ * This reduces confusion and provides a simpler mental model.
+ *
  * Multiple filters are combined with AND logic.
- * Include arrays select which items to show (empty = all).
- * Exclude arrays remove items from the result (applied after include).
  */
 export interface FilterState {
-  /** Filter by item type - only show these types (empty = all types) */
+  /** Types to show (empty = nothing shown for types, must select) */
   types: SharedItemType[];
-  /** Exclude these types - always hide regardless of other filters */
-  excludeTypes: SharedItemType[];
-  /** Filter by status - only show these statuses (empty = all statuses) */
-  statuses: SharedItemStatus[];
-  /** Exclude these statuses - always hide regardless of other filters */
-  excludeStatuses: SharedItemStatus[];
-  /** Filter by priority - only show these priorities (empty = all priorities) */
-  priorities: SharedPriority[];
-  /** Exclude these priorities - always hide regardless of other filters */
-  excludePriorities: SharedPriority[];
-  /** Filter by owner IDs - only show these owners (empty = all owners) */
+  /** Status categories to show (empty = nothing shown for statuses, must select) */
+  statusCategories: StatusFilterCategory[];
+  /** Owner IDs to show (empty = nothing shown for owners, must select) */
   owners: string[];
-  /** Exclude these owner IDs - always hide regardless of other filters */
-  excludeOwners: string[];
-  /** Text search across title, description, and tags */
+  /** Text search across title and description */
   searchQuery: string;
-  /**
-   * @deprecated Since v2.0. Use excludeTypes, excludeStatuses, excludePriorities, excludeOwners arrays instead.
-   * Legacy filter mode for backwards compatibility. Will be removed in v3.0.
-   * When set to 'hide', the include arrays (types, statuses, etc.) act as exclude filters.
-   */
-  filterMode: FilterMode;
-  /** Optional date range filter */
-  dateRange?: {
-    start: string;
-    end: string;
-  };
 }
 
 /**
