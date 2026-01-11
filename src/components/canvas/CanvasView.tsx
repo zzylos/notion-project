@@ -1,11 +1,10 @@
-import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
+import { useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
   ConnectionMode,
-  Panel,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -14,162 +13,30 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStore } from '../../store/useStore';
-import { useItemLimit, useFullscreen } from '../../hooks';
 import type { WorkItem } from '../../types';
 import { typeHexColors } from '../../utils/colors';
 import { calculateLayout } from '../../utils/layoutCalculator';
-import { collectAncestorIds } from '../../utils/treeBuilder';
-import { TREE } from '../../constants';
 import CanvasNode from './CanvasNode';
-import CanvasLegend from './CanvasLegend';
-import CanvasControls from './CanvasControls';
-import ItemLimitBanner from '../ui/ItemLimitBanner';
 
-/**
- * Collect all descendants of an item using BFS
- * Limited to TREE.MAX_DESCENDANT_ITERATIONS to handle pathological data
- */
-function collectDescendants(
-  children: string[] | undefined,
-  items: Map<string, WorkItem>,
-  connected: Set<string>
-): void {
-  const queue = children ? [...children] : [];
-  let iterations = 0;
-  while (queue.length > 0 && iterations < TREE.MAX_DESCENDANT_ITERATIONS) {
-    const childId = queue.shift()!;
-    if (!connected.has(childId)) {
-      connected.add(childId);
-      const child = items.get(childId);
-      if (child?.children) queue.push(...child.children);
-    }
-    iterations++;
-  }
-}
-
-/**
- * Build the set of connected item IDs for focus mode
- */
-function buildConnectedIds(
-  selectedItemId: string,
-  items: Map<string, WorkItem>
-): Set<string> | null {
-  const selectedItem = items.get(selectedItemId);
-  if (!selectedItem) return null;
-
-  const connected = new Set<string>([selectedItemId]);
-
-  // Use shared utility with existingSet parameter to mutate connected set
-  collectAncestorIds(selectedItem.parentId, items, connected);
-  collectDescendants(selectedItem.children, items, connected);
-
-  // Add blocked by items
-  selectedItem.blockedBy?.forEach(id => connected.add(id));
-
-  // Find items that this item blocks
-  for (const item of items.values()) {
-    if (item.blockedBy?.includes(selectedItemId)) {
-      connected.add(item.id);
-    }
-  }
-
-  // Add siblings
-  if (selectedItem.parentId) {
-    const parent = items.get(selectedItem.parentId);
-    parent?.children?.forEach(id => connected.add(id));
-  }
-
-  return connected;
-}
-
-// Custom node types
 const nodeTypes = {
   workItem: CanvasNode,
 };
 
-interface CanvasViewProps {
-  onNodeSelect?: (id: string) => void;
-}
-
-// Inner component that uses React Flow hooks
-const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
-  const { getFilteredItems, setSelectedItem, selectedItemId, items } = useStore();
-  const allFilteredItems = getFilteredItems();
+const CanvasViewInner: React.FC = () => {
+  const { getFilteredItems, setSelectedItem, selectedItemId } = useStore();
+  const filteredItems = getFilteredItems();
   const { fitView } = useReactFlow();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const fitViewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef);
-  const [focusMode, setFocusMode] = useState(false);
 
-  // Track the item that was selected when focus mode was enabled
-  // This keeps the item set stable while navigating within focus mode
-  const [focusModeAnchorId, setFocusModeAnchorId] = useState<string | null>(null);
-
-  const handleToggleFocusMode = useCallback(() => {
-    setFocusMode(prev => {
-      const newFocusMode = !prev;
-      // When enabling focus mode, anchor to the current selection
-      if (newFocusMode && selectedItemId) {
-        setFocusModeAnchorId(selectedItemId);
-      } else {
-        setFocusModeAnchorId(null);
-      }
-      return newFocusMode;
-    });
-  }, [selectedItemId]);
-
-  // Calculate connected items for the ANCHOR item (stable during focus mode navigation)
-  // This determines which items are displayed in the canvas
-  const anchorConnectedItemIds = useMemo(() => {
-    if (!focusModeAnchorId) return null;
-    return buildConnectedIds(focusModeAnchorId, items);
-  }, [focusModeAnchorId, items]);
-
-  // Calculate connected items for the currently selected item
-  // This determines which items are highlighted vs dimmed
-  const selectedConnectedItemIds = useMemo(() => {
-    if (!selectedItemId) return null;
-    return buildConnectedIds(selectedItemId, items);
-  }, [selectedItemId, items]);
-
-  // Calculate final filtered items, adding connected items in focus mode
-  const focusModeItems = useMemo(() => {
-    // When focus mode is active, add connected items that may have been filtered out
-    if (focusMode && anchorConnectedItemIds) {
-      const filteredIds = new Set(allFilteredItems.map(i => i.id));
-      const additionalItems = [...anchorConnectedItemIds]
-        .filter(id => !filteredIds.has(id))
-        .map(id => items.get(id))
-        .filter((item): item is WorkItem => item !== undefined);
-
-      if (additionalItems.length > 0) {
-        return [...allFilteredItems, ...additionalItems];
-      }
-    }
-    return allFilteredItems;
-  }, [allFilteredItems, focusMode, anchorConnectedItemIds, items]);
-
-  // Apply item limit for performance (bypass when in focus mode to ensure all connected items are visible)
-  const { limitedItems, totalCount, isLimited } = useItemLimit(focusModeItems);
-
-  // When focus mode is active, use all items (no limit) to ensure connected items are visible
-  const filteredItems = focusMode && focusModeAnchorId ? focusModeItems : limitedItems;
-  const showLimitBanner = focusMode && focusModeAnchorId ? false : isLimited;
-
-  // Track data key for detecting when items change
+  // Track data changes
   const dataKey = useMemo(
-    () =>
-      filteredItems
-        .map(i => i.id)
-        .sort()
-        .join(','),
+    () => filteredItems.map(i => i.id).sort().join(','),
     [filteredItems]
   );
 
   const prevDataKeyRef = useRef<string | null>(null);
   const isInitialMountRef = useRef(true);
 
-  // Calculate layout based on current data
+  // Calculate layout
   const currentLayout = useMemo(
     () => calculateLayout(filteredItems, selectedItemId),
     [filteredItems, selectedItemId]
@@ -178,8 +45,7 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(currentLayout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(currentLayout.edges);
 
-  // Update when underlying data changes (new items added/removed)
-  // Skip the initial mount since we already have the correct layout
+  // Update when data changes
   useEffect(() => {
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
@@ -195,149 +61,87 @@ const CanvasViewInner: React.FC<CanvasViewProps> = ({ onNodeSelect }) => {
     }
   }, [dataKey, filteredItems, selectedItemId, setNodes, setEdges]);
 
-  // Update node and edge selection/connection state without resetting positions
-  // Use selectedConnectedItemIds for highlighting (changes with selection)
+  // Update selection state
   useEffect(() => {
     setNodes(currentNodes =>
-      currentNodes.map(node => {
-        const isConnected = selectedConnectedItemIds ? selectedConnectedItemIds.has(node.id) : true;
-        const isDimmed = focusMode && selectedItemId && !isConnected;
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            isSelected: node.id === selectedItemId,
-            isConnected,
-            isDimmed,
-          },
-        };
-      })
+      currentNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          isSelected: node.id === selectedItemId,
+        },
+      }))
     );
-
-    // Update edge opacity based on focus mode
-    setEdges(currentEdges =>
-      currentEdges.map(edge => {
-        const sourceConnected = selectedConnectedItemIds
-          ? selectedConnectedItemIds.has(edge.source)
-          : true;
-        const targetConnected = selectedConnectedItemIds
-          ? selectedConnectedItemIds.has(edge.target)
-          : true;
-        const isEdgeDimmed = focusMode && selectedItemId && (!sourceConnected || !targetConnected);
-        return {
-          ...edge,
-          style: {
-            ...edge.style,
-            opacity: isEdgeDimmed ? 0.2 : 1,
-          },
-        };
-      })
-    );
-  }, [selectedItemId, selectedConnectedItemIds, focusMode, setNodes, setEdges]);
-
-  // Reset layout to original positions
-  const handleResetLayout = useCallback(() => {
-    const newLayout = calculateLayout(filteredItems, selectedItemId);
-    setNodes(newLayout.nodes);
-    setEdges(newLayout.edges);
-    // Fit view after a short delay to allow nodes to update (clear any existing timeout first)
-    if (fitViewTimeoutRef.current) {
-      clearTimeout(fitViewTimeoutRef.current);
-    }
-    fitViewTimeoutRef.current = setTimeout(() => fitView({ padding: 0.2 }), 50);
-  }, [filteredItems, selectedItemId, fitView, setNodes, setEdges]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (fitViewTimeoutRef.current) {
-        clearTimeout(fitViewTimeoutRef.current);
-      }
-    };
-  }, []);
+  }, [selectedItemId, setNodes]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setSelectedItem(node.id);
-      onNodeSelect?.(node.id);
     },
-    [setSelectedItem, onNodeSelect]
+    [setSelectedItem]
   );
 
-  // Minimap node color based on type
   const nodeColor = useCallback((node: Node) => {
     const item = node.data?.item as WorkItem;
     return item ? typeHexColors[item.type] : '#94a3b8';
   }, []);
 
-  return (
-    <div ref={containerRef} className="h-full w-full bg-gray-50 flex flex-col">
-      {/* Item limit warning banner (hidden in focus mode) */}
-      {showLimitBanner && (
-        <ItemLimitBanner totalItems={totalCount} displayedItems={filteredItems.length} />
-      )}
+  const handleResetLayout = useCallback(() => {
+    const newLayout = calculateLayout(filteredItems, selectedItemId);
+    setNodes(newLayout.nodes);
+    setEdges(newLayout.edges);
+    setTimeout(() => fitView({ padding: 0.2 }), 50);
+  }, [filteredItems, selectedItemId, fitView, setNodes, setEdges]);
 
-      <div className="flex-1 relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          nodeTypes={nodeTypes}
-          connectionMode={ConnectionMode.Loose}
-          nodesDraggable={true}
-          nodesConnectable={false}
-          elementsSelectable={true}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.1}
-          maxZoom={2}
-          defaultEdgeOptions={{
-            type: 'smoothstep',
-          }}
-        >
-          <Background color="#e5e7eb" gap={20} />
-          <Controls />
-          <MiniMap
-            nodeColor={nodeColor}
-            nodeStrokeWidth={3}
-            zoomable
-            pannable
-            className="bg-white border border-gray-200 rounded-lg"
-          />
-
-          {/* Legend */}
-          <CanvasLegend />
-
-          {/* Action buttons */}
-          <CanvasControls
-            onResetLayout={handleResetLayout}
-            onToggleFullscreen={toggleFullscreen}
-            isFullscreen={isFullscreen}
-            focusMode={focusMode}
-            onToggleFocusMode={handleToggleFocusMode}
-            hasSelection={!!selectedItemId}
-          />
-
-          {/* Instructions */}
-          <Panel
-            position="bottom-left"
-            className="bg-white/90 px-3 py-2 rounded-lg text-xs text-gray-500"
-          >
-            Drag nodes to reorganize • Scroll to zoom • Click nodes to select
-          </Panel>
-        </ReactFlow>
+  if (filteredItems.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-500">No items to display</div>
       </div>
+    );
+  }
+
+  return (
+    <div className="h-full w-full bg-gray-50">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
+        connectionMode={ConnectionMode.Loose}
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={true}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.1}
+        maxZoom={2}
+        defaultEdgeOptions={{ type: 'smoothstep' }}
+      >
+        <Background color="#e5e7eb" gap={20} />
+        <Controls />
+        <MiniMap nodeColor={nodeColor} zoomable pannable className="bg-white border border-gray-200 rounded-lg" />
+
+        {/* Reset button */}
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={handleResetLayout}
+            className="px-3 py-2 bg-white border border-gray-200 rounded-lg shadow text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Reset Layout
+          </button>
+        </div>
+      </ReactFlow>
     </div>
   );
 };
 
-// Wrapper component that provides ReactFlowProvider
-const CanvasView: React.FC<CanvasViewProps> = props => {
+const CanvasView: React.FC = () => {
   return (
     <ReactFlowProvider>
-      <CanvasViewInner {...props} />
+      <CanvasViewInner />
     </ReactFlowProvider>
   );
 };

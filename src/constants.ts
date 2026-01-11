@@ -67,7 +67,7 @@ export const REFRESH = {
 /**
  * Available view modes
  */
-export const VIEW_MODES: ViewMode[] = ['tree', 'canvas', 'kanban', 'timeline'];
+export const VIEW_MODES: ViewMode[] = ['tree', 'canvas', 'kanban'];
 
 /**
  * Item type order for consistent display

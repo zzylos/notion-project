@@ -11,23 +11,7 @@ import type {
   DashboardStats,
 } from '../types';
 import { getStatusCategory } from '../utils/colors';
-import {
-  buildTreeNodes,
-  getItemPath as getItemPathUtil,
-  collectAncestorIds,
-} from '../utils/treeBuilder';
-import { parseDate } from '../utils/dateUtils';
-import {
-  itemMatchesIncludeFilters,
-  itemMatchesExcludeFilters,
-  isOrphanItem,
-  itemMatchesSearch,
-  applyOrphanFilter,
-  hasActiveIncludeFilters,
-  hasActiveExcludeFilters,
-  buildChildMap,
-} from '../utils/filterUtils';
-import { logger } from '../utils/logger';
+import { buildTreeNodes, getItemPath as getItemPathUtil } from '../utils/treeBuilder';
 
 interface StoreState {
   // Data
@@ -35,12 +19,8 @@ interface StoreState {
 
   // UI State
   selectedItemId: string | null;
-  focusedItemId: string | null;
   expandedIds: Set<string>;
   viewMode: ViewMode;
-  hideOrphanItems: boolean;
-  showOnlyOrphans: boolean;
-  disableItemLimit: boolean;
 
   // Filters
   filters: FilterState;
@@ -62,13 +42,8 @@ interface StoreState {
   toggleExpanded: (id: string) => void;
   expandAll: () => void;
   collapseAll: () => void;
-  expandToItem: (id: string) => void;
 
   setViewMode: (mode: ViewMode) => void;
-  setHideOrphanItems: (hide: boolean) => void;
-  setShowOnlyOrphans: (show: boolean) => void;
-  toggleOrphanMode: () => void;
-  setDisableItemLimit: (disable: boolean) => void;
   setFilters: (filters: Partial<FilterState>) => void;
   resetFilters: () => void;
 
@@ -77,10 +52,9 @@ interface StoreState {
 
   setNotionConfig: (config: NotionConfig | null) => void;
 
-  // Computed values (not really computed in Zustand, but helper methods)
+  // Computed values
   getTreeNodes: () => TreeNode[];
   getFilteredItems: () => WorkItem[];
-  getOrphanCount: () => number;
   getStats: () => DashboardStats;
   getItemPath: (id: string) => WorkItem[];
 }
@@ -95,7 +69,7 @@ const defaultFilters: FilterState = {
   owners: [],
   excludeOwners: [],
   searchQuery: '',
-  filterMode: 'show', // Kept for backwards compatibility, prefer using exclude arrays
+  filterMode: 'show',
 };
 
 export const useStore = create<StoreState>()(
@@ -104,12 +78,8 @@ export const useStore = create<StoreState>()(
       // Initial state
       items: new Map(),
       selectedItemId: null,
-      focusedItemId: null,
       expandedIds: new Set(),
       viewMode: 'tree',
-      hideOrphanItems: true,
-      showOnlyOrphans: false,
-      disableItemLimit: false,
       filters: defaultFilters,
       isLoading: false,
       error: null,
@@ -172,29 +142,8 @@ export const useStore = create<StoreState>()(
 
       collapseAll: () => set({ expandedIds: new Set() }),
 
-      expandToItem: (id: string) => {
-        const state = get();
-        const path = state.getItemPath(id);
-        const newExpanded = new Set(state.expandedIds);
-        path.forEach(item => newExpanded.add(item.id));
-        set({ expandedIds: newExpanded, focusedItemId: id });
-      },
-
       // View mode
       setViewMode: (mode: ViewMode) => set({ viewMode: mode }),
-
-      // Orphan filter (global)
-      setHideOrphanItems: (hide: boolean) => set({ hideOrphanItems: hide }),
-      setShowOnlyOrphans: (show: boolean) => set({ showOnlyOrphans: show }),
-      toggleOrphanMode: () =>
-        set(state => ({
-          showOnlyOrphans: !state.showOnlyOrphans,
-          // When showing only orphans, we need to unhide them first
-          hideOrphanItems: state.showOnlyOrphans ? true : false,
-        })),
-
-      // Item limit toggle (for performance with large datasets)
-      setDisableItemLimit: (disable: boolean) => set({ disableItemLimit: disable }),
 
       // Filter actions
       setFilters: (filters: Partial<FilterState>) => {
@@ -212,12 +161,7 @@ export const useStore = create<StoreState>()(
       // Notion config
       setNotionConfig: (config: NotionConfig | null) => set({ notionConfig: config }),
 
-      /**
-       * Builds a hierarchical tree structure from filtered work items.
-       * Delegates to the buildTreeNodes utility for actual tree construction.
-       *
-       * @see buildTreeNodes in utils/treeBuilder.ts for algorithm details
-       */
+      // Computed: build tree nodes
       getTreeNodes: (): TreeNode[] => {
         const state = get();
         const filteredItems = state.getFilteredItems();
@@ -225,85 +169,67 @@ export const useStore = create<StoreState>()(
         return buildTreeNodes(filteredItems, {
           expandedIds: state.expandedIds,
           selectedItemId: state.selectedItemId,
-          focusedItemId: state.focusedItemId,
+          focusedItemId: null,
         });
       },
 
+      // Computed: filter items
       getFilteredItems: (): WorkItem[] => {
         const state = get();
-        const { filters, focusedItemId, items, hideOrphanItems, showOnlyOrphans } = state;
+        const { filters, items } = state;
         const allItems = Array.from(items.values());
 
-        // Collect focused item and all its ancestors - these bypass filters
-        // This ensures the tree path to the focused item remains visible
-        const focusedPathIds = focusedItemId
-          ? collectAncestorIds(focusedItemId, items)
-          : new Set<string>();
-
-        // Check if any filters are active
-        const hasIncludeFilters = hasActiveIncludeFilters(filters);
-        const hasExcludeFilters = hasActiveExcludeFilters(filters);
-
-        // Legacy filterMode: 'hide' support - convert to exclude filters logic
-        const isHideMode = filters.filterMode === 'hide';
-
-        // Pre-compute child map for efficient orphan checking (O(n) instead of O(n²))
-        // Only build if orphan filtering is active
-        const needsOrphanCheck = hideOrphanItems || showOnlyOrphans;
-        const childMap = needsOrphanCheck ? buildChildMap(items) : undefined;
-
         return allItems.filter(item => {
-          // Items in the focused path always bypass filters to maintain tree structure
-          if (focusedPathIds.has(item.id)) {
-            return true;
+          // Search query filter
+          if (filters.searchQuery) {
+            const query = filters.searchQuery.toLowerCase();
+            const matchesTitle = item.title.toLowerCase().includes(query);
+            const matchesDesc = item.description?.toLowerCase().includes(query);
+            if (!matchesTitle && !matchesDesc) return false;
           }
 
-          // Search query is always applied first
-          if (!itemMatchesSearch(item, filters.searchQuery)) {
+          // Type filter
+          if (filters.types.length > 0 && !filters.types.includes(item.type)) {
+            return false;
+          }
+          if (filters.excludeTypes.length > 0 && filters.excludeTypes.includes(item.type)) {
             return false;
           }
 
-          // Step 1: Check exclude filters - if item matches any exclude, hide it
-          if (hasExcludeFilters && itemMatchesExcludeFilters(item, filters)) {
+          // Status filter
+          if (filters.statuses.length > 0 && !filters.statuses.includes(item.status)) {
+            return false;
+          }
+          if (filters.excludeStatuses.length > 0 && filters.excludeStatuses.includes(item.status)) {
             return false;
           }
 
-          // Step 2: Handle legacy filterMode: 'hide' - include filters act as exclude
-          if (isHideMode && hasIncludeFilters) {
-            return !itemMatchesIncludeFilters(item, filters);
+          // Priority filter
+          if (filters.priorities.length > 0 && (!item.priority || !filters.priorities.includes(item.priority))) {
+            return false;
           }
-
-          // Step 3: Check include filters - if include filters are set, item must match
-          if (hasIncludeFilters && !itemMatchesIncludeFilters(item, filters)) {
+          if (filters.excludePriorities.length > 0 && item.priority && filters.excludePriorities.includes(item.priority)) {
             return false;
           }
 
-          // Step 4: Orphan filtering (global) - uses pre-computed childMap for O(1) lookup
-          return applyOrphanFilter(item, items, showOnlyOrphans, hideOrphanItems, childMap);
+          // Owner filter
+          if (filters.owners.length > 0 && (!item.owner || !filters.owners.includes(item.owner.id))) {
+            return false;
+          }
+          if (filters.excludeOwners.length > 0 && item.owner && filters.excludeOwners.includes(item.owner.id)) {
+            return false;
+          }
+
+          return true;
         });
       },
 
-      getOrphanCount: (): number => {
-        const state = get();
-        const items = state.items;
-        // Pre-compute child map once for O(n) total instead of O(n²)
-        const childMap = buildChildMap(items);
-        let count = 0;
-        for (const item of items.values()) {
-          if (isOrphanItem(item, items, childMap)) {
-            count++;
-          }
-        }
-        return count;
-      },
-
+      // Computed: get stats
       getStats: (): DashboardStats => {
         const state = get();
         const items = Array.from(state.items.values());
 
-        // Dynamic status counting
         const byStatus: Record<string, number> = {};
-
         const byType: Record<ItemType, number> = {
           mission: 0,
           problem: 0,
@@ -311,7 +237,6 @@ export const useStore = create<StoreState>()(
           design: 0,
           project: 0,
         };
-
         const byPriority: Record<Priority, number> = {
           P0: 0,
           P1: 0,
@@ -319,57 +244,40 @@ export const useStore = create<StoreState>()(
           P3: 0,
         };
 
-        let overdueItems = 0;
         let completedItems = 0;
         let blockedItems = 0;
+        let overdueItems = 0;
         const now = new Date();
 
         items.forEach(item => {
-          // Count by original status
           byStatus[item.status] = (byStatus[item.status] || 0) + 1;
-
           byType[item.type]++;
           if (item.priority) {
             byPriority[item.priority]++;
           }
 
-          // Check status category for completion/blocked counts
           const category = getStatusCategory(item.status);
-          if (category === 'completed') {
-            completedItems++;
-          }
-          if (category === 'blocked') {
-            blockedItems++;
-          }
+          if (category === 'completed') completedItems++;
+          if (category === 'blocked') blockedItems++;
 
           if (item.dueDate && category !== 'completed') {
-            const dueDate = parseDate(item.dueDate);
-            if (dueDate && dueDate < now) {
-              overdueItems++;
-            }
+            const dueDate = new Date(item.dueDate);
+            if (dueDate < now) overdueItems++;
           }
         });
 
-        const totalItems = items.length;
-        const completionRate = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-
         return {
-          totalItems,
+          totalItems: items.length,
           byStatus,
           byType,
           byPriority,
-          completionRate,
+          completionRate: items.length > 0 ? (completedItems / items.length) * 100 : 0,
           overdueItems,
           blockedItems,
         };
       },
 
-      /**
-       * Get the path from root to a specific item.
-       * Delegates to the getItemPath utility for actual path construction.
-       *
-       * @see getItemPath in utils/treeBuilder.ts for algorithm details
-       */
+      // Get path from root to item
       getItemPath: (id: string): WorkItem[] => {
         const state = get();
         return getItemPathUtil(id, state.items);
@@ -380,32 +288,22 @@ export const useStore = create<StoreState>()(
       partialize: state => ({
         expandedIds: Array.from(state.expandedIds),
         viewMode: state.viewMode,
-        hideOrphanItems: state.hideOrphanItems,
-        showOnlyOrphans: state.showOnlyOrphans,
-        disableItemLimit: state.disableItemLimit,
         filters: state.filters,
         notionConfig: state.notionConfig,
       }),
       merge: (persisted, current) => {
-        try {
-          // Handle undefined or null persisted state
-          if (!persisted || typeof persisted !== 'object') {
-            return current;
-          }
-          const persistedState = persisted as Partial<StoreState> & { expandedIds?: string[] };
-          // Validate expandedIds is an array before converting to Set
-          const expandedIdsArray = Array.isArray(persistedState.expandedIds)
-            ? persistedState.expandedIds.filter(id => typeof id === 'string')
-            : [];
-          return {
-            ...current,
-            ...persistedState,
-            expandedIds: new Set(expandedIdsArray),
-          };
-        } catch (error) {
-          logger.store.warn('Failed to merge persisted state, using defaults:', error);
+        if (!persisted || typeof persisted !== 'object') {
           return current;
         }
+        const persistedState = persisted as Partial<StoreState> & { expandedIds?: string[] };
+        const expandedIdsArray = Array.isArray(persistedState.expandedIds)
+          ? persistedState.expandedIds.filter(id => typeof id === 'string')
+          : [];
+        return {
+          ...current,
+          ...persistedState,
+          expandedIds: new Set(expandedIdsArray),
+        };
       },
     }
   )
