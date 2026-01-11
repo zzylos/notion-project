@@ -1,7 +1,5 @@
 /**
- * Component exports for the Notion Opportunity Tree Visualizer.
- *
- * This barrel file provides convenient access to all components.
+ * Component exports.
  */
 
 // Canvas components
@@ -15,9 +13,6 @@ export * from './filters';
 
 // Tree components
 export * from './tree';
-
-// UI components
-export * from './ui';
 
 // View components
 export * from './views';

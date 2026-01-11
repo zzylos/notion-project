@@ -1,8 +1,22 @@
 import type { WorkItem, ItemStatus, FetchItemsResponse } from '../types';
 import { NETWORK } from '../../shared';
-import { ApiError, NetworkError, isAbortError } from '../utils/errors';
 
 const FETCH_TIMEOUT_MS = NETWORK.FETCH_TIMEOUT_MS;
+
+/**
+ * Custom API Error
+ */
+class ApiError extends Error {
+  endpoint: string;
+  statusCode?: number;
+
+  constructor(message: string, endpoint: string, statusCode?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.endpoint = endpoint;
+    this.statusCode = statusCode;
+  }
+}
 
 /**
  * API response wrapper type
@@ -16,81 +30,12 @@ interface ApiResponse<T> {
 }
 
 /**
- * Context for abort handling during API requests.
- */
-interface AbortContext {
-  controller: AbortController;
-  timeoutId: ReturnType<typeof setTimeout>;
-  abortHandler: (() => void) | null;
-  signal?: AbortSignal;
-}
-
-/**
- * Set up abort controller with timeout and optional external signal.
- */
-function setupAbortContext(signal?: AbortSignal): AbortContext {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  const abortHandler = signal ? () => controller.abort() : null;
-
-  if (signal && abortHandler) {
-    signal.addEventListener('abort', abortHandler);
-  }
-
-  return { controller, timeoutId, abortHandler, signal };
-}
-
-/**
- * Clean up abort context resources.
- */
-function cleanupAbortContext(ctx: AbortContext): void {
-  clearTimeout(ctx.timeoutId);
-  if (ctx.signal && ctx.abortHandler) {
-    ctx.signal.removeEventListener('abort', ctx.abortHandler);
-  }
-}
-
-/**
- * Handle errors from fetch requests and convert to appropriate error types.
- */
-function handleRequestError(
-  error: unknown,
-  endpoint: string,
-  baseUrl: string,
-  signal?: AbortSignal
-): never {
-  // Handle abort errors (including timeout)
-  if (isAbortError(error)) {
-    if (!signal?.aborted) {
-      throw new NetworkError(`Request to ${endpoint} timed out after ${FETCH_TIMEOUT_MS / 1000}s`);
-    }
-    throw error;
-  }
-
-  // Re-throw ApiError instances
-  if (error instanceof ApiError) {
-    throw error;
-  }
-
-  // Handle network errors
-  if (error instanceof TypeError) {
-    throw new NetworkError(
-      `Unable to connect to backend at ${baseUrl}. Make sure the server is running.`
-    );
-  }
-
-  throw error;
-}
-
-/**
  * Client for communicating with the backend API server.
- * The frontend always communicates via the backend server.
  */
 class ApiClient {
   private baseUrl: string;
 
   constructor() {
-    // Default to localhost:3001 for development
     this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   }
 
@@ -103,12 +48,18 @@ class ApiClient {
     signal?: AbortSignal
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
-    const ctx = setupAbortContext(signal);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    const abortHandler = signal ? () => controller.abort() : null;
+    if (signal && abortHandler) {
+      signal.addEventListener('abort', abortHandler);
+    }
 
     try {
       const response = await fetch(url, {
         ...options,
-        signal: ctx.controller.signal,
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -120,24 +71,33 @@ class ApiClient {
       try {
         data = (await response.json()) as ApiResponse<T>;
       } catch {
-        throw new ApiError(
-          `Failed to parse API response: Invalid JSON from ${endpoint}`,
-          endpoint,
-          { statusCode: response.status }
-        );
+        throw new ApiError(`Failed to parse API response from ${endpoint}`, endpoint, response.status);
       }
 
       if (!response.ok) {
-        throw new ApiError(data.error || `HTTP error ${response.status}`, endpoint, {
-          statusCode: response.status,
-        });
+        throw new ApiError(data.error || `HTTP error ${response.status}`, endpoint, response.status);
       }
 
       return data;
     } catch (error) {
-      handleRequestError(error, endpoint, this.baseUrl, signal);
+      // Handle abort
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw error;
+      }
+      // Re-throw ApiError
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      // Handle network errors
+      if (error instanceof TypeError) {
+        throw new Error(`Unable to connect to backend at ${this.baseUrl}. Make sure the server is running.`);
+      }
+      throw error;
     } finally {
-      cleanupAbortContext(ctx);
+      clearTimeout(timeoutId);
+      if (signal && abortHandler) {
+        signal.removeEventListener('abort', abortHandler);
+      }
     }
   }
 
@@ -211,8 +171,7 @@ class ApiClient {
   }
 
   /**
-   * Invalidate the server cache by triggering a full re-sync from Notion.
-   * This replaces the old cache-based architecture with the new DataStore.
+   * Trigger a full re-sync from Notion.
    */
   async invalidateCache(): Promise<void> {
     const endpoint = '/api/items/sync';
