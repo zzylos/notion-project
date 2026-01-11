@@ -5,9 +5,10 @@ import { useStore } from '../../store/useStore';
 import type { TreeNode as TreeNodeType } from '../../types';
 
 const TreeView: React.FC = memo(() => {
-  const { getTreeNodes, expandAll, collapseAll, expandedIds, isLoading } = useStore();
+  const { getTreeNodes, expandAll, collapseAll, expandedIds, isLoading, filters } = useStore();
 
-  const treeNodes = useMemo(() => getTreeNodes(), [getTreeNodes, expandedIds]);
+  // Include filters in dependencies to ensure recalculation when filters change
+  const treeNodes = useMemo(() => getTreeNodes(), [getTreeNodes, expandedIds, filters]);
 
   // Check if all expandable items are expanded
   const expandableIds = useMemo(() => {
