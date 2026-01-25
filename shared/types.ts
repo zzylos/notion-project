@@ -8,7 +8,7 @@
  * Each type corresponds to a Notion database and represents a different level
  * in the opportunity hierarchy.
  */
-export type ItemType = 'mission' | 'problem' | 'solution' | 'design' | 'project';
+export type ItemType = 'mission' | 'problem' | 'solution' | 'deliverable' | 'project';
 
 /**
  * Status of work items - dynamic string type.
@@ -62,6 +62,7 @@ export interface WorkItem {
  */
 export interface DatabaseConfig {
   databaseId: string;
+  dataSourceId?: string; // Required for API version 2025-09-03+
   type: ItemType;
   mappings?: Partial<PropertyMappings>;
 }

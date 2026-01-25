@@ -250,7 +250,7 @@ export const typeColors: Record<
     border: 'border-blue-300',
     icon: 'text-blue-600',
   },
-  design: {
+  deliverable: {
     bg: 'bg-fuchsia-100',
     text: 'text-fuchsia-700',
     border: 'border-fuchsia-300',
@@ -293,7 +293,7 @@ export const typeLabels: Record<ItemType, string> = {
   mission: 'Mission',
   problem: 'Problem',
   solution: 'Solution',
-  design: 'Design',
+  deliverable: 'Deliverable',
   project: 'Project',
 };
 
@@ -317,7 +317,7 @@ export const typeHexColors: Record<ItemType, string> = {
   mission: '#7c3aed',
   problem: '#dc2626',
   solution: '#2563eb',
-  design: '#d946ef',
+  deliverable: '#d946ef',
   project: '#0891b2',
 };
 

@@ -66,7 +66,7 @@ export const ITEM_TYPES: readonly ItemType[] = [
   'problem',
   'solution',
   'project',
-  'design',
+  'deliverable',
 ] as const;
 
 /**

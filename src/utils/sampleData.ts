@@ -137,7 +137,7 @@ export const sampleData: WorkItem[] = [
   {
     id: 'design-1',
     title: 'Price comparison UI wireframes',
-    type: 'design',
+    type: 'deliverable',
     status: 'Done',
     priority: 'P0',
     progress: 100,
@@ -152,7 +152,7 @@ export const sampleData: WorkItem[] = [
   {
     id: 'design-2',
     title: 'Heatmap visualization design',
-    type: 'design',
+    type: 'deliverable',
     status: 'Done',
     priority: 'P1',
     progress: 100,
@@ -167,7 +167,7 @@ export const sampleData: WorkItem[] = [
   {
     id: 'design-3',
     title: 'Communication templates',
-    type: 'design',
+    type: 'deliverable',
     status: 'In Progress',
     priority: 'P1',
     progress: 50,

@@ -63,7 +63,7 @@ class NotionService {
         signal: controller.signal,
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
-          'Notion-Version': '2022-06-28',
+          'Notion-Version': '2025-09-03',
           'Content-Type': 'application/json',
           ...options.headers,
         },
@@ -244,10 +244,38 @@ class NotionService {
   }
 
   /**
+   * Fetch data source ID for a database (API version 2025-09-03+).
+   * Returns the first data source ID for the database.
+   */
+  private async fetchDataSourceId(databaseId: string): Promise<string | null> {
+    try {
+      interface DatabaseResponse {
+        data_sources?: Array<{ id: string; name: string }>;
+      }
+      
+      const response = await this.notionFetch<DatabaseResponse>(`/databases/${databaseId}`);
+      
+      if (response.data_sources && response.data_sources.length > 0) {
+        const dataSourceId = response.data_sources[0].id;
+        logger.notion.info(`Found data source ${dataSourceId} for database ${databaseId}`);
+        return dataSourceId;
+      }
+      
+      logger.notion.warn(`No data sources found for database ${databaseId}`);
+      return null;
+    } catch (error) {
+      logger.notion.error(`Failed to fetch data source for database ${databaseId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Fetch a single page of results with optional filter.
+   * Uses data_source_id if available (API 2025-09-03+), falls back to database_id.
    */
   private async fetchPage(
     databaseId: string,
+    dataSourceId: string | undefined,
     cursor?: string,
     filter?: Record<string, unknown>
   ): Promise<NotionQueryResponse> {
@@ -259,7 +287,12 @@ class NotionService {
       body.filter = filter;
     }
 
-    const response = await this.notionFetch<unknown>(`/databases/${databaseId}/query`, {
+    // Use data source endpoint if available (API 2025-09-03+), otherwise fall back to database
+    const endpoint = dataSourceId 
+      ? `/data_sources/${dataSourceId}/query`
+      : `/databases/${databaseId}/query`;
+    
+    const response = await this.notionFetch<unknown>(endpoint, {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -280,8 +313,18 @@ class NotionService {
     let currentCursor: string | undefined;
     let hasMore = true;
 
+    // Discover data source ID if not already cached
+    let dataSourceId = dbConfig.dataSourceId;
+    if (!dataSourceId) {
+      dataSourceId = await this.fetchDataSourceId(dbConfig.databaseId) ?? undefined;
+      if (dataSourceId) {
+        // Cache the data source ID in the config
+        dbConfig.dataSourceId = dataSourceId;
+      }
+    }
+
     while (hasMore) {
-      const response = await this.fetchPage(dbConfig.databaseId, currentCursor);
+      const response = await this.fetchPage(dbConfig.databaseId, dataSourceId, currentCursor);
       allPages.push(...response.results);
       hasMore = response.has_more;
       currentCursor = response.next_cursor ?? undefined;
@@ -363,6 +406,15 @@ class NotionService {
     let currentCursor: string | undefined;
     let hasMore = true;
 
+    // Discover data source ID if not already cached
+    let dataSourceId = dbConfig.dataSourceId;
+    if (!dataSourceId) {
+      dataSourceId = await this.fetchDataSourceId(dbConfig.databaseId) ?? undefined;
+      if (dataSourceId) {
+        dbConfig.dataSourceId = dataSourceId;
+      }
+    }
+
     // Create filter for items edited after the given timestamp
     const filter = {
       timestamp: 'last_edited_time',
@@ -372,7 +424,7 @@ class NotionService {
     };
 
     while (hasMore) {
-      const response = await this.fetchPage(dbConfig.databaseId, currentCursor, filter);
+      const response = await this.fetchPage(dbConfig.databaseId, dataSourceId, currentCursor, filter);
       allPages.push(...response.results);
       hasMore = response.has_more;
       currentCursor = response.next_cursor ?? undefined;

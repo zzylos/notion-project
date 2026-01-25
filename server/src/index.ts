@@ -10,6 +10,7 @@ import { initializeScheduler, stopScheduler, getScheduler } from './services/sch
 import { apiRateLimiter } from './middleware/rateLimit.js';
 import { logger } from './utils/logger.js';
 import itemsRouter from './routes/items.js';
+import syncRouter from './routes/sync.js';
 import webhookRouter from './routes/webhook.js';
 import type { RequestWithRawBody } from './types/express.js';
 
@@ -62,6 +63,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Routes (registered before server start)
 app.use('/api/items', itemsRouter);
+app.use('/api/sync', syncRouter);
 app.use('/api/webhook', webhookRouter);
 
 // Health check

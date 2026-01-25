@@ -9,6 +9,6 @@ export const typeIcons: Record<ItemType, React.ComponentType<{ className?: strin
   mission: Target,
   problem: AlertCircle,
   solution: Lightbulb,
-  design: Palette,
+  deliverable: Palette,
   project: FolderKanban,
 };

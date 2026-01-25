@@ -72,7 +72,7 @@ export const VIEW_MODES: ViewMode[] = ['tree', 'canvas', 'kanban'];
 /**
  * Item type order for consistent display
  */
-export const TYPE_ORDER: ItemType[] = ['mission', 'problem', 'solution', 'design', 'project'];
+export const TYPE_ORDER: ItemType[] = ['mission', 'problem', 'solution', 'deliverable', 'project'];
 
 /**
  * Simplified status filter categories.

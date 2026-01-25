@@ -15,7 +15,7 @@ const DATABASE_TYPES: { type: ItemType; label: string }[] = [
   { type: 'problem', label: 'Problems' },
   { type: 'solution', label: 'Solutions' },
   { type: 'project', label: 'Projects' },
-  { type: 'design', label: 'Deliverables' },
+  { type: 'deliverable', label: 'Deliverables' },
 ];
 
 const NotionConfigModal: React.FC<NotionConfigModalProps> = ({ isOpen, onClose }) => {

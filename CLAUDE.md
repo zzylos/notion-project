@@ -57,8 +57,10 @@ VITE_NOTION_API_KEY=secret_xxx          # Your Notion API key
 VITE_NOTION_DB_MISSION=xxx              # Objectives database
 VITE_NOTION_DB_PROBLEM=xxx              # Problems database
 VITE_NOTION_DB_SOLUTION=xxx             # Solutions database
+VITE_NOTION_DB_OBJECTIVE=xxx            # Objectives database
 VITE_NOTION_DB_PROJECT=xxx              # Projects database
-VITE_NOTION_DB_DESIGN=xxx               # Deliverables database
+VITE_NOTION_DB_DELIVERABLE=xxx          # Deliverables database
+VITE_NOTION_DB_TASK=xxx                 # Tasks database
 
 # Optional property mappings (defaults shown)
 VITE_MAPPING_TITLE=Name
@@ -116,8 +118,10 @@ VITE_NOTION_API_KEY=secret_xxx
 VITE_NOTION_DB_MISSION=xxx
 VITE_NOTION_DB_PROBLEM=xxx
 VITE_NOTION_DB_SOLUTION=xxx
+VITE_NOTION_DB_OBJECTIVE=xxx
 VITE_NOTION_DB_PROJECT=xxx
-VITE_NOTION_DB_DESIGN=xxx
+VITE_NOTION_DB_DELIVERABLE=xxx
+VITE_NOTION_DB_TASK=xxx
 
 # Property mappings (optional)
 VITE_MAPPING_TITLE=Name
@@ -511,7 +515,7 @@ Types are defined in `shared/types.ts` (single source of truth) and re-exported 
 interface WorkItem {
   id: string;
   title: string;
-  type: 'mission' | 'problem' | 'solution' | 'design' | 'project';
+  type: 'mission' | 'problem' | 'solution' | 'deliverable' | 'project';
   status: string; // Dynamic - preserves original Notion status
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   progress?: number;
