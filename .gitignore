@@ -42,3 +42,4 @@ QUALITY_IMPROVEMENTS_CHECKLIST.md
 *.njsproj
 *.sln
 *.sw?
+notion-project.code-workspace
